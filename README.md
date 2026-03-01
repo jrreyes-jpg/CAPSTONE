@@ -1,17 +1,22 @@
-# Jhay Reyes Portfolio
+# Jhay Reyes – Portfolio Website
 
-This is my personal portfolio website.
+Welcome to my personal portfolio website!  
+This project showcases my skills, projects, and background as a web developer.
 
-## Technologies Used
-- HTML
-- CSS
-- JavaScript
+## 🚀 About the Project
+
+This portfolio was built to highlight:
+- My web development skills
+- Sample projects
+- Contact information
+- Personal background
+
+## 🛠️ Built With
+
+- HTML5
+- CSS3
 - PHP
+- JavaScript
+- Git & GitHub
 
-## How to Run
-1. Clone the repository
-2. Open in XAMPP
-3. Run in browser
-
-## Author
-Jhay Reyes
+## 📂 Project Structure
