@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../../config/database.php';
 
 $error = "";
 $success = "";
@@ -34,7 +34,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Forgot Password - Edge Automation Portal</title>
-<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="/codesamplecaps/public/assets/css/style.css">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -43,7 +43,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <div class="container">
 <div class="left-panel">
 <div class="logo">
-    <img src="../assets/images/logo.png" alt="Edge Logo">
+    <img src="/codesamplecaps/public/assets/images/logo.png" alt="Edge Logo">
 </div>
     <h1>EDGE AUTOMATION</h1>
     <p>Technology Services Co.<br>PCAB LIC: 58783</p>
@@ -66,13 +66,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <button type="submit">Send Reset Link</button>
 
 <div class="links">
-    <a href="../index.php">Back to Login</a>
+    <a href="/codesamplecaps/public/login.php">Back to Login</a>
 </div>
 </form>
 </div>
 </div>
 </div>
 
-<script src="../assets/js/script.js"></script>
+<script src="/codesamplecaps/public/assets/js/script.js"></script>
 </body>
 </html>

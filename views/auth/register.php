@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../../config/database.php';
 
 $error = "";
 $success = "";
@@ -37,7 +37,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
             if ($stmt->execute()) {
                 $success = "Account created successfully! You can now login.";
                 // Redirect after 2 seconds
-                header("refresh:2;url=../index.php");
+                header("refresh:2;url=/codesamplecaps/public/login.php");
             } else {
                 $error = "Error creating account. Please try again.";
             }
@@ -51,7 +51,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Register - Edge Automation Portal</title>
-<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="/codesamplecaps/public/assets/css/style.css">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -60,7 +60,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
 <div class="container">
 <div class="left-panel">
 <div class="logo">
-    <img src="../assets/images/logo.png" alt="Edge Logo">
+    <img src="/codesamplecaps/public/assets/images/edge.jpg" alt="Edge Logo">
 </div>
 <h1 class="company-name">
     EDGE AUTOMATION TECHNOLOGY SERVICES CO.
@@ -94,29 +94,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['register'])) {
 <button type="submit" name="register">Register</button>
 
 <div class="links">
-    <a href="../index.php">Back to Login</a>
+    <a href="/codesamplecaps/public/login.php">Back to Login</a>
 </div>
 </form>
 </div>
-</div>
-</div>
+</head>
+<body>
 
-<script src="../assets/js/script.js"></script>
-<script>
-// Show/hide password toggles for register form
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.togglePassword').forEach(function(btn){
-        btn.addEventListener('click', function () {
-            var target = btn.getAttribute('data-target');
-            var input = document.getElementById(target);
-            if (!input) return;
-            var type = input.getAttribute('type') === 'password' ? 'text' : 'password';
-            input.setAttribute('type', type);
-            btn.textContent = type === 'text' ? 'Hide' : 'Show';
-            btn.setAttribute('aria-pressed', type === 'text' ? 'true' : 'false');
-        });
-    });
-});
-</script>
+<script src="/codesamplecaps/public/assets/js/script.js"></script>
 </body>
 </html>

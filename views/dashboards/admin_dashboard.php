@@ -1,9 +1,9 @@
 <?php
 session_start();
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../../config/database.php';
 
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 'admin') {
-    header("Location: ../index.php");
+    header("Location: /codesamplecaps/public/login.php");
     exit();
 }
 
@@ -29,11 +29,21 @@ $totalEngineers->bind_result($engineersCount);
 $totalEngineers->fetch();
 $totalEngineers->close();
 
-$availableEngineers = $conn->prepare("SELECT COUNT(*) FROM users WHERE role='engineer' AND availability_status='available'");
-$availableEngineers->execute();
-$availableEngineers->bind_result($availCount);
-$availableEngineers->fetch();
-$availableEngineers->close();
+$availCount = 0;
+$engListForAvail = $conn->prepare("SELECT user_id FROM users WHERE role='engineer'");
+$engListForAvail->execute();
+$engRes = $engListForAvail->get_result();
+$countActiveForAvail = $conn->prepare("SELECT COUNT(*) FROM project_engineers pe JOIN projects p ON pe.project_id=p.project_id WHERE pe.engineer_id=? AND p.status!='completed'");
+while($r = $engRes->fetch_assoc()){
+    $eid = $r['user_id'];
+    $countActiveForAvail->bind_param("i", $eid);
+    $countActiveForAvail->execute();
+    $countActiveForAvail->bind_result($aCount);
+    $countActiveForAvail->fetch();
+    $capacity = 1;
+    if($aCount < $capacity) $availCount++;
+}
+$countActiveForAvail->close();
 
 /* CLIENTS COUNT */
 $totalClients = $conn->prepare("SELECT COUNT(*) FROM users WHERE role='client'");
@@ -86,7 +96,7 @@ $clients_list = $allClients->get_result();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - Edge Automation</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/css/global.css">
+    <link rel="stylesheet" href="/codesamplecaps/public/assets/css/global.css">
 <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Poppins', sans-serif; background: #ecf0f1; }
@@ -145,7 +155,7 @@ $clients_list = $allClients->get_result();
 </head>
 <body>
 
-<?php include("../includes/sidebar_admin.php"); ?>
+<?php include("../../views/components/sidebar_admin.php"); ?>
 
 <div class="main-content">
     <h1>📊 Admin Dashboard</h1>
@@ -154,7 +164,7 @@ $clients_list = $allClients->get_result();
         <div class="stat-card"><h4>📁 Projects</h4><p><?php echo $projectsCount; ?></p></div>
         <div class="stat-card"><h4>⏳ Ongoing</h4><p><?php echo $ongoingCount; ?></p></div>
         <div class="stat-card"><h4>👨‍💼 Engineers</h4><p><?php echo $engineersCount; ?></p></div>
-        <div class="stat-card"><h4>✅ Available</h4><p><?php echo $availCount; ?></p></div>
+        <div class="stat-card"><h4>✅ Engineers With Slots</h4><p><?php echo $availCount; ?></p></div>
         <div class="stat-card"><h4>👥 Clients</h4><p><?php echo $clientsCount; ?></p></div>
         <div class="stat-card"><h4>📦 Inventory</h4><p><?php echo $inventoryCount; ?></p></div>
     </div>
@@ -175,7 +185,7 @@ $clients_list = $allClients->get_result();
             <div class="card-section">
                 <h3>📊 Quick Actions</h3>
                 <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <button class="btn" onclick="window.location.href='create_engineer.php'">➕ Create Engineer</button>
+                    <button class="btn" onclick="window.location.href='/codesamplecaps/views/dashboards/create_engineer.php'">➕ Create Engineer</button>
                     <button class="btn btn-secondary">📁 Create Project</button>
                     <button class="btn btn-secondary">📦 Add Inventory</button>
                 </div>
@@ -185,9 +195,7 @@ $clients_list = $allClients->get_result();
                 <h3>📝 System Info</h3>
                 <p><strong>Total Users:</strong> <?php echo $engineersCount + $clientsCount; ?></p>
                 <p><strong>Active Projects:</strong> <?php echo $ongoingCount; ?></p>
-                <p><strong>System Users:</strong> Admin, 
-                   <?php echo $engineersCount; ?> Engineers, 
-                   <?php echo $clientsCount; ?> Clients</p>
+                <p><strong>System Users:</strong> Admin, <?php echo $engineersCount; ?> Engineers, <?php echo $clientsCount; ?> Clients</p>
             </div>
         </div>
     </div>
@@ -221,26 +229,34 @@ $clients_list = $allClients->get_result();
                         <tr>
                             <th>Full Name</th>
                             <th>Email</th>
-                            <th>Status</th>
+                            <th>Active Projects</th>
+                            <th>Capacity</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                    <?php while($eng = $engineers_list->fetch_assoc()): ?>
+                    <?php 
+                        $countActiveStmt = $conn->prepare("SELECT COUNT(*) FROM project_engineers pe JOIN projects p ON pe.project_id=p.project_id WHERE pe.engineer_id=? AND p.status!='completed'");
+                        while($eng = $engineers_list->fetch_assoc()): 
+                            $eid = $eng['user_id'];
+                            $countActiveStmt->bind_param("i", $eid);
+                            $countActiveStmt->execute();
+                            $countActiveStmt->bind_result($activeCount);
+                            $countActiveStmt->fetch();
+                            $capacity = 1;
+                            $slotsLeft = $capacity - $activeCount;
+                    ?>
                         <tr>
                             <td><?php echo htmlspecialchars($eng['full_name']); ?></td>
                             <td><?php echo htmlspecialchars($eng['email']); ?></td>
-                            <td>
-                                <span class="status <?php echo $eng['availability_status']; ?>">
-                                    <?php echo ucfirst($eng['availability_status']); ?>
-                                </span>
-                            </td>
+                            <td><?php echo $activeCount; ?></td>
+                            <td><?php echo $capacity; ?> <?php if($slotsLeft>0) echo '(Slots left: '.$slotsLeft.')'; else echo '(Fully booked)'; ?></td>
                             <td>
                                 <button class="btn btn-small">Edit</button>
                                 <button class="btn btn-small btn-secondary">Assign</button>
                             </td>
                         </tr>
-                    <?php endwhile; ?>
+                    <?php endwhile; $countActiveStmt->close(); ?>
                     </tbody>
                 </table>
             </div>

@@ -1,9 +1,9 @@
 <?php
 session_start();
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../../config/database.php';
 
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 'engineer') {
-    header("Location: ../index.php");
+    header("Location: /codesamplecaps/public/login.php");
     exit();
 }
 
@@ -77,8 +77,7 @@ $tasks_list = $tasksStmt->get_result();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Engineer Dashboard - Edge Automation</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/css/global.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/codesamplecaps/public/assets/css/global.css">
 <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Poppins', sans-serif; background: #ecf0f1; }
@@ -124,7 +123,7 @@ $tasks_list = $tasksStmt->get_result();
 </head>
 <body>
 
-<?php include("../includes/sidebar_engineer.php"); ?>
+<?php include("../../views/components/sidebar_engineer.php"); ?>
 
 <div class="main-content">
     <h1>👨‍💼 Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></h1>
@@ -198,7 +197,7 @@ $tasks_list = $tasksStmt->get_result();
                     <option>on-leave</option>
                 </select>
             </div>
-            <button class="btn" onclick="window.location.href='change_password.php'">🔐 Change Password</button>
+            <button class="btn" onclick="window.location.href='/codesamplecaps/views/dashboards/change_password.php'">🔐 Change Password</button>
         </div>
     </div>
 </div>

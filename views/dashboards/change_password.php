@@ -1,10 +1,9 @@
 <?php
 session_start();
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../../config/database.php';
 
-// Check if user is admin
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 'admin') {
-    header("Location: ../index.php");
+    header("Location: /codesamplecaps/public/login.php");
     exit();
 }
 
@@ -23,7 +22,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
     } elseif (strlen($new_password) < 6) {
         $error = "New password must be at least 6 characters.";
     } else {
-        // Get current password from database
         $user_id = $_SESSION['user_id'];
         $stmt = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
         $stmt->bind_param("i", $user_id);
@@ -31,12 +29,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
         $result = $stmt->get_result();
         $user = $result->fetch_assoc();
         
-        // Verify current password
         if (password_verify($current_password, $user['password'])) {
-            // Hash new password
             $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
             
-            // Update password in database
             $update_stmt = $conn->prepare("UPDATE users SET password = ? WHERE user_id = ?");
             $update_stmt->bind_param("si", $hashed_password, $user_id);
             
@@ -57,7 +52,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
 <html>
 <head>
     <title>Change Password</title>
-    <link rel="stylesheet" href="../assets/css/global.css">
+    <link rel="stylesheet" href="/codesamplecaps/public/assets/css/global.css">
     <style>
         .change-password-container {
             max-width: 400px;
@@ -155,7 +150,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
 </head>
 <body>
 
-<?php include("../includes/sidebar_admin.php"); ?>
+<?php include("../../views/components/sidebar_admin.php"); ?>
 
 <div class="main-content">
     <div class="change-password-container">
@@ -189,7 +184,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
         </form>
         
         <div class="back-link">
-            <a href="admin_dashboard.php">← Back to Dashboard</a>
+            <a href="/codesamplecaps/views/dashboards/admin_dashboard.php">← Back to Dashboard</a>
         </div>
     </div>
 </div>

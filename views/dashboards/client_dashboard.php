@@ -1,9 +1,9 @@
 <?php
 session_start();
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../../config/database.php';
 
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 'client') {
-    header("Location: ../index.php");
+    header("Location: /codesamplecaps/public/login.php");
     exit();
 }
 
@@ -31,14 +31,14 @@ $completed->bind_result($completedCount);
 $completed->fetch();
 $completed->close();
 
-/* AVAILABLE ENGINEERS COUNT */
-$availEngineers = $conn->prepare("SELECT COUNT(*) FROM users WHERE role='engineer' AND availability_status='available'");
-$availEngineers->execute();
-$availEngineers->bind_result($availCount);
-$availEngineers->fetch();
-$availEngineers->close();
+/* TOTAL ENGINEERS COUNT (used in stats) */
+$totalEngineersStmt = $conn->prepare("SELECT COUNT(*) FROM users WHERE role='engineer'");
+$totalEngineersStmt->execute();
+$totalEngineersStmt->bind_result($availCount);
+$totalEngineersStmt->fetch();
+$totalEngineersStmt->close();
 
-/* FETCH AVAILABLE ENGINEERS */
+/* FETCH ENGINEERS */
 $engineersStmt = $conn->prepare("SELECT user_id, full_name, availability_status FROM users WHERE role='engineer' ORDER BY full_name ASC");
 $engineersStmt->execute();
 $available_engineers = $engineersStmt->get_result();
@@ -63,7 +63,7 @@ $client_projects = $projectsStmt->get_result();
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Client Dashboard - Edge Automation</title>
-<link rel="stylesheet" href="../assets/css/global.css">
+<link rel="stylesheet" href="/codesamplecaps/public/assets/css/global.css">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
     body { background: #f5f7fa; }
@@ -87,7 +87,7 @@ $client_projects = $projectsStmt->get_result();
     .availability { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin: 10px 0; }
     .availability.available { background: #d4edda; color: #0f9d38; }
     .engineer-card p { color: #7f8c8d; margin: 8px 0; font-size: 14px; }
-    .btn { padding: 10px 20px; background: #0f9d38; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; }
+    .btn { padding: 10px 20px; background: #0f9d38; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; transition: background 0.3s; }
     .btn:hover { background: #087f23; }
     .btn:disabled { background: #bdc3c7; cursor: not-allowed; }
     .btn-secondary { background: #95a5a6; }
@@ -110,7 +110,7 @@ $client_projects = $projectsStmt->get_result();
 </head>
 <body>
 
-<?php include("../includes/sidebar_client.php"); ?>
+<?php include("../../views/components/sidebar_client.php"); ?>
 
 <div class="main-content">
     <h1>💼 Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></h1>
@@ -119,34 +119,43 @@ $client_projects = $projectsStmt->get_result();
         <div class="stat-card"><h4>📁 Your Projects</h4><p><?php echo $totalCount; ?></p></div>
         <div class="stat-card"><h4>⏳ In Progress</h4><p><?php echo $ongoingCount; ?></p></div>
         <div class="stat-card"><h4>✅ Completed</h4><p><?php echo $completedCount; ?></p></div>
-        <div class="stat-card"><h4>👷 Available Engineers</h4><p><?php echo $availCount; ?></p></div>
+        <div class="stat-card"><h4>👷 Engineers</h4><p><?php echo $availCount; ?></p></div>
     </div>
     
     <div class="tabs">
-        <button class="tab active" onclick="showTab('engineers-tab', this)">👷 Hire Engineers</button>
+        <button class="tab active" onclick="showTab('engineers-tab', this)">👷 Request/Assign Edge Engineer</button>
         <button class="tab" onclick="showTab('projects-tab', this)">📁 My Projects</button>
         <button class="tab" onclick="showTab('profile-tab', this)">⚙️ Profile</button>
     </div>
     
     <div id="engineers-tab" class="tab-content active">
-        <h2>Available Engineers Marketplace</h2>
-        <p style="color: #7f8c8d; margin-bottom: 20px;">Browse and hire qualified engineers for your projects</p>
+        <h2>Engineers for Project Scope</h2>
+        <p style="color: #7f8c8d; margin-bottom: 20px;">Browse engineers and see how many active projects they currently handle (capacity defaults to 1).</p>
         <div class="engineers-grid">
         <?php if($available_engineers->num_rows > 0):
-            while($engineer = $available_engineers->fetch_assoc()): ?>
+            $countActiveStmt = $conn->prepare("SELECT COUNT(*) FROM project_engineers pe JOIN projects p ON pe.project_id=p.project_id WHERE pe.engineer_id=? AND p.status!='completed'");
+            while($engineer = $available_engineers->fetch_assoc()):
+                $engId = $engineer['user_id'];
+                $countActiveStmt->bind_param("i", $engId);
+                $countActiveStmt->execute();
+                $countActiveStmt->bind_result($activeProjects);
+                $countActiveStmt->fetch();
+                $capacity = isset($engineer['capacity']) ? (int)$engineer['capacity'] : 1;
+                $slotsLeft = $capacity - $activeProjects;
+        ?>
             <div class="engineer-card">
                 <div class="engineer-name">👨‍💼 <?php echo htmlspecialchars($engineer['full_name']); ?></div>
-                <span class="availability <?php echo $engineer['availability_status']; ?>">✅ <?php echo ucfirst($engineer['availability_status']); ?></span>
+                <p style="margin:8px 0;"><strong>Active Projects:</strong> <?php echo $activeProjects; ?> &nbsp;•&nbsp; <strong>Capacity:</strong> <?php echo $capacity; ?></p>
                 <p><strong>User ID:</strong> #<?php echo $engineer['user_id']; ?></p>
                 <div class="action-buttons">
-                    <?php if($engineer['availability_status'] == 'available'): ?>
-                        <button class="btn" onclick="hireEngineer(<?php echo $engineer['user_id']; ?>, '<?php echo htmlspecialchars($engineer['full_name']); ?>')">💼 Hire</button>
+                    <?php if($slotsLeft > 0): ?>
+                        <button class="btn" onclick="hireEngineer(<?php echo $engineer['user_id']; ?>, '<?php echo htmlspecialchars($engineer['full_name']); ?>')">📨 Request</button>
                     <?php else: ?>
-                        <button class="btn" disabled>Assigned</button>
+                        <button class="btn" disabled>Fully Booked</button>
                     <?php endif; ?>
                 </div>
             </div>
-        <?php endwhile; else: ?>
+        <?php endwhile; $countActiveStmt->close(); else: ?>
             <div class="no-data" style="grid-column: 1/-1;"><p>😔 No available engineers</p></div>
         <?php endif; ?>
         </div>
@@ -180,7 +189,7 @@ $client_projects = $projectsStmt->get_result();
                 <label>Email</label>
                 <input type="email" value="<?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?>" disabled>
             </div>
-            <button class="btn" onclick="window.location.href='change_password.php'">🔐 Change Password</button>
+            <button class="btn" onclick="window.location.href='/codesamplecaps/views/dashboards/change_password.php'">🔐 Change Password</button>
         </div>
     </div>
 </div>

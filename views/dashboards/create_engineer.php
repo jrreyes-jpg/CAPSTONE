@@ -1,17 +1,15 @@
 <?php
 session_start();
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../../config/database.php';
 
-// Admin check
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 'admin') {
-    header("Location: ../index.php");
+    header("Location: /codesamplecaps/public/login.php");
     exit();
 }
 
 $error = "";
 $success = "";
 
-// Create engineer account
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_engineer'])) {
     $full_name = trim($_POST['full_name']);
     $email = trim($_POST['email']);
@@ -20,7 +18,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_engineer'])) {
     if (empty($full_name) || empty($email) || empty($password)) {
         $error = "Please fill in all fields.";
     } else {
-        // Check if email exists
         $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
         $stmt->bind_param("s", $email);
         $stmt->execute();
@@ -37,7 +34,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_engineer'])) {
 
             if ($stmt->execute()) {
                 $success = "Engineer account created successfully!";
-                // Clear form
                 $_POST = array();
             } else {
                 $error = "Error creating account. Please try again.";
@@ -46,7 +42,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_engineer'])) {
     }
 }
 
-// Get all engineers
 $engineers_result = $conn->query("SELECT user_id, full_name, email, created_at FROM users WHERE role = 'engineer' ORDER BY created_at DESC");
 
 ?>
@@ -56,7 +51,7 @@ $engineers_result = $conn->query("SELECT user_id, full_name, email, created_at F
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Create Engineer Account - Admin</title>
-<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="stylesheet" href="/codesamplecaps/public/assets/css/style.css">
 <style>
     body {
         background: #f5f5f5;
@@ -193,9 +188,9 @@ $engineers_result = $conn->query("SELECT user_id, full_name, email, created_at F
 <div class="admin-container">
     <div class="sidebar">
         <h3>Admin Menu</h3>
-        <a href="create_engineer.php">Create Engineer</a>
-        <a href="../dashboards/admin_dashboard.php">Dashboard</a>
-        <a href="../auth/logout.php">Logout</a>
+        <a href="/codesamplecaps/views/dashboards/create_engineer.php">Create Engineer</a>
+        <a href="/codesamplecaps/views/dashboards/admin_dashboard.php">Dashboard</a>
+        <a href="/codesamplecaps/views/auth/logout.php">Logout</a>
     </div>
     
     <div class="main-content">

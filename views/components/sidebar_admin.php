@@ -57,13 +57,13 @@
         <p>Admin Control Panel</p>
     </div>
     <ul class="nav-menu">
-        <li><a href="../dashboards/admin_dashboard.php">📊 Dashboard</a></li>
-        <li><a href="../dashboards/create_engineer.php">➕ Create Engineer</a></li>
-        <li><a href="../dashboards/admin_dashboard.php#projects-tab">📁 Projects</a></li>
+        <li><a href="/codesamplecaps/views/dashboards/admin_dashboard.php">📊 Dashboard</a></li>
+        <li><a href="/codesamplecaps/views/dashboards/create_engineer.php">➕ Create Engineer</a></li>
+        <li><a href="/codesamplecaps/views/dashboards/admin_dashboard.php#projects-tab">📁 Projects</a></li>
         <li><a href="#">📦 Inventory</a></li>
         <li><a href="#">🏗️ Assets</a></li>
         <li><a href="#">📈 Reports</a></li>
-        <li><a href="../dashboards/change_password.php">🔐 Change Password</a></li>
-        <li><a href="../auth/logout.php" class="logout">🚪 Logout</a></li>
+        <li><a href="/codesamplecaps/views/dashboards/change_password.php">🔐 Change Password</a></li>
+        <li><a href="/codesamplecaps/views/auth/logout.php" class="logout">🚪 Logout</a></li>
     </ul>
 </nav>

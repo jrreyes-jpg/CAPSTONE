@@ -58,9 +58,9 @@
 <div class="sidebar">
     <h3>🏢 EDGE AUTOMATION</h3>
     <div class="sidebar-subtitle">Engineer Portal</div>
-    <a href="engineer_dashboard.php">📊 Dashboard</a>
-    <a href="engineer_dashboard.php#projects-tab">📁 My Projects</a>
-    <a href="engineer_dashboard.php#tasks-tab">📋 My Tasks</a>
-    <a href="../dashboards/change_password.php">🔐 Change Password</a>
-    <a href="../auth/logout.php" class="logout">🚪 Logout</a>
+    <a href="/codesamplecaps/views/dashboards/engineer_dashboard.php">📊 Dashboard</a>
+    <a href="/codesamplecaps/views/dashboards/engineer_dashboard.php#projects-tab">📁 My Projects</a>
+    <a href="/codesamplecaps/views/dashboards/engineer_dashboard.php#tasks-tab">📋 My Tasks</a>
+    <a href="/codesamplecaps/views/dashboards/change_password.php">🔐 Change Password</a>
+    <a href="/codesamplecaps/views/auth/logout.php" class="logout">🚪 Logout</a>
 </div>
