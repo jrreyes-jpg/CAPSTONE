@@ -1,30 +1,67 @@
 <?php
 session_start();
-require_once __DIR__ . '/../../config/database.php';
+require __DIR__ . '/../../vendor/autoload.php';
+require __DIR__ . '/../../config/database.php';
 
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
 $error = "";
 $success = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+
     $email = trim($_POST['email']);
 
-    if (!empty($email)) {
-        $stmt = $conn->prepare("SELECT user_id, full_name FROM users WHERE email = ?");
-        $stmt->bind_param("s", $email);
-        $stmt->execute();
-        $result = $stmt->get_result();
+    $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
+    $stmt->bind_param("s", $email);
+    $stmt->execute();
+    $result = $stmt->get_result();
 
-        if ($result->num_rows === 1) {
-            $user = $result->fetch_assoc();
-            
-            // In production, generate a reset token and send email
-            // For now, just show a message
-            $success = "Password reset instructions have been sent to " . htmlspecialchars($email);
-        } else {
-            $error = "Email not found in our system.";
+    if ($result->num_rows > 0) {
+
+        $user = $result->fetch_assoc();
+        $token = bin2hex(random_bytes(50));
+        $expiry = date("Y-m-d H:i:s", strtotime("+1 hour"));
+
+        $update = $conn->prepare("UPDATE users SET reset_token=?, token_expiry=? WHERE user_id=?");
+        $update->bind_param("ssi", $token, $expiry, $user['user_id']);
+        $update->execute();
+
+        $mail = new PHPMailer(true);
+
+        try {
+            $mail->isSMTP();
+            $mail->Host       = 'smtp.gmail.com';
+            $mail->SMTPAuth   = true;
+            $mail->Username   = 'jeshowap@gmail.com'; // CHANGE
+            $mail->Password   = 'otpobfbebgmiowww';   // CHANGE
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+            $mail->Port       = 587;
+
+            $mail->setFrom('jeshowap@gmail.com', 'Edge Automation');
+            $mail->addAddress($email);
+
+            $resetLink = "http://localhost/codesamplecaps/views/auth/reset_password.php?token=" . $token;
+
+            $mail->isHTML(true);
+            $mail->Subject = 'Password Reset - Edge Automation';
+            $mail->Body    = "
+                <h3>Password Reset Request</h3>
+                <p>Click the link below to reset your password:</p>
+                <a href='$resetLink'>$resetLink</a>
+                <br><br>
+                <p>This link expires in 1 hour.</p>
+            ";
+
+            $mail->send();
+
+            $success = "Reset link sent to your email.";
+        } catch (Exception $e) {
+            $error = "Email failed: {$mail->ErrorInfo}";
         }
+
     } else {
-        $error = "Please enter your email.";
+        echo "If email exists, reset link will be sent.";
     }
 }
 ?>
@@ -43,11 +80,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <div class="container">
 <div class="left-panel">
 <div class="logo">
-    <img src="/codesamplecaps/public/assets/images/logo.png" alt="Edge Logo">
-</div>
-    <h1>EDGE AUTOMATION</h1>
-    <p>Technology Services Co.<br>PCAB LIC: 58783</p>
-</div>
+    <img src="/codesamplecaps/public/assets/images/edge.jpg" alt="Edge Logo">
+    </div>
+    <h1 class="company-name">
+        EDGE AUTOMATION TECHNOLOGY SERVICES, CO.
+    </h1></div>
 
 <div class="right-panel">
 <div class="form active">

@@ -2,7 +2,7 @@
 session_start();
 require_once __DIR__ . '/../../config/database.php';
 
-if (!isset($_SESSION['role']) || $_SESSION['role'] != 'admin') {
+if (!isset($_SESSION['role']) || $_SESSION['role'] != 'super_admin') {
     header("Location: /codesamplecaps/public/login.php");
     exit();
 }
@@ -94,7 +94,7 @@ $clients_list = $allClients->get_result();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Edge Automation</title>
+    <title>Super Admin Dashboard - Edge Automation</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/codesamplecaps/public/assets/css/global.css">
 <style>
@@ -155,10 +155,10 @@ $clients_list = $allClients->get_result();
 </head>
 <body>
 
-<?php include("../../views/components/sidebar_admin.php"); ?>
+<?php include("../../views/components/sidebar_super_admin.php"); ?>
 
 <div class="main-content">
-    <h1>📊 Admin Dashboard</h1>
+    <h1>📊 Super Admin Dashboard</h1>
     
     <div class="stats-grid">
         <div class="stat-card"><h4>📁 Projects</h4><p><?php echo $projectsCount; ?></p></div>
@@ -195,7 +195,7 @@ $clients_list = $allClients->get_result();
                 <h3>📝 System Info</h3>
                 <p><strong>Total Users:</strong> <?php echo $engineersCount + $clientsCount; ?></p>
                 <p><strong>Active Projects:</strong> <?php echo $ongoingCount; ?></p>
-                <p><strong>System Users:</strong> Admin, <?php echo $engineersCount; ?> Engineers, <?php echo $clientsCount; ?> Clients</p>
+                <p><strong>System Users:</strong> Super Admin, <?php echo $engineersCount; ?> Engineers, <?php echo $clientsCount; ?> Clients</p>
             </div>
         </div>
     </div>

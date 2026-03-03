@@ -2,7 +2,7 @@
 session_start();
 require_once __DIR__ . '/../../config/database.php';
 
-if (!isset($_SESSION['role']) || $_SESSION['role'] != 'admin') {
+if (!isset($_SESSION['role']) || $_SESSION['role'] != 'super_admin') {
     header("Location: /codesamplecaps/public/login.php");
     exit();
 }

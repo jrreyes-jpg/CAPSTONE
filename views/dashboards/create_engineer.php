@@ -1,11 +1,14 @@
 <?php
 session_start();
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../controllers/UserController.php';
 
-if (!isset($_SESSION['role']) || $_SESSION['role'] != 'admin') {
+if (!isset($_SESSION['role']) || $_SESSION['role'] != 'super_admin') {
     header("Location: /codesamplecaps/public/login.php");
     exit();
 }
+
+$userController = new UserController();
 
 $error = "";
 $success = "";
@@ -18,21 +21,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_engineer'])) {
     if (empty($full_name) || empty($email) || empty($password)) {
         $error = "Please fill in all fields.";
     } else {
-        $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
-        $stmt->bind_param("s", $email);
-        $stmt->execute();
-        $result = $stmt->get_result();
-
-        if ($result->num_rows > 0) {
+        $result = $userController->findByEmail($email);
+        if ($result && $result->num_rows > 0) {
             $error = "Email already exists.";
         } else {
-            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-            $role = 'engineer';
-
-            $stmt = $conn->prepare("INSERT INTO users (full_name, email, password, role) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("ssss", $full_name, $email, $hashed_password, $role);
-
-            if ($stmt->execute()) {
+            if ($userController->createEngineer($full_name, $email, $password)) {
                 $success = "Engineer account created successfully!";
                 $_POST = array();
             } else {
@@ -42,7 +35,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_engineer'])) {
     }
 }
 
-$engineers_result = $conn->query("SELECT user_id, full_name, email, created_at FROM users WHERE role = 'engineer' ORDER BY created_at DESC");
+$engineers_result = $conn->query("SELECT id AS user_id, full_name, email, created_at FROM users WHERE role = 'engineer' ORDER BY created_at DESC");
 
 ?>
 <!DOCTYPE html>
@@ -50,7 +43,7 @@ $engineers_result = $conn->query("SELECT user_id, full_name, email, created_at F
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Create Engineer Account - Admin</title>
+<title>Create Engineer Account - Super Admin</title>
 <link rel="stylesheet" href="/codesamplecaps/public/assets/css/style.css">
 <style>
     body {
@@ -187,7 +180,7 @@ $engineers_result = $conn->query("SELECT user_id, full_name, email, created_at F
 
 <div class="admin-container">
     <div class="sidebar">
-        <h3>Admin Menu</h3>
+        <h3>Super Admin Menu</h3>
         <a href="/codesamplecaps/views/dashboards/create_engineer.php">Create Engineer</a>
         <a href="/codesamplecaps/views/dashboards/admin_dashboard.php">Dashboard</a>
         <a href="/codesamplecaps/views/auth/logout.php">Logout</a>

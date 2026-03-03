@@ -43,10 +43,12 @@
                         $_SESSION['role'] = $user['role'];
 
                         // Redirect based on role
-                        if ($user['role'] == 'admin') {
+                        if ($user['role'] == 'super_admin') {
                             header("Location: /codesamplecaps/views/dashboards/admin_dashboard.php");
                         } elseif ($user['role'] == 'engineer') {
                             header("Location: /codesamplecaps/views/dashboards/engineer_dashboard.php");
+                        } elseif ($user['role'] == 'foreman') {
+                            header("Location: /codesamplecaps/views/dashboards/foreman_dashboard.php");
                         } else {
                             header("Location: /codesamplecaps/views/dashboards/client_dashboard.php");
                         }
@@ -126,7 +128,6 @@
                 <button type="submit" name="login">Login</button>
 
                 <div class="links">
-                    <a onclick="showSignup()">Sign Up</a>
                     <a onclick="showForgot()">Forgot Password?</a>
                 </div>
             </form>
@@ -137,10 +138,6 @@
     </div>
 
     <script>
-    function showSignup(){
-        window.location.href = '/codesamplecaps/views/auth/register.php';
-    }
-
     function showLogin(){
         window.location.href = '/codesamplecaps/public/login.php';
     }
