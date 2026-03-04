@@ -5,74 +5,97 @@
     $error = "";
     $failed_attempts_display = "";
 
-    if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
+    $max_attempts = 10;
+$lockout_time = 15 * 60;
+$ip_address = $_SERVER['REMOTE_ADDR'];
 
-        $email = trim($_POST['email']);
-        $password = trim($_POST['password']);
-        $error = "Email or password is incorrect."; // High security message
-        $max_attempts = 10;
-        $lockout_time = 15 * 60; // 15 minutes
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
 
-        if (!empty($email) && !empty($password)) {
+    $email = trim($_POST['email']);
+    $password = trim($_POST['password']);
+    $error = "Email or password is incorrect.";
 
-            $stmt = $conn->prepare("SELECT user_id, full_name, password, role, failed_attempts, last_failed_login 
-                                    FROM users WHERE email = ?");
-            $stmt->bind_param("s", $email);
-            $stmt->execute();
-            $result = $stmt->get_result();
+    if (!empty($email) && !empty($password)) {
 
-            $attempts = 0;
+        $checkAttempt = $conn->prepare("SELECT attempts, last_attempt FROM login_attempts WHERE email = ? AND ip_address = ?");
+        $checkAttempt->bind_param("ss", $email, $ip_address);
+        $checkAttempt->execute();
+        $attemptResult = $checkAttempt->get_result();
 
-            if ($result->num_rows === 1) {
-                $user = $result->fetch_assoc();
-                $attempts = $user['failed_attempts'];
+        $attempts = 0;
+        $last_attempt = null;
 
-                // Check if account is locked
-                if ($attempts >= $max_attempts && strtotime($user['last_failed_login']) + $lockout_time > time()) {
-                    $error = "Too many failed attempts. Try again later.";
-                    $failed_attempts_display = "Failed attempts: $attempts / $max_attempts";
+        if ($attemptResult->num_rows === 1) {
+            $attemptData = $attemptResult->fetch_assoc();
+            $attempts = (int)$attemptData['attempts'];
+            $last_attempt = $attemptData['last_attempt'];
+
+            if ($attempts >= $max_attempts && strtotime($last_attempt) + $lockout_time > time()) {
+                $error = "Too many failed attempts. Try again later.";
+                $failed_attempts_display = "Failed attempts: $attempts / $max_attempts";
+                goto end_login;
+            }
+        }
+
+        $stmt = $conn->prepare("SELECT id, full_name, password, role FROM users WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        if ($result->num_rows === 1) {
+
+            $user = $result->fetch_assoc();
+
+            if (password_verify($password, $user['password'])) {
+
+                $deleteAttempts = $conn->prepare("DELETE FROM login_attempts WHERE email = ? AND ip_address = ?");
+                $deleteAttempts->bind_param("ss", $email, $ip_address);
+                $deleteAttempts->execute();
+
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['name'] = $user['full_name'];
+                $_SESSION['role'] = $user['role'];
+
+                if ($user['role'] == 'super_admin') {
+                    header("Location: /codesamplecaps/views/dashboards/admin_dashboard.php");
+                } elseif ($user['role'] == 'engineer') {
+                    header("Location: /codesamplecaps/views/dashboards/engineer_dashboard.php");
+                } elseif ($user['role'] == 'foreman') {
+                    header("Location: /codesamplecaps/views/dashboards/foreman_dashboard.php");
                 } else {
-                    if (password_verify($password, $user['password'])) {
-                        // Successful login: reset failed attempts
-                        $resetStmt = $conn->prepare("UPDATE users SET failed_attempts = 0, last_failed_login = NULL WHERE user_id = ?");
-                        $resetStmt->bind_param("i", $user['user_id']);
-                        $resetStmt->execute();
-
-                        $_SESSION['user_id'] = $user['user_id'];
-                        $_SESSION['name'] = $user['full_name'];
-                        $_SESSION['role'] = $user['role'];
-
-                        // Redirect based on role
-                        if ($user['role'] == 'super_admin') {
-                            header("Location: /codesamplecaps/views/dashboards/admin_dashboard.php");
-                        } elseif ($user['role'] == 'engineer') {
-                            header("Location: /codesamplecaps/views/dashboards/engineer_dashboard.php");
-                        } elseif ($user['role'] == 'foreman') {
-                            header("Location: /codesamplecaps/views/dashboards/foreman_dashboard.php");
-                        } else {
-                            header("Location: /codesamplecaps/views/dashboards/client_dashboard.php");
-                        }
-                        exit();
-                    } else {
-                        // Wrong password: increase failed attempts
-                        $attempts++;
-                        $updateStmt = $conn->prepare("UPDATE users SET failed_attempts = ?, last_failed_login = NOW() WHERE user_id = ?");
-                        $updateStmt->bind_param("ii", $attempts, $user['user_id']);
-                        $updateStmt->execute();
-
-                        $failed_attempts_display = "Failed attempts: $attempts / $max_attempts";
-                    }
+                    header("Location: /codesamplecaps/views/dashboards/client_dashboard.php");
                 }
+                exit();
+
             } else {
-                // Email not found, still high-security message
-                $failed_attempts_display = "Failed attempts: 0 / $max_attempts";
+                $attempts++;
             }
 
         } else {
-            $error = "Please fill in all fields.";
+            $attempts++;
         }
-    }
 
+        if ($attemptResult->num_rows === 1) {
+
+            $updateAttempt = $conn->prepare("UPDATE login_attempts SET attempts = ?, last_attempt = NOW() WHERE email = ? AND ip_address = ?");
+            $updateAttempt->bind_param("iss", $attempts, $email, $ip_address);
+            $updateAttempt->execute();
+
+        } else {
+
+            $insertAttempt = $conn->prepare("INSERT INTO login_attempts (email, ip_address, attempts, last_attempt) VALUES (?, ?, ?, NOW())");
+            $insertAttempt->bind_param("ssi", $email, $ip_address, $attempts);
+            $insertAttempt->execute();
+        }
+
+        $failed_attempts_display = "Failed attempts: $attempts / $max_attempts";
+
+    } else {
+        $error = "Please fill in all fields.";
+    }
+}
+
+end_login:
     ?>
     <!DOCTYPE html>
     <html lang="en">
@@ -127,42 +150,29 @@
 
                 <button type="submit" name="login">Login</button>
 
-                <div class="links">
-                    <a onclick="showForgot()">Forgot Password?</a>
-                </div>
-            </form>
+<div class="links">
+    <a onclick="showForgot()">Forgot Password?</a>
+    <a onclick="showSignup()">Sign Up</a>
+</div>            </form>
         </div>
 
     </div>
 
     </div>
 
-    <script>
-    function showLogin(){
-        window.location.href = '/codesamplecaps/public/login.php';
-    }
+<script>
+function showLogin(){
+    window.location.href = '/codesamplecaps/public/login.php';
+}
 
-    function showForgot(){
-        window.location.href = '/codesamplecaps/views/auth/forgot.php';
-    }
-    </script>
+function showForgot(){
+    window.location.href = '/codesamplecaps/views/auth/forgot.php';
+}
 
-    <script>
-    // Show/hide password toggles (supports multiple pages/buttons using .togglePassword + data-target)
-    document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('.togglePassword').forEach(function(btn){
-            btn.addEventListener('click', function () {
-                var targetId = btn.getAttribute('data-target');
-                var input = document.getElementById(targetId);
-                if (!input) return;
-                var type = input.getAttribute('type') === 'password' ? 'text' : 'password';
-                input.setAttribute('type', type);
-                btn.textContent = type === 'text' ? 'Hide' : 'Show';
-                btn.setAttribute('aria-pressed', type === 'text' ? 'true' : 'false');
-            });
-        });
-    });
-    </script>
+function showSignup(){
+    window.location.href = '/codesamplecaps/views/auth/register.php';
+}
+</script>
 
     <script src="/codesamplecaps/public/assets/js/script.js"></script>
     </body>

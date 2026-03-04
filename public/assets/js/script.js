@@ -1,4 +1,6 @@
+// ================================
 // Canvas particle animation
+// ================================
 const canvas = document.getElementById('particles');
 if (canvas) {
     const ctx = canvas.getContext('2d');
@@ -55,3 +57,32 @@ if (canvas) {
         canvas.height = window.innerHeight;
     });
 }
+
+// ================================
+// Password show/hide toggle
+// ================================
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.togglePassword').forEach(function(btn){
+        btn.addEventListener('click', function () {
+            const targetId = btn.getAttribute('data-target');
+            const input = document.getElementById(targetId);
+            if (!input) return;
+            const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
+            input.setAttribute('type', type);
+            btn.textContent = type === 'text' ? 'Hide' : 'Show';
+            btn.setAttribute('aria-pressed', type === 'text' ? 'true' : 'false');
+        });
+    });
+
+    // ================================
+    // Forgot Password redirect
+    // ================================
+    document.querySelectorAll('.links a').forEach(function(link){
+        if(link.textContent.includes('Forgot Password')) {
+            link.addEventListener('click', function(e){
+                e.preventDefault();
+                window.location.href = '/codesamplecaps/views/auth/forgot.php';
+            });
+        }
+    });
+});

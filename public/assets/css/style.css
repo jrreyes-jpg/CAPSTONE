@@ -178,8 +178,9 @@ button:hover{
 .links{
     margin-top:15px;
     font-size:13px;
+    display:flex;
+    gap:15px;
 }
-
 .links a{
     color:#087f23;
     text-decoration:none;
