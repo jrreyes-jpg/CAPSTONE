@@ -86,3 +86,40 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 });
+document.addEventListener("DOMContentLoaded", function () {
+
+    const sidebar = document.getElementById("sidebar");
+    const toggleBtn = document.getElementById("sidebarToggle");
+    const overlay = document.getElementById("sidebarOverlay");
+
+    // Load saved state (Desktop only)
+    if (window.innerWidth > 768) {
+        if (localStorage.getItem("sidebarShrink") === "true") {
+            sidebar.classList.add("shrink");
+        }
+    }
+
+    toggleBtn.addEventListener("click", function () {
+
+        if (window.innerWidth <= 768) {
+            sidebar.classList.toggle("mobile-open");
+            overlay.classList.toggle("active");
+        } else {
+            sidebar.classList.toggle("shrink");
+
+            // Save state
+            localStorage.setItem(
+                "sidebarShrink",
+                sidebar.classList.contains("shrink")
+            );
+        }
+
+    });
+
+    // Close mobile on overlay click
+    overlay.addEventListener("click", function () {
+        sidebar.classList.remove("mobile-open");
+        overlay.classList.remove("active");
+    });
+
+});

@@ -39,7 +39,7 @@ $totalEngineersStmt->fetch();
 $totalEngineersStmt->close();
 
 /* FETCH ENGINEERS */
-$engineersStmt = $conn->prepare("SELECT user_id, full_name, availability_status FROM users WHERE role='engineer' ORDER BY full_name ASC");
+$engineersStmt = $conn->prepare("SELECT id, full_name, status FROM users WHERE role='engineer' ORDER BY full_name ASC");
 $engineersStmt->execute();
 $available_engineers = $engineersStmt->get_result();
 
@@ -47,8 +47,8 @@ $available_engineers = $engineersStmt->get_result();
 $projectsStmt = $conn->prepare("
 SELECT p.*, u.full_name AS engineer_name
 FROM projects p
-LEFT JOIN users u ON u.user_id = (
-    SELECT engineer_id FROM project_engineers WHERE project_id = p.project_id LIMIT 1
+LEFT JOIN users u ON u.id = (
+    SELECT engineer_id FROM project_assignments WHERE project_id = p.id LIMIT 1
 )
 WHERE p.client_id=?
 ORDER BY p.created_at DESC
