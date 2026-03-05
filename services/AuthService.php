@@ -270,18 +270,13 @@ class AuthService {
             return ['success' => false, 'error' => 'Password must be at least 8 characters.'];
         }
 
-// Find user with valid token
-$user = $this->userRepo->findByResetToken($token);
+        // Find user with valid (non-expired) token
+        $user = $this->userRepo->findByResetToken($token);
 
-if (!$user) {
-    return ['success' => false, 'error' => 'Invalid or expired reset link.'];
-}
+        if (!$user) {
+            return ['success' => false, 'error' => 'Invalid or expired reset link.'];
+        }
 
-// ✅ Check if token is expired
-$currentDateTime = date('Y-m-d H:i:s');
-if ($user['token_expiry'] < $currentDateTime) {
-    return ['success' => false, 'error' => 'Invalid or expired reset link!'];
-}
         // Hash new password
         $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
 
