@@ -84,25 +84,24 @@ $clients = $userController->getClients();
             <!-- Dashboard Tab -->
             <div id="dashboard" class="tab-content <?php echo $activeTab === 'dashboard' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'dashboard' ? 'display: block;' : 'display: none;'; ?>">
                 <h2 style="margin-bottom: 20px;">System Overview</h2>
-                <div class="stats">
-                    <div class="stat-card">
-                        <h3>Engineers</h3>
-                        <div class="number"><?php echo count($engineers); ?></div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Manpower</h3>
-                        <div class="number"><?php echo count($manpower); ?></div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Clients</h3>
-                        <div class="number"><?php echo count($clients); ?></div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Total Users</h3>
-                        <div class="number"><?php echo count($engineers) + count($manpower) + count($clients) + 1; ?></div>
-                    </div>
-                </div>
-            </div>
+<div class="stats">
+    <div class="stat-card">
+        <h3>Engineers</h3>
+        <div class="number counter" data-target="<?php echo count($engineers); ?>">0</div>
+    </div>
+    <div class="stat-card">
+        <h3>Manpower</h3>
+        <div class="number counter" data-target="<?php echo count($manpower); ?>">0</div>
+    </div>
+    <div class="stat-card">
+        <h3>Clients</h3>
+        <div class="number counter" data-target="<?php echo count($clients); ?>">0</div>
+    </div>
+    <div class="stat-card">
+        <h3>Total Users</h3>
+        <div class="number counter" data-target="<?php echo count($engineers) + count($manpower) + count($clients) + 1; ?>">0</div>
+    </div>
+</div>            </div>
 
             <!-- Create Account Tab -->
             <div id="create" class="tab-content <?php echo $activeTab === 'create' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'create' ? 'display: block;' : 'display: none;'; ?>">

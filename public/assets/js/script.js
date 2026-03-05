@@ -123,3 +123,34 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
 });
+// Auto active menu based on URL
+const links = document.querySelectorAll(".menu-link");
+links.forEach(link => {
+    if (window.location.href.includes(link.getAttribute("href"))) {
+        link.classList.add("active");
+    }
+});
+// Smooth page fade in
+window.addEventListener("load", function() {
+    document.body.classList.add("page-loaded");
+});
+// Counter Animation
+const counters = document.querySelectorAll(".counter");
+
+counters.forEach(counter => {
+
+    const updateCount = () => {
+        const target = +counter.getAttribute("data-target");
+        const current = +counter.innerText;
+        const increment = target / 40;
+
+        if (current < target) {
+            counter.innerText = Math.ceil(current + increment);
+            setTimeout(updateCount, 30);
+        } else {
+            counter.innerText = target;
+        }
+    };
+
+    updateCount();
+});
