@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
             <h1>Change Password</h1>
             <div class="user-info">
                 <span>Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></span>
-                <a href="/codesamplecaps/views/auth/logout.php" class="logout-btn">Logout</a>
+                
             </div>
         </div>
 
@@ -82,18 +82,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
                 <div class="form-row">
                     <div class="form-group">
                         <label for="current_password">Current Password</label>
-                        <input type="password" id="current_password" name="current_password" required>
+                        <div class="password-input-wrap"><input type="password" id="current_password" name="current_password" required><button type="button" class="togglePassword" data-target="current_password">Show</button></div>
                     </div>
                 </div>
 
                 <div class="form-row">
                     <div class="form-group">
                         <label for="new_password">New Password</label>
-                        <input type="password" id="new_password" name="new_password" minlength="8" required>
+                        <div class="password-input-wrap"><input type="password" id="new_password" name="new_password" minlength="8" required><button type="button" class="togglePassword" data-target="new_password">Show</button></div>
                     </div>
                     <div class="form-group">
                         <label for="confirm_password">Confirm New Password</label>
-                        <input type="password" id="confirm_password" name="confirm_password" minlength="8" required>
+                        <div class="password-input-wrap"><input type="password" id="confirm_password" name="confirm_password" minlength="8" required><button type="button" class="togglePassword" data-target="confirm_password">Show</button></div>
                     </div>
                 </div>
 

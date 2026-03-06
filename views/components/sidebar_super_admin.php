@@ -1,7 +1,14 @@
-<nav class="sidebar" id="sidebar">
+<?php
+$currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
+$currentQuery = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_QUERY) ?? '';
 
-    <!-- Floating Glass Toggle -->
-    <button id="sidebarToggle" class="sidebar-toggle">
+$isDashboard = str_contains($currentPath, '/views/dashboards/super_admin_dashboard.php') && $currentQuery === '';
+$isCreate = str_contains($currentPath, '/views/dashboards/super_admin_dashboard.php') && str_contains($currentQuery, 'tab=create');
+$isUsers = str_contains($currentPath, '/views/dashboards/super_admin_dashboard.php') && str_contains($currentQuery, 'tab=users');
+$isChangePassword = str_contains($currentPath, '/views/dashboards/change_password.php');
+?>
+<nav class="sidebar" id="sidebar">
+    <button id="sidebarToggle" class="sidebar-toggle" type="button">
         <span id="toggleIcon">❮</span>
     </button>
 
@@ -10,56 +17,36 @@
         <p class="sidebar-subtitle menu-text">Super Admin Control Panel</p>
     </div>
 
-   <ul class="nav-menu">
-    <li>
-        <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php" class="menu-link">
-            📊 <span class="menu-text">Dashboard</span>
-        </a>
-    </li>
+    <ul class="nav-menu">
+        <li>
+            <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php" class="menu-link<?php echo $isDashboard ? ' active' : ''; ?>">
+                📊 <span class="menu-text">Dashboard</span>
+            </a>
+        </li>
 
-    <li>
-        <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php?tab=create" class="menu-link">
-            ➕ <span class="menu-text">Create Accounts</span>
-        </a>
-    </li>
+        <li>
+            <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php?tab=create" class="menu-link<?php echo $isCreate ? ' active' : ''; ?>">
+                ➕ <span class="menu-text">Create Accounts</span>
+            </a>
+        </li>
 
-    <li>
-        <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php?tab=users" class="menu-link">
-            📁 <span class="menu-text">Manage Users</span>
-        </a>
-    </li>
+        <li>
+            <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php?tab=users" class="menu-link<?php echo $isUsers ? ' active' : ''; ?>">
+                👥 <span class="menu-text">Manage Users</span>
+            </a>
+        </li>
 
-    <li>
-        <a href="/codesamplecaps/views/dashboards/inventory.php" class="menu-link">
-            📦 <span class="menu-text">Inventory</span>
-        </a>
-    </li>
+        <li>
+            <a href="/codesamplecaps/views/dashboards/change_password.php" class="menu-link<?php echo $isChangePassword ? ' active' : ''; ?>">
+                🔐 <span class="menu-text">Change Password</span>
+            </a>
+        </li>
 
-    <li>
-        <a href="/codesamplecaps/views/dashboards/assets.php" class="menu-link">
-            🏗️ <span class="menu-text">Assets</span>
-        </a>
-    </li>
-
-    <li>
-        <a href="/codesamplecaps/views/dashboards/reports.php" class="menu-link">
-            📈 <span class="menu-text">Reports</span>
-        </a>
-    </li>
-
-    <li>
-        <a href="/codesamplecaps/views/dashboards/change_password.php" class="menu-link">
-            🔐 <span class="menu-text">Change Password</span>
-        </a>
-    </li>
-
-    <li>
-        <a href="/codesamplecaps/views/auth/logout.php" class="menu-link logout">
-            🚪 <span class="menu-text">Logout</span>
-        </a>
-    </li>
-</ul>
+        <li>
+            <a href="/codesamplecaps/views/auth/logout.php" class="menu-link logout">
+                🚪 <span class="menu-text">Logout</span>
+            </a>
+        </li>
+    </ul>
 </nav>
-
-<!-- Mobile Overlay -->
 <div id="sidebarOverlay" class="sidebar-overlay"></div>

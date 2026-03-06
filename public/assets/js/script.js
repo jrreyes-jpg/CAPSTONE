@@ -106,35 +106,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Active menu: only exact match should be green
-    const links = document.querySelectorAll('.menu-link');
-    links.forEach((link) => link.classList.remove('active'));
-
-    const current = new URL(window.location.href);
-    let matched = null;
-
-    links.forEach((link) => {
-        try {
-            const target = new URL(link.getAttribute('href'), window.location.origin);
-            const samePath = current.pathname === target.pathname;
-            const sameQuery = current.search === target.search;
-            if (samePath && sameQuery) {
-                matched = link;
-            }
-        } catch (_) {}
-    });
-
-    if (!matched) {
-        links.forEach((link) => {
-            try {
-                const target = new URL(link.getAttribute('href'), window.location.origin);
-                if (!matched && current.pathname === target.pathname) matched = link;
-            } catch (_) {}
-        });
-    }
-
-    if (matched) matched.classList.add('active');
-
     // Smooth load
     document.body.classList.add('page-loaded');
 
