@@ -2,192 +2,175 @@
 session_start();
 require_once __DIR__ . '/../../config/database.php';
 
-if (!isset($_SESSION['role']) || $_SESSION['role'] != 'super_admin') {
-    header("Location: /codesamplecaps/public/login.php");
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'super_admin') {
+    header('Location: /codesamplecaps/public/login.php');
     exit();
 }
 
-$error = "";
-$success = "";
+function isStrongPassword(string $password): bool {
+    return strlen($password) >= 12
+        && preg_match('/[A-Z]/', $password)
+        && preg_match('/[a-z]/', $password)
+        && preg_match('/\d/', $password)
+        && preg_match('/[^A-Za-z0-9]/', $password);
+}
 
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
-    $current_password = trim($_POST['current_password']);
-    $new_password = trim($_POST['new_password']);
-    $confirm_password = trim($_POST['confirm_password']);
-    
-    if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
-        $error = "Please fill in all fields.";
-    } elseif ($new_password !== $confirm_password) {
-        $error = "New passwords do not match.";
-    } elseif (strlen($new_password) < 6) {
-        $error = "New password must be at least 6 characters.";
+$error = '';
+$success = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
+    $currentPassword = trim($_POST['current_password'] ?? '');
+    $newPassword = trim($_POST['new_password'] ?? '');
+    $confirmPassword = trim($_POST['confirm_password'] ?? '');
+
+    if ($currentPassword === '' || $newPassword === '' || $confirmPassword === '') {
+        $error = 'Please fill in all fields.';
+    } elseif ($newPassword !== $confirmPassword) {
+        $error = 'New passwords do not match.';
+    } elseif (!isStrongPassword($newPassword)) {
+        $error = 'Password must be STRONG: 12+ chars with uppercase, lowercase, number, and special symbol.';
     } else {
-        $user_id = $_SESSION['user_id'];
-        $stmt = $conn->prepare("SELECT password FROM users WHERE user_id = ?");
-        $stmt->bind_param("i", $user_id);
+        $userId = (int)($_SESSION['user_id'] ?? 0);
+        $stmt = $conn->prepare('SELECT password FROM users WHERE id = ? LIMIT 1');
+        $stmt->bind_param('i', $userId);
         $stmt->execute();
         $result = $stmt->get_result();
-        $user = $result->fetch_assoc();
-        
-        if (password_verify($current_password, $user['password'])) {
-            $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-            
-            $update_stmt = $conn->prepare("UPDATE users SET password = ? WHERE user_id = ?");
-            $update_stmt->bind_param("si", $hashed_password, $user_id);
-            
-            if ($update_stmt->execute()) {
-                $success = "✅ Password changed successfully!";
-            } else {
-                $error = "Error updating password. Please try again.";
-            }
-            $update_stmt->close();
+        $user = $result ? $result->fetch_assoc() : null;
+
+        if (!$user || !password_verify($currentPassword, $user['password'])) {
+            $error = 'Current password is incorrect.';
         } else {
-            $error = "Current password is incorrect.";
+            $hash = password_hash($newPassword, PASSWORD_DEFAULT);
+            $updateStmt = $conn->prepare('UPDATE users SET password = ? WHERE id = ?');
+            $updateStmt->bind_param('si', $hash, $userId);
+
+            if ($updateStmt->execute()) {
+                $success = 'Password changed successfully.';
+            } else {
+                $error = 'Error updating password. Please try again.';
+            }
         }
-        $stmt->close();
     }
 }
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Change Password</title>
-    <link rel="stylesheet" href="/codesamplecaps/public/assets/css/global.css">
-    <style>
-        .change-password-container {
-            max-width: 400px;
-            margin: 50px auto;
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-        
-        .change-password-container h2 {
-            color: #2c3e50;
-            margin-bottom: 30px;
-            text-align: center;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #2c3e50;
-            font-weight: 600;
-        }
-        
-        input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-family: 'Poppins', sans-serif;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-        
-        input:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 5px rgba(102, 126, 234, 0.1);
-        }
-        
-        button {
-            width: 100%;
-            padding: 12px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-weight: 600;
-            cursor: pointer;
-            font-family: 'Poppins', sans-serif;
-            font-size: 14px;
-            transition: background 0.3s;
-        }
-        
-        button:hover {
-            background: #5568d3;
-        }
-        
-        .error-message {
-            background: #fee;
-            color: #c33;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            border-left: 4px solid #c33;
-        }
-        
-        .success-message {
-            background: #efe;
-            color: #3c3;
-            padding: 12px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            border-left: 4px solid #3c3;
-        }
-        
-        .back-link {
-            text-align: center;
-            margin-top: 20px;
-        }
-        
-        .back-link a {
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 600;
-        }
-        
-        .back-link a:hover {
-            text-decoration: underline;
-        }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Change Password - Edge Automation</title>
+    <link rel="stylesheet" href="/codesamplecaps/public/assets/css/admin_dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+<div class="container">
+    <?php include __DIR__ . '/../components/sidebar_super_admin.php'; ?>
 
-<?php include("../../views/components/sidebar_admin.php"); ?>
-
-<div class="main-content">
-    <div class="change-password-container">
-        <h2>Change Password</h2>
-        
-        <?php if($error): ?>
-            <p class="error-message"><?php echo $error; ?></p>
-        <?php endif; ?>
-        
-        <?php if($success): ?>
-            <p class="success-message"><?php echo $success; ?></p>
-        <?php endif; ?>
-        
-        <form method="POST">
-            <div class="form-group">
-                <label for="current_password">Current Password:</label>
-                <input type="password" id="current_password" name="current_password" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="new_password">New Password:</label>
-                <input type="password" id="new_password" name="new_password" required>
-            </div>
-            
-            <div class="form-group">
-                <label for="confirm_password">Confirm Password:</label>
-                <input type="password" id="confirm_password" name="confirm_password" required>
-            </div>
-            
-            <button type="submit" name="change_password">Change Password</button>
-        </form>
-        
-        <div class="back-link">
-            <a href="/codesamplecaps/views/dashboards/admin_dashboard.php">← Back to Dashboard</a>
+    <main class="main-content">
+        <div class="header">
+            <h1>Change Password</h1>
+            <div class="user-info"><span>Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></span></div>
         </div>
-    </div>
+
+        <div class="form-section" style="max-width:700px;">
+            <h2 style="margin-top:0;">Update Super Admin Password</h2>
+            <p class="password-tip">Use strong password: 12+ chars with uppercase, lowercase, number, special symbol (e.g. <code>Admin#2026Secure!</code>).</p>
+
+            <?php if ($error): ?>
+                <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
+
+            <?php if ($success): ?>
+                <div class="alert alert-success"><?php echo htmlspecialchars($success); ?></div>
+            <?php endif; ?>
+
+            <form method="POST">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="current_password">Current Password</label>
+                        <div class="password-input-wrap">
+                            <input type="password" id="current_password" name="current_password" required>
+                            <button type="button" class="togglePassword" data-target="current_password">Show</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="new_password">New Password</label>
+                        <div class="password-input-wrap">
+                            <input type="password" id="new_password" name="new_password" minlength="12" required>
+                            <button type="button" class="togglePassword" data-target="new_password">Show</button>
+                        </div>
+                        <small id="newPassStrength" class="pass-indicator">Strength: -</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm_password">Confirm New Password</label>
+                        <div class="password-input-wrap">
+                            <input type="password" id="confirm_password" name="confirm_password" minlength="12" required>
+                            <button type="button" class="togglePassword" data-target="confirm_password">Show</button>
+                        </div>
+                        <small id="confirmPassMatch" class="pass-indicator">Match: -</small>
+                    </div>
+                </div>
+
+                <button type="submit" name="change_password" class="btn-primary">Save New Password</button>
+            </form>
+        </div>
+    </main>
 </div>
 
+<script src="/codesamplecaps/public/assets/js/script.js"></script>
+<script>
+function scorePassword(value) {
+    let score = 0;
+    if (value.length >= 12) score++;
+    if (/[A-Z]/.test(value)) score++;
+    if (/[a-z]/.test(value)) score++;
+    if (/\d/.test(value)) score++;
+    if (/[^A-Za-z0-9]/.test(value)) score++;
+    return score;
+}
+
+function renderStrength(input, indicator) {
+    const score = scorePassword(input.value);
+    let text = 'Weak';
+    let cls = 'weak';
+    if (score >= 5) { text = 'Super Strong'; cls = 'super-strong'; }
+    else if (score === 4) { text = 'Strong'; cls = 'strong'; }
+    else if (score === 3) { text = 'Medium'; cls = 'medium'; }
+
+    indicator.textContent = 'Strength: ' + text;
+    indicator.className = 'pass-indicator ' + cls;
+    input.classList.remove('weak-border', 'medium-border', 'strong-border');
+    if (cls === 'weak') input.classList.add('weak-border');
+    else if (cls === 'medium') input.classList.add('medium-border');
+    else input.classList.add('strong-border');
+}
+
+const newPass = document.getElementById('new_password');
+const confirmPass = document.getElementById('confirm_password');
+const strength = document.getElementById('newPassStrength');
+const match = document.getElementById('confirmPassMatch');
+
+if (newPass && strength) {
+    newPass.addEventListener('input', function(){
+        renderStrength(newPass, strength);
+        if (confirmPass && match) {
+            const same = confirmPass.value !== '' && confirmPass.value === newPass.value;
+            match.textContent = 'Match: ' + (same ? 'Yes' : 'No');
+            match.className = 'pass-indicator ' + (same ? 'strong' : 'weak');
+        }
+    });
+}
+
+if (confirmPass && match) {
+    confirmPass.addEventListener('input', function(){
+        const same = confirmPass.value !== '' && confirmPass.value === newPass.value;
+        match.textContent = 'Match: ' + (same ? 'Yes' : 'No');
+        match.className = 'pass-indicator ' + (same ? 'strong' : 'weak');
+    });
+}
+</script>
 </body>
 </html>

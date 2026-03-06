@@ -53,6 +53,18 @@
         background: #c0392b;
         transform: translateX(5px);
     }
+
+    @media (max-width: 768px) {
+        .sidebar {
+            position: relative;
+            width: 100%;
+            height: auto;
+            min-height: auto;
+            padding: 14px;
+        }
+        .sidebar a { margin: 6px 0; }
+    }
+
 </style>
 
 <div class="sidebar">
