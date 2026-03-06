@@ -26,7 +26,6 @@ session_start();
                 <li><a href="#projects" class="nav-link">Projects</a></li>
                 <li><a href="#contact" class="nav-link">Contact</a></li>
                 <?php if (empty($_SESSION['user_id'])): ?>
-                    <li><a href="/codesamplecaps/views/auth/register.php" class="nav-link btn btn-secondary">Register</a></li>
                     <li class="mobile-only"><a href="login.php" class="nav-link btn btn-primary">Login</a></li>
                 <?php endif; ?>
             </ul>
@@ -207,7 +206,6 @@ session_start();
                         <p>You must be logged in to send us a message.</p>
                         <div class="login-card-actions">
                             <a href="login.php" class="btn btn-primary">Login</a>
-                            <a href="/codesamplecaps/views/auth/register.php" class="btn btn-secondary">Create Account</a>
                         </div>
                     </div>
                 <?php else: ?>
