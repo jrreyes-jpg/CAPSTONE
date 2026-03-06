@@ -182,7 +182,7 @@ $engineers_result = $conn->query("SELECT id AS user_id, full_name, email, create
     <div class="sidebar">
         <h3>Super Admin Menu</h3>
         <a href="/codesamplecaps/views/dashboards/create_engineer.php">Create Engineer</a>
-        <a href="/codesamplecaps/views/dashboards/admin_dashboard.php">Dashboard</a>
+        <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php">Dashboard</a>
         <a href="/codesamplecaps/views/auth/logout.php">Logout</a>
     </div>
     
