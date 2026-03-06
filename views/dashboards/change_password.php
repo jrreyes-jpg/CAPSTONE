@@ -184,7 +184,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
         </form>
         
         <div class="back-link">
-            <a href="/codesamplecaps/views/dashboards/admin_dashboard.php">← Back to Dashboard</a>
+            <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php">← Back to Dashboard</a>
         </div>
     </div>
 </div>

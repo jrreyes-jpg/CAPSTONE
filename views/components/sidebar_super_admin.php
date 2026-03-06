@@ -12,7 +12,7 @@
 
    <ul class="nav-menu">
     <li>
-        <a href="/codesamplecaps/views/dashboards/admin_dashboard.php" class="menu-link">
+        <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php" class="menu-link">
             📊 <span class="menu-text">Dashboard</span>
         </a>
     </li>
@@ -24,7 +24,7 @@
     </li>
 
     <li>
-        <a href="/codesamplecaps/views/dashboards/admin_dashboard.php#projects-tab" class="menu-link">
+        <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php#projects-tab" class="menu-link">
             📁 <span class="menu-text">Projects</span>
         </a>
     </li>
