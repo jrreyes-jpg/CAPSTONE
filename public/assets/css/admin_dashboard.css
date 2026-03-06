@@ -715,15 +715,3 @@ body.page-loaded {
 .medium-border { border-color: #f59e0b !important; box-shadow: 0 0 0 2px rgba(245,158,11,.15); }
 .strong-border { border-color: #16a34a !important; box-shadow: 0 0 0 2px rgba(22,163,74,.15); }
 
-.role-pill {
-    display: inline-block;
-    padding: 6px 10px;
-    border-radius: 999px;
-    font-size: 12px;
-    color: #0f172a;
-    background: #e2e8f0;
-}
-
-.role-grid {
-    grid-template-columns: 1.1fr 1.3fr 1fr auto auto auto;
-}

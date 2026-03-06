@@ -168,18 +168,10 @@ function fetchUsersByRoles(mysqli $conn, array $roles): array {
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
-function fetchUsersWithoutValidRole(mysqli $conn): array {
-    $stmt = $conn->prepare("SELECT id, full_name, email, phone, status, role FROM users WHERE role IS NULL OR role = '' OR role NOT IN ('engineer','foreman','foremen','client') ORDER BY id DESC");
-    $stmt->execute();
-    $result = $stmt->get_result();
-    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
-}
-
 $engineers = fetchUsersByRoles($conn, ['engineer']);
 $foremen = fetchUsersByRoles($conn, ['foreman', 'foremen']);
 $clients = fetchUsersByRoles($conn, ['client']);
-$unknownRoles = fetchUsersWithoutValidRole($conn);
-$totalUsers = count($engineers) + count($foremen) + count($clients) + count($unknownRoles);
+$totalUsers = count($engineers) + count($foremen) + count($clients);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -207,7 +199,7 @@ $totalUsers = count($engineers) + count($foremen) + count($clients) + count($unk
             <h2 style="margin-bottom: 20px;">System Overview</h2>
             <div class="stats">
                 <div class="stat-card"><h3>Engineers</h3><div class="number counter" data-target="<?php echo count($engineers); ?>">0</div></div>
-                <div class="stat-card"><h3>Foremen</h3><div class="number counter" data-target="<?php echo count($foremen); ?>">0</div></div>
+                <div class="stat-card"><h3>Foreman</h3><div class="number counter" data-target="<?php echo count($foremen); ?>">0</div></div>
                 <div class="stat-card"><h3>Clients</h3><div class="number counter" data-target="<?php echo count($clients); ?>">0</div></div>
                 <div class="stat-card"><h3>Total Users</h3><div class="number counter" data-target="<?php echo $totalUsers; ?>">0</div></div>
             </div>
@@ -216,15 +208,14 @@ $totalUsers = count($engineers) + count($foremen) + count($clients) + count($unk
         <div id="create" class="tab-content <?php echo $activeTab === 'create' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'create' ? 'display: block;' : 'display: none;'; ?>">
             <div class="form-section">
                 <h2>Create Account</h2>
-                <p class="password-tip">Password must be strong: 12+ chars, uppercase, lowercase, number, special symbol (e.g. <code>Edge#2026Secure!</code>).</p>
-                <form method="POST">
+                                <form method="POST">
                     <input type="hidden" name="action" value="create_account">
                     <div class="form-row">
                         <div class="form-group"><label for="full_name">Full Name *</label><input type="text" id="full_name" name="full_name" required></div>
                         <div class="form-group"><label for="email">Email *</label><input type="email" id="email" name="email" required></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label for="phone">Phone Number (PH)</label><input type="tel" id="phone" name="phone" pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX" inputmode="numeric"></div>
+                        <div class="form-group"><label for="phone">Phone Number (PH)</label><input type="tel" id="phone" name="phone" pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,'')"></div>
                         <div class="form-group">
                             <label for="role">Role *</label>
                             <select id="role" name="role" required>
@@ -240,6 +231,7 @@ $totalUsers = count($engineers) + count($foremen) + count($clients) + count($unk
                             <label for="password">Temporary Password *</label>
                             <div class="password-input-wrap">
                                 <input type="password" id="password" name="password" minlength="12" required>
+                                <small class="password-tip">Password must be strong: 12+ chars, uppercase, lowercase, number, special symbol (e.g. Edge#2026Secure!).</small>
                                 <button type="button" class="togglePassword" data-target="password">Show</button>
                             </div>
                             <small id="tempPassStrength" class="pass-indicator">Strength: -</small>
@@ -251,26 +243,25 @@ $totalUsers = count($engineers) + count($foremen) + count($clients) + count($unk
         </div>
 
         <div id="users" class="tab-content <?php echo $activeTab === 'users' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'users' ? 'display: block;' : 'display: none;'; ?>">
-            <?php $sections = ['Engineers' => $engineers, 'Foremen' => $foremen, 'Clients' => $clients, 'Missing/Invalid Role' => $unknownRoles]; foreach ($sections as $title => $users): ?>
+            <?php $sections = ['Engineers' => $engineers, 'Foreman' => $foremen, 'Clients' => $clients]; foreach ($sections as $title => $users): ?>
                 <h2 style="margin-top: 20px; margin-bottom: 15px;"><?php echo $title; ?></h2>
                 <div class="users-table">
                     <table>
-                        <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead>
                         <tbody>
                             <?php if (empty($users)): ?>
-                                <tr><td colspan="6" style="text-align: center; padding: 20px; color: #999;">No <?php echo strtolower($title); ?></td></tr>
+                                <tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">No <?php echo strtolower($title); ?></td></tr>
                             <?php else: ?>
                                 <?php foreach ($users as $user): $status = $user['status'] ?? 'active'; ?>
                                     <tr>
-                                        <td colspan="6">
+                                        <td colspan="5">
                                             <form method="POST" class="row-edit-form" data-row-form>
                                                 <input type="hidden" name="action" value="edit_user">
                                                 <input type="hidden" name="user_id" value="<?php echo (int)$user['id']; ?>">
-                                                <div class="row-grid role-grid">
+                                                <div class="row-grid">
                                                     <input type="text" name="edit_full_name" value="<?php echo htmlspecialchars($user['full_name']); ?>" required readonly>
                                                     <input type="email" name="edit_email" value="<?php echo htmlspecialchars($user['email']); ?>" required readonly>
-                                                    <input type="text" name="edit_phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX" readonly>
-                                                    <span class="role-pill"><?php echo htmlspecialchars($user['role'] ?: 'N/A'); ?></span>
+                                                    <input type="text" name="edit_phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX" oninput="this.value=this.value.replace(/[^0-9]/g,'')" readonly>
                                                     <span class="status-badge <?php echo $status === 'active' ? 'status-active' : 'status-inactive'; ?>"><?php echo htmlspecialchars(ucfirst($status)); ?></span>
                                                     <div class="action-group">
                                                         <button type="button" class="action-btn edit" data-edit-btn>Edit</button>
