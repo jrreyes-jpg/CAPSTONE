@@ -288,6 +288,7 @@ img { max-width: 100%; height: auto; }
   .left-panel,
   .right-panel {
     width: 100% !important;
+    min-height: auto;
   }
   .right-panel {
     padding: 20px 16px;
