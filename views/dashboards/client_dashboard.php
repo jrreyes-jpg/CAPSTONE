@@ -141,9 +141,9 @@ $client_projects = $projectsStmt->get_result();
         <p style="color: #7f8c8d; margin-bottom: 20px;">Browse engineers and see how many active projects they currently handle (capacity defaults to 1).</p>
         <div class="engineers-grid">
         <?php if($available_engineers->num_rows > 0):
-            $countActiveStmt = $conn->prepare("SELECT COUNT(*) FROM project_engineers pe JOIN projects p ON pe.project_id=p.project_id WHERE pe.engineer_id=? AND p.status!='completed'");
+            $countActiveStmt = $conn->prepare("SELECT COUNT(*) FROM project_assignments pa JOIN projects p ON pa.project_id=p.id WHERE pa.engineer_id=? AND p.status!='completed'");
             while($engineer = $available_engineers->fetch_assoc()):
-                $engId = $engineer['user_id'];
+                $engId = $engineer['id'];
                 $countActiveStmt->bind_param("i", $engId);
                 $countActiveStmt->execute();
                 $countActiveStmt->bind_result($activeProjects);
@@ -154,10 +154,10 @@ $client_projects = $projectsStmt->get_result();
             <div class="engineer-card">
                 <div class="engineer-name">👨‍💼 <?php echo htmlspecialchars($engineer['full_name']); ?></div>
                 <p style="margin:8px 0;"><strong>Active Projects:</strong> <?php echo $activeProjects; ?> &nbsp;•&nbsp; <strong>Capacity:</strong> <?php echo $capacity; ?></p>
-                <p><strong>User ID:</strong> #<?php echo $engineer['user_id']; ?></p>
+                <p><strong>User ID:</strong> #<?php echo $engineer['id']; ?></p>
                 <div class="action-buttons">
                     <?php if($slotsLeft > 0): ?>
-                        <button class="btn" onclick="hireEngineer(<?php echo $engineer['user_id']; ?>, '<?php echo htmlspecialchars($engineer['full_name']); ?>')">📨 Request</button>
+                        <button class="btn" onclick="hireEngineer(<?php echo $engineer['id']; ?>, '<?php echo htmlspecialchars($engineer['full_name']); ?>')">📨 Request</button>
                     <?php else: ?>
                         <button class="btn" disabled>Fully Booked</button>
                     <?php endif; ?>
