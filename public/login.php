@@ -57,7 +57,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
                 $_SESSION['role'] = $user['role'];
 
                 if ($user['role'] == 'super_admin') {
-                    header("Location: /codesamplecaps/views/dashboards/admin_dashboard.php");
+                    header("Location: /codesamplecaps/views/dashboards/super_admin_dashboard.php");
                 } elseif ($user['role'] == 'engineer') {
                     header("Location: /codesamplecaps/views/dashboards/engineer_dashboard.php");
                 } elseif ($user['role'] == 'foreman') {
@@ -152,7 +152,6 @@ end_login:
 
 <div class="links">
     <a onclick="showForgot()">Forgot Password?</a>
-    <a onclick="showSignup()">Sign Up</a>
 </div>            </form>
         </div>
 
@@ -169,9 +168,6 @@ function showForgot(){
     window.location.href = '/codesamplecaps/views/auth/forgot.php';
 }
 
-function showSignup(){
-    window.location.href = '/codesamplecaps/views/auth/register.php';
-}
 </script>
 
     <script src="/codesamplecaps/public/assets/js/script.js"></script>
