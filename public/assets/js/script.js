@@ -19,7 +19,7 @@ if (canvas) {
             this.speedY = Math.random() * 1 - 0.5;
             this.opacity = Math.random() * 0.5 + 0.3;
         }
-        
+
         update() {
             this.x += this.speedX;
             this.y += this.speedY;
@@ -28,7 +28,7 @@ if (canvas) {
             if (this.y > canvas.height) this.y = 0;
             if (this.y < 0) this.y = canvas.height;
         }
-        
+
         draw() {
             ctx.fillStyle = `rgba(100, 200, 255, ${this.opacity})`;
             ctx.beginPath();
@@ -37,13 +37,11 @@ if (canvas) {
         }
     }
 
-    for (let i = 0; i < particleCount; i++) {
-        particles.push(new Particle());
-    }
+    for (let i = 0; i < particleCount; i++) particles.push(new Particle());
 
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        particles.forEach(particle => {
+        particles.forEach((particle) => {
             particle.update();
             particle.draw();
         });
@@ -58,11 +56,9 @@ if (canvas) {
     });
 }
 
-// ================================
-// Password show/hide toggle
-// ================================
 document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('.togglePassword').forEach(function(btn){
+    // Password toggle
+    document.querySelectorAll('.togglePassword').forEach(function (btn) {
         btn.addEventListener('click', function () {
             const targetId = btn.getAttribute('data-target');
             const input = document.getElementById(targetId);
@@ -74,83 +70,90 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // ================================
-    // Forgot Password redirect
-    // ================================
-    document.querySelectorAll('.links a').forEach(function(link){
-        if(link.textContent.includes('Forgot Password')) {
-            link.addEventListener('click', function(e){
+    // Forgot password redirect
+    document.querySelectorAll('.links a').forEach(function (link) {
+        if (link.textContent.includes('Forgot Password')) {
+            link.addEventListener('click', function (e) {
                 e.preventDefault();
                 window.location.href = '/codesamplecaps/views/auth/forgot.php';
             });
         }
     });
-});
-document.addEventListener("DOMContentLoaded", function () {
 
-    const sidebar = document.getElementById("sidebar");
-    const toggleBtn = document.getElementById("sidebarToggle");
-    const overlay = document.getElementById("sidebarOverlay");
+    // Sidebar behavior (safe-guard if elements are missing)
+    const sidebar = document.getElementById('sidebar');
+    const toggleBtn = document.getElementById('sidebarToggle');
+    const overlay = document.getElementById('sidebarOverlay');
 
-    // Load saved state (Desktop only)
-    if (window.innerWidth > 768) {
-        if (localStorage.getItem("sidebarShrink") === "true") {
-            sidebar.classList.add("shrink");
+    if (sidebar && toggleBtn && overlay) {
+        if (window.innerWidth > 768 && localStorage.getItem('sidebarShrink') === 'true') {
+            sidebar.classList.add('shrink');
         }
+
+        toggleBtn.addEventListener('click', function () {
+            if (window.innerWidth <= 768) {
+                sidebar.classList.toggle('mobile-open');
+                overlay.classList.toggle('active');
+            } else {
+                sidebar.classList.toggle('shrink');
+                localStorage.setItem('sidebarShrink', sidebar.classList.contains('shrink'));
+            }
+        });
+
+        overlay.addEventListener('click', function () {
+            sidebar.classList.remove('mobile-open');
+            overlay.classList.remove('active');
+        });
     }
 
-    toggleBtn.addEventListener("click", function () {
+    // Active menu: only exact match should be green
+    const links = document.querySelectorAll('.menu-link');
+    links.forEach((link) => link.classList.remove('active'));
 
-        if (window.innerWidth <= 768) {
-            sidebar.classList.toggle("mobile-open");
-            overlay.classList.toggle("active");
-        } else {
-            sidebar.classList.toggle("shrink");
+    const current = new URL(window.location.href);
+    let matched = null;
 
-            // Save state
-            localStorage.setItem(
-                "sidebarShrink",
-                sidebar.classList.contains("shrink")
-            );
-        }
-
+    links.forEach((link) => {
+        try {
+            const target = new URL(link.getAttribute('href'), window.location.origin);
+            const samePath = current.pathname === target.pathname;
+            const sameQuery = current.search === target.search;
+            if (samePath && sameQuery) {
+                matched = link;
+            }
+        } catch (_) {}
     });
 
-    // Close mobile on overlay click
-    overlay.addEventListener("click", function () {
-        sidebar.classList.remove("mobile-open");
-        overlay.classList.remove("active");
-    });
-
-});
-// Auto active menu based on URL
-const links = document.querySelectorAll(".menu-link");
-links.forEach(link => {
-    if (window.location.href.includes(link.getAttribute("href"))) {
-        link.classList.add("active");
+    if (!matched) {
+        links.forEach((link) => {
+            try {
+                const target = new URL(link.getAttribute('href'), window.location.origin);
+                if (!matched && current.pathname === target.pathname) matched = link;
+            } catch (_) {}
+        });
     }
-});
-// Smooth page fade in
-window.addEventListener("load", function() {
-    document.body.classList.add("page-loaded");
-});
-// Counter Animation
-const counters = document.querySelectorAll(".counter");
 
-counters.forEach(counter => {
+    if (matched) matched.classList.add('active');
 
-    const updateCount = () => {
-        const target = +counter.getAttribute("data-target");
-        const current = +counter.innerText;
-        const increment = target / 40;
+    // Smooth load
+    document.body.classList.add('page-loaded');
 
-        if (current < target) {
-            counter.innerText = Math.ceil(current + increment);
-            setTimeout(updateCount, 30);
-        } else {
-            counter.innerText = target;
-        }
-    };
+    // Counter animation
+    const counters = document.querySelectorAll('.counter');
+    counters.forEach((counter) => {
+        const updateCount = () => {
+            const target = +counter.getAttribute('data-target');
+            const currentValue = +counter.innerText;
+            const increment = target / 40;
 
-    updateCount();
+            if (currentValue < target) {
+                counter.innerText = Math.ceil(currentValue + increment);
+                setTimeout(updateCount, 30);
+            } else {
+                counter.innerText = target;
+            }
+        };
+
+        updateCount();
+    });
 });

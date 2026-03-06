@@ -24,8 +24,8 @@
     </li>
 
     <li>
-        <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php#projects-tab" class="menu-link">
-            📁 <span class="menu-text">Projects</span>
+        <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php?tab=users" class="menu-link">
+            📁 <span class="menu-text">Manage Users</span>
         </a>
     </li>
 
