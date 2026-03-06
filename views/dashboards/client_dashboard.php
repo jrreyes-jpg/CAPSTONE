@@ -43,17 +43,14 @@ $engineersStmt = $conn->prepare("SELECT id, full_name, status FROM users WHERE r
 $engineersStmt->execute();
 $available_engineers = $engineersStmt->get_result();
 
-/* FETCH CLIENT'S PROJECTS */
 $projectsStmt = $conn->prepare("
 SELECT p.*, u.full_name AS engineer_name
 FROM projects p
-LEFT JOIN users u ON u.id = (
-    SELECT engineer_id FROM project_assignments WHERE project_id = p.id LIMIT 1
-)
+LEFT JOIN project_assignments pa ON pa.project_id = p.id
+LEFT JOIN users u ON u.id = pa.engineer_id
 WHERE p.client_id=?
 ORDER BY p.created_at DESC
-");
-$projectsStmt->bind_param("i",$user_id);
+");$projectsStmt->bind_param("i",$user_id);
 $projectsStmt->execute();
 $client_projects = $projectsStmt->get_result();
 ?>

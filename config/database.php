@@ -1,20 +1,28 @@
 <?php
+/**
+ * Database Connection
+ * Uses Config service for settings (NEVER hardcoded)
+ */
 
-$host = "127.0.0.1";   // Mas stable kaysa localhost
-$port = "3307";        // Custom MySQL port mo
-$user = "root";        // Default sa XAMPP
-$pass = "";            // Default walang password
-$db   = "edge_project_asset_inventory_db";
+require_once __DIR__ . '/Config.php';
 
-// Create connection
-$conn = new mysqli($host, $user, $pass, $db, $port);
+$config = Config::getInstance();
+$db_config = $config->getDbConnection();
+
+// Create connection using config
+$conn = new mysqli(
+    $db_config['host'],
+    $db_config['user'],
+    $db_config['password'],
+    $db_config['database'],
+    $db_config['port']
+);
 
 // Check connection
 if ($conn->connect_error) {
     die("Database Connection Failed: " . $conn->connect_error);
 }
 
-// Optional: set charset
-$conn->set_charset("utf8mb4");
+// Set charset
+$conn->set_charset($db_config['charset']);
 
-?>
