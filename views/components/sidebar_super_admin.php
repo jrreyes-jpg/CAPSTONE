@@ -18,8 +18,8 @@
     </li>
 
     <li>
-        <a href="/codesamplecaps/views/dashboards/create_engineer.php" class="menu-link">
-            ➕ <span class="menu-text">Create Engineer</span>
+        <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php?tab=create" class="menu-link">
+            ➕ <span class="menu-text">Create Accounts</span>
         </a>
     </li>
 

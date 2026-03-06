@@ -909,3 +909,18 @@ p {
 .feature:nth-child(4) { animation-delay: 0.4s; }
 .feature:nth-child(5) { animation-delay: 0.5s; }
 .feature:nth-child(6) { animation-delay: 0.6s; }
+
+/* === Global responsive adjustments === */
+img { max-width: 100%; height: auto; }
+
+@media (max-width: 768px) {
+  body { overflow-x: hidden; }
+  .container, .nav-container { padding-left: 14px !important; padding-right: 14px !important; }
+  .hero-title { font-size: 1.9rem !important; line-height: 1.2; }
+  .hero-subtitle { font-size: 1rem !important; }
+  .services-grid,
+  .features-grid,
+  .projects-grid { grid-template-columns: 1fr !important; }
+  .cta-buttons { width: 100%; display: grid; grid-template-columns: 1fr; gap: 10px; }
+  .cta-buttons .btn { width: 100%; text-align: center; }
+}

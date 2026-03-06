@@ -90,6 +90,12 @@ $totalUsers = count($engineers) + count($foremen) + count($clients);
             <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
         <?php endif; ?>
 
+        <div class="dashboard-actions">
+            <a class="action-chip" href="?tab=dashboard">Overview</a>
+            <a class="action-chip" href="?tab=create">Create Client / Foreman / Engineer</a>
+            <a class="action-chip" href="?tab=users">View All Accounts</a>
+        </div>
+
         <div id="dashboard" class="tab-content <?php echo $activeTab === 'dashboard' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'dashboard' ? 'display: block;' : 'display: none;'; ?>">
             <h2 style="margin-bottom: 20px;">System Overview</h2>
             <div class="stats">
@@ -114,7 +120,7 @@ $totalUsers = count($engineers) + count($foremen) + count($clients);
 
         <div id="create" class="tab-content <?php echo $activeTab === 'create' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'create' ? 'display: block;' : 'display: none;'; ?>">
             <div class="form-section">
-                <h2>Create New Account</h2>
+                <h2>Create New Account (Client, Foreman, Engineer)</h2>
                 <form method="POST">
                     <div class="form-row">
                         <div class="form-group">
