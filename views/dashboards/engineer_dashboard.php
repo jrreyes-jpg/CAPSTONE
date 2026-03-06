@@ -11,9 +11,8 @@ $user_id = $_SESSION['user_id'];
 
 /* ASSIGNED PROJECTS COUNT */
 $totalAssigned = $conn->prepare("
-    SELECT COUNT(*)
-    FROM project_assignments pa
-    WHERE pa.user_id = ? AND pa.role_in_project = 'engineer'
+    SELECT COUNT(*) FROM project_assignments
+    WHERE engineer_id=?
 ");
 $totalAssigned->bind_param("i",$user_id);
 $totalAssigned->execute();
@@ -24,8 +23,8 @@ $totalAssigned->close();
 /* IN PROGRESS PROJECTS */
 $inProgress = $conn->prepare("
     SELECT COUNT(*) FROM projects p
-    JOIN project_assignments pa ON p.project_id = pa.project_id
-    WHERE pa.user_id = ? AND pa.role_in_project = 'engineer' AND p.status='ongoing'
+    JOIN project_assignments pe ON project_id = pe.project_id
+    WHERE pe.engineer_id=? AND p.status='ongoing'
 ");
 $inProgress->bind_param("i",$user_id);
 $inProgress->execute();
@@ -36,8 +35,8 @@ $inProgress->close();
 /* COMPLETED PROJECTS */
 $completedProjects = $conn->prepare("
     SELECT COUNT(*) FROM projects p
-    JOIN project_assignments pa ON p.project_id = pa.project_id
-    WHERE pa.user_id = ? AND pa.role_in_project = 'engineer' AND p.status='completed'
+    JOIN project_assignments pe ON project_id = pe.project_id
+    WHERE pe.engineer_id=? AND p.status='completed'
 ");
 $completedProjects->bind_param("i",$user_id);
 $completedProjects->execute();
@@ -49,9 +48,9 @@ $completedProjects->close();
 $projectsStmt = $conn->prepare("
     SELECT p.id, p.project_name, p.status, p.description, p.start_date, p.end_date, u.full_name as client_name
     FROM projects p
-    JOIN project_assignments pa ON p.project_id = pa.project_id
+    JOIN project_assignments pe ON p.id = pe.project_id
     LEFT JOIN users u ON p.client_id = u.id
-    WHERE pa.user_id = ? AND pa.role_in_project = 'engineer'
+    WHERE pe.engineer_id=?
     ORDER BY p.status DESC, p.created_at DESC
 ");
 $projectsStmt->bind_param("i",$user_id);
@@ -62,9 +61,9 @@ $assigned_projects = $projectsStmt->get_result();
 $tasksStmt = $conn->prepare("
     SELECT t.id, t.task_name, t.status, t.deadline, p.project_name, p.id
     FROM tasks t
-    JOIN projects p ON t.project_id = p.project_id
-    JOIN project_assignments pa ON p.project_id = pa.project_id
-    WHERE pa.user_id = ? AND pa.role_in_project = 'engineer'
+    JOIN projects p ON t.project_id = p.id
+    JOIN project_assignments pe ON p.id = pe.project_id
+    WHERE pe.engineer_id=?
     ORDER BY t.deadline ASC
 ");
 $tasksStmt->bind_param("i",$user_id);
