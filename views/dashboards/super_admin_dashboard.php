@@ -32,6 +32,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!in_array($role, $allowedRoles, true)) {
             $error = 'Invalid role selected.';
             $activeTab = 'create';
+        } elseif ($phone !== '' && !preg_match('/^09\d{9}$/', $phone)) {
+            $error = 'Phone number must be a valid PH mobile number (09xxxxxxxxx).';
+            $activeTab = 'create';
         } else {
             $checkStmt = $conn->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
             $checkStmt->bind_param('s', $email);
@@ -87,6 +90,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Invalid edit request. Full name and email are required.';
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error = 'Invalid email format.';
+        } elseif ($phone !== '' && !preg_match('/^09\d{9}$/', $phone)) {
+            $error = 'Phone number must be a valid PH mobile number (09xxxxxxxxx).';
         } else {
             $emailStmt = $conn->prepare('SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1');
             $emailStmt->bind_param('si', $email, $userId);
@@ -184,7 +189,7 @@ $totalUsers = count($engineers) + count($foremen) + count($clients);
                         <div class="form-group"><label for="email">Email *</label><input type="email" id="email" name="email" required></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label for="phone">Phone Number</label><input type="tel" id="phone" name="phone"></div>
+                        <div class="form-group"><label for="phone">Phone Number</label><input type="tel" id="phone" name="phone" pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX"></div>
                         <div class="form-group">
                             <label for="role">Role *</label>
                             <select id="role" name="role" required>
@@ -229,7 +234,7 @@ $totalUsers = count($engineers) + count($foremen) + count($clients);
                                                 <div class="row-grid">
                                                     <input type="text" name="edit_full_name" value="<?php echo htmlspecialchars($user['full_name']); ?>" required readonly>
                                                     <input type="email" name="edit_email" value="<?php echo htmlspecialchars($user['email']); ?>" required readonly>
-                                                    <input type="text" name="edit_phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" readonly>
+                                                    <input type="text" name="edit_phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX" readonly>
 
                                                     <span class="status-badge <?php echo $status === 'active' ? 'status-active' : 'status-inactive'; ?>"><?php echo htmlspecialchars(ucfirst($status)); ?></span>
 

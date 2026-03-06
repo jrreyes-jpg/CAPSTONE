@@ -670,3 +670,23 @@ body.page-loaded {
         grid-template-columns: 1fr;
     }
 }
+
+/* spacing polish requested */
+.password-input-wrap input {
+    flex: 1;
+    min-width: 0;
+}
+
+.form-section form .btn-primary {
+    margin-top: 14px;
+}
+
+.form-section .form-row + .form-row {
+    margin-top: 6px;
+}
+
+.action-btn,
+.password-input-wrap .togglePassword,
+.btn-primary {
+    white-space: nowrap;
+}

@@ -99,10 +99,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
 
                 <button type="submit" name="change_password" class="btn-primary">Save New Password</button>
             </form>
-
-            <div style="margin-top:18px;">
-                <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php" class="action-chip">← Back to Super Admin Dashboard</a>
-            </div>
         </div>
     </main>
 </div>

@@ -5,6 +5,9 @@ $currentQuery = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_QUERY) ?? '';
 $isDashboard = str_contains($currentPath, '/views/dashboards/super_admin_dashboard.php') && $currentQuery === '';
 $isCreate = str_contains($currentPath, '/views/dashboards/super_admin_dashboard.php') && str_contains($currentQuery, 'tab=create');
 $isUsers = str_contains($currentPath, '/views/dashboards/super_admin_dashboard.php') && str_contains($currentQuery, 'tab=users');
+$isInventory = str_contains($currentPath, '/views/dashboards/inventory.php');
+$isAssets = str_contains($currentPath, '/views/dashboards/assets.php');
+$isReports = str_contains($currentPath, '/views/dashboards/reports.php');
 $isChangePassword = str_contains($currentPath, '/views/dashboards/change_password.php');
 ?>
 <nav class="sidebar" id="sidebar">
@@ -18,35 +21,16 @@ $isChangePassword = str_contains($currentPath, '/views/dashboards/change_passwor
     </div>
 
     <ul class="nav-menu">
-        <li>
-            <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php" class="menu-link<?php echo $isDashboard ? ' active' : ''; ?>">
-                📊 <span class="menu-text">Dashboard</span>
-            </a>
-        </li>
+        <li><a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php" class="menu-link<?php echo $isDashboard ? ' active' : ''; ?>">📊 <span class="menu-text">Dashboard</span></a></li>
+        <li><a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php?tab=create" class="menu-link<?php echo $isCreate ? ' active' : ''; ?>">➕ <span class="menu-text">Create Accounts</span></a></li>
+        <li><a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php?tab=users" class="menu-link<?php echo $isUsers ? ' active' : ''; ?>">👥 <span class="menu-text">Manage Users</span></a></li>
 
-        <li>
-            <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php?tab=create" class="menu-link<?php echo $isCreate ? ' active' : ''; ?>">
-                ➕ <span class="menu-text">Create Accounts</span>
-            </a>
-        </li>
+        <li><a href="/codesamplecaps/views/dashboards/inventory.php" class="menu-link<?php echo $isInventory ? ' active' : ''; ?>">📦 <span class="menu-text">Inventory</span></a></li>
+        <li><a href="/codesamplecaps/views/dashboards/assets.php" class="menu-link<?php echo $isAssets ? ' active' : ''; ?>">🏗️ <span class="menu-text">Assets</span></a></li>
+        <li><a href="/codesamplecaps/views/dashboards/reports.php" class="menu-link<?php echo $isReports ? ' active' : ''; ?>">📈 <span class="menu-text">Reports</span></a></li>
 
-        <li>
-            <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php?tab=users" class="menu-link<?php echo $isUsers ? ' active' : ''; ?>">
-                👥 <span class="menu-text">Manage Users</span>
-            </a>
-        </li>
-
-        <li>
-            <a href="/codesamplecaps/views/dashboards/change_password.php" class="menu-link<?php echo $isChangePassword ? ' active' : ''; ?>">
-                🔐 <span class="menu-text">Change Password</span>
-            </a>
-        </li>
-
-        <li>
-            <a href="/codesamplecaps/views/auth/logout.php" class="menu-link logout">
-                🚪 <span class="menu-text">Logout</span>
-            </a>
-        </li>
+        <li><a href="/codesamplecaps/views/dashboards/change_password.php" class="menu-link<?php echo $isChangePassword ? ' active' : ''; ?>">🔐 <span class="menu-text">Change Password</span></a></li>
+        <li><a href="/codesamplecaps/views/auth/logout.php" class="menu-link logout">🚪 <span class="menu-text">Logout</span></a></li>
     </ul>
 </nav>
 <div id="sidebarOverlay" class="sidebar-overlay"></div>
