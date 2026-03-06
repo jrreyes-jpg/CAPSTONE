@@ -106,6 +106,17 @@ $client_projects = $projectsStmt->get_result();
     .form-group { margin-bottom: 20px; }
     .form-group label { color: #2c3e50; font-weight: 600; display: block; margin-bottom: 8px; }
     .form-group input { width: 100%; padding: 10px; border: 1px solid #bdc3c7; border-radius: 5px; }
+
+@media (max-width: 768px) {
+    body { overflow-x: hidden; }
+    .sidebar { position: relative; width: 100%; height: auto; min-height: auto; }
+    .main-content { margin-left: 0; padding: 16px; }
+    .tabs { flex-wrap: wrap; gap: 8px; }
+    .tab { width: 100%; text-align: center; }
+    .engineers-grid, .projects-grid, .stats-grid { grid-template-columns: 1fr; }
+    .project-card, .engineer-card, .profile-form { width: 100%; }
+}
+
 </style>
 </head>
 <body>

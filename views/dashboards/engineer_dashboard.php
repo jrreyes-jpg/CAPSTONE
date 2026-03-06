@@ -119,6 +119,16 @@ $tasks_list = $tasksStmt->get_result();
     .form-group { margin-bottom: 20px; }
     .form-group label { color: #2c3e50; font-weight: 600; display: block; margin-bottom: 8px; }
     .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #bdc3c7; border-radius: 5px; font-family: 'Poppins', sans-serif; }
+
+@media (max-width: 768px) {
+    body { overflow-x: hidden; }
+    .main-content { margin-left: 0 !important; padding: 16px !important; }
+    .stats-grid, .projects-grid { grid-template-columns: 1fr !important; }
+    .tabs { flex-wrap: wrap; gap: 8px; }
+    .tab { width: 100%; text-align: center; }
+    .project-card { width: 100%; }
+}
+
 </style>
 </head>
 <body>
