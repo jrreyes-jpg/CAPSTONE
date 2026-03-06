@@ -690,3 +690,40 @@ body.page-loaded {
 .btn-primary {
     white-space: nowrap;
 }
+
+.password-tip {
+    margin: 6px 0 14px;
+    color: #334155;
+    font-size: 13px;
+}
+
+.pass-indicator {
+    display: inline-block;
+    margin-top: 8px;
+    padding-left: 10px;
+    border-left: 4px solid #94a3b8;
+    font-size: 12px;
+    color: #475569;
+}
+
+.pass-indicator.weak { border-left-color: #dc2626; color: #991b1b; }
+.pass-indicator.medium { border-left-color: #f59e0b; color: #92400e; }
+.pass-indicator.strong,
+.pass-indicator.super-strong { border-left-color: #16a34a; color: #166534; }
+
+.weak-border { border-color: #ef4444 !important; box-shadow: 0 0 0 2px rgba(239,68,68,.15); }
+.medium-border { border-color: #f59e0b !important; box-shadow: 0 0 0 2px rgba(245,158,11,.15); }
+.strong-border { border-color: #16a34a !important; box-shadow: 0 0 0 2px rgba(22,163,74,.15); }
+
+.role-pill {
+    display: inline-block;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    color: #0f172a;
+    background: #e2e8f0;
+}
+
+.role-grid {
+    grid-template-columns: 1.1fr 1.3fr 1fr auto auto auto;
+}
