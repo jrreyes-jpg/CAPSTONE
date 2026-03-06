@@ -27,7 +27,14 @@ $teamMembers = [];
         .main-content { margin-left: 250px; padding: 40px; }
         .stats-grid { display: flex; gap: 20px; margin-bottom: 20px; }
         .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); flex: 1; }
-    </style>
+    
+@media (max-width: 768px) {
+    body { overflow-x: hidden; }
+    .main-content { margin-left: 0; padding: 16px; }
+    .stats-grid { flex-direction: column; }
+}
+
+</style>
 </head>
 <body>
 
