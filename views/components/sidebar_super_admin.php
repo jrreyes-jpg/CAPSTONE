@@ -12,20 +12,20 @@
 
    <ul class="nav-menu">
     <li>
-        <a href="/codesamplecaps/views/dashboards/admin_dashboard.php" class="menu-link">
+        <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php" class="menu-link">
             📊 <span class="menu-text">Dashboard</span>
         </a>
     </li>
 
     <li>
-        <a href="/codesamplecaps/views/dashboards/create_engineer.php" class="menu-link">
-            ➕ <span class="menu-text">Create Engineer</span>
+        <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php?tab=create" class="menu-link">
+            ➕ <span class="menu-text">Create Accounts</span>
         </a>
     </li>
 
     <li>
-        <a href="/codesamplecaps/views/dashboards/admin_dashboard.php#projects-tab" class="menu-link">
-            📁 <span class="menu-text">Projects</span>
+        <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php?tab=users" class="menu-link">
+            📁 <span class="menu-text">Manage Users</span>
         </a>
     </li>
 
