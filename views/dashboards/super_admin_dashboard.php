@@ -231,9 +231,9 @@ $totalUsers = count($engineers) + count($foremen) + count($clients);
                             <label for="password">Temporary Password *</label>
                             <div class="password-input-wrap">
                                 <input type="password" id="password" name="password" minlength="12" required>
-                                <small class="password-tip">Password must be strong: 12+ chars, uppercase, lowercase, number, special symbol (e.g. Edge#2026Secure!).</small>
                                 <button type="button" class="togglePassword" data-target="password">Show</button>
                             </div>
+                            <small class="password-tip">Password must be strong: 12+ chars, uppercase, lowercase, number, special symbol (e.g. Edge#2026Secure!).</small>
                             <small id="tempPassStrength" class="pass-indicator">Strength: -</small>
                         </div>
                     </div>
@@ -246,41 +246,51 @@ $totalUsers = count($engineers) + count($foremen) + count($clients);
             <?php $sections = ['Engineers' => $engineers, 'Foreman' => $foremen, 'Clients' => $clients]; foreach ($sections as $title => $users): ?>
                 <h2 style="margin-top: 20px; margin-bottom: 15px;"><?php echo $title; ?></h2>
                 <div class="users-table">
-                    <table>
-                        <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Actions</th></tr></thead>
+                    <table class="responsive-table">
+                        <colgroup>
+                            <col style="width: 22%;">
+                            <col style="width: 26%;">
+                            <col style="width: 18%;">
+                            <col style="width: 14%;">
+                            <col style="width: 20%;">
+                        </colgroup>
+                        <thead>
+                            <tr><th>Name</th><th>Email</th><th>Phone</th><th>Status</th><th>Actions</th></tr>
+                        </thead>
                         <tbody>
                             <?php if (empty($users)): ?>
                                 <tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">No <?php echo strtolower($title); ?></td></tr>
                             <?php else: ?>
-                                <?php foreach ($users as $user): $status = $user['status'] ?? 'active'; ?>
-                                    <tr>
-                                        <td colspan="5">
-                                            <form method="POST" class="row-edit-form" data-row-form>
-                                                <input type="hidden" name="action" value="edit_user">
-                                                <input type="hidden" name="user_id" value="<?php echo (int)$user['id']; ?>">
-                                                <div class="row-grid">
-                                                    <input type="text" name="edit_full_name" value="<?php echo htmlspecialchars($user['full_name']); ?>" required readonly>
-                                                    <input type="email" name="edit_email" value="<?php echo htmlspecialchars($user['email']); ?>" required readonly>
-                                                    <input type="text" name="edit_phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX" oninput="this.value=this.value.replace(/[^0-9]/g,'')" readonly>
-                                                    <span class="status-badge <?php echo $status === 'active' ? 'status-active' : 'status-inactive'; ?>"><?php echo htmlspecialchars(ucfirst($status)); ?></span>
-                                                    <div class="action-group">
-                                                        <button type="button" class="action-btn edit" data-edit-btn>Edit</button>
-                                                        <button type="submit" class="action-btn save" data-save-btn hidden>Save</button>
-                                                        <button type="button" class="action-btn cancel" data-cancel-btn hidden>Cancel</button>
-                                                    </div>
-                                                </div>
-                                            </form>
-                                            <div class="action-group row-secondary-actions">
-                                                <form method="POST" style="display:inline-block;">
+                                <?php foreach ($users as $user): $status = $user['status'] ?? 'active'; $rowId = (int)$user['id']; ?>
+                                    <tr class="user-row" data-row-id="<?php echo $rowId; ?>">
+                                        <td><input class="table-input" type="text" data-field="full_name" value="<?php echo htmlspecialchars($user['full_name']); ?>" readonly required></td>
+                                        <td><input class="table-input" type="email" data-field="email" value="<?php echo htmlspecialchars($user['email']); ?>" readonly required></td>
+                                        <td><input class="table-input" type="text" data-field="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" pattern="09[0-9]{9}" maxlength="11" placeholder="09XXXXXXXXX" oninput="this.value=this.value.replace(/[^0-9]/g,'')" readonly></td>
+                                        <td><span class="status-badge <?php echo $status === 'active' ? 'status-active' : 'status-inactive'; ?>"><?php echo htmlspecialchars(ucfirst($status)); ?></span></td>
+                                        <td>
+                                            <div class="action-group compact">
+                                                <button type="button" class="action-btn edit" data-edit-btn>Edit</button>
+                                                <button type="button" class="action-btn save" data-save-btn hidden>Save</button>
+                                                <button type="button" class="action-btn cancel" data-cancel-btn hidden>Cancel</button>
+                                            </div>
+                                            <div class="action-group compact row-secondary-actions">
+                                                <form method="POST" style="display:inline-block; margin:0;">
                                                     <input type="hidden" name="action" value="update_status">
-                                                    <input type="hidden" name="user_id" value="<?php echo (int)$user['id']; ?>">
+                                                    <input type="hidden" name="user_id" value="<?php echo $rowId; ?>">
                                                     <input type="hidden" name="status" value="<?php echo $status === 'active' ? 'inactive' : 'active'; ?>">
                                                     <button type="submit" class="action-btn <?php echo $status === 'active' ? 'deactivate' : 'activate'; ?>"><?php echo $status === 'active' ? 'Set Inactive' : 'Set Active'; ?></button>
                                                 </form>
-                                                <form method="POST" style="display:inline-block;" onsubmit="return confirm('Delete user? This will set the account to inactive.');">
+                                                <form method="POST" style="display:inline-block; margin:0;" onsubmit="return confirm('Delete user? This will set the account to inactive.');">
                                                     <input type="hidden" name="action" value="delete_user">
-                                                    <input type="hidden" name="user_id" value="<?php echo (int)$user['id']; ?>">
+                                                    <input type="hidden" name="user_id" value="<?php echo $rowId; ?>">
                                                     <button type="submit" class="action-btn delete">Delete</button>
+                                                </form>
+                                                <form method="POST" id="save-form-<?php echo $rowId; ?>" style="display:none;">
+                                                    <input type="hidden" name="action" value="edit_user">
+                                                    <input type="hidden" name="user_id" value="<?php echo $rowId; ?>">
+                                                    <input type="hidden" name="edit_full_name" data-save-field="full_name">
+                                                    <input type="hidden" name="edit_email" data-save-field="email">
+                                                    <input type="hidden" name="edit_phone" data-save-field="phone">
                                                 </form>
                                             </div>
                                         </td>
@@ -292,6 +302,7 @@ $totalUsers = count($engineers) + count($foremen) + count($clients);
                 </div>
             <?php endforeach; ?>
         </div>
+</div>
     </main>
 </div>
 
@@ -331,28 +342,39 @@ if (tempPass && tempIndicator) {
     });
 }
 
-document.querySelectorAll('[data-row-form]').forEach(function(form){
-    const editBtn = form.querySelector('[data-edit-btn]');
-    const saveBtn = form.querySelector('[data-save-btn]');
-    const cancelBtn = form.querySelector('[data-cancel-btn]');
-    const inputs = form.querySelectorAll('input[type="text"], input[type="email"]');
-    const original = Array.from(inputs).map((i) => i.value);
+document.querySelectorAll('.user-row').forEach(function(row){
+    const editBtn = row.querySelector('[data-edit-btn]');
+    const saveBtn = row.querySelector('[data-save-btn]');
+    const cancelBtn = row.querySelector('[data-cancel-btn]');
+    const inputs = row.querySelectorAll('.table-input');
+    const rowId = row.getAttribute('data-row-id');
+    const saveForm = document.getElementById('save-form-' + rowId);
+    const originals = Array.from(inputs).map((input) => input.value);
 
     editBtn.addEventListener('click', function(){
-        inputs.forEach((i) => i.removeAttribute('readonly'));
+        inputs.forEach((input) => input.removeAttribute('readonly'));
         editBtn.hidden = true;
         saveBtn.hidden = false;
         cancelBtn.hidden = false;
     });
 
     cancelBtn.addEventListener('click', function(){
-        inputs.forEach((i, idx) => {
-            i.value = original[idx];
-            i.setAttribute('readonly', 'readonly');
+        inputs.forEach((input, index) => {
+            input.value = originals[index];
+            input.setAttribute('readonly', 'readonly');
         });
         editBtn.hidden = false;
         saveBtn.hidden = true;
         cancelBtn.hidden = true;
+    });
+
+    saveBtn.addEventListener('click', function(){
+        const byField = {};
+        inputs.forEach((input) => { byField[input.getAttribute('data-field')] = input.value; });
+        saveForm.querySelector('[data-save-field="full_name"]').value = byField.full_name || '';
+        saveForm.querySelector('[data-save-field="email"]').value = byField.email || '';
+        saveForm.querySelector('[data-save-field="phone"]').value = byField.phone || '';
+        saveForm.submit();
     });
 });
 </script>
