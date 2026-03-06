@@ -47,7 +47,7 @@ $completedProjects->close();
 
 /* FETCH ASSIGNED PROJECTS */
 $projectsStmt = $conn->prepare("
-    SELECT p.project_id, p.project_name, p.status, p.description, p.start_date, p.end_date, u.full_name as client_name
+    SELECT p.id, p.project_name, p.status, p.description, p.start_date, p.end_date, u.full_name as client_name
     FROM projects p
     JOIN project_assignments pa ON p.project_id = pa.project_id
     LEFT JOIN users u ON p.client_id = u.id
@@ -60,7 +60,7 @@ $assigned_projects = $projectsStmt->get_result();
 
 /* FETCH TASKS FOR ENGINEER */
 $tasksStmt = $conn->prepare("
-    SELECT t.task_id, t.task_name, t.status, t.deadline, p.project_name, p.project_id
+    SELECT t.id, t.task_name, t.status, t.deadline, p.project_name, p.id
     FROM tasks t
     JOIN projects p ON t.project_id = p.project_id
     JOIN project_assignments pa ON p.project_id = pa.project_id
