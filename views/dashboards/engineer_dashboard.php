@@ -11,8 +11,9 @@ $user_id = $_SESSION['user_id'];
 
 /* ASSIGNED PROJECTS COUNT */
 $totalAssigned = $conn->prepare("
-    SELECT COUNT(*) FROM project_engineers 
-    WHERE engineer_id=?
+    SELECT COUNT(*)
+    FROM project_assignments pa
+    WHERE pa.user_id = ? AND pa.role_in_project = 'engineer'
 ");
 $totalAssigned->bind_param("i",$user_id);
 $totalAssigned->execute();
@@ -23,8 +24,8 @@ $totalAssigned->close();
 /* IN PROGRESS PROJECTS */
 $inProgress = $conn->prepare("
     SELECT COUNT(*) FROM projects p
-    JOIN project_engineers pe ON p.project_id = pe.project_id
-    WHERE pe.engineer_id=? AND p.status='ongoing'
+    JOIN project_assignments pa ON p.project_id = pa.project_id
+    WHERE pa.user_id = ? AND pa.role_in_project = 'engineer' AND p.status='ongoing'
 ");
 $inProgress->bind_param("i",$user_id);
 $inProgress->execute();
@@ -35,8 +36,8 @@ $inProgress->close();
 /* COMPLETED PROJECTS */
 $completedProjects = $conn->prepare("
     SELECT COUNT(*) FROM projects p
-    JOIN project_engineers pe ON p.project_id = pe.project_id
-    WHERE pe.engineer_id=? AND p.status='completed'
+    JOIN project_assignments pa ON p.project_id = pa.project_id
+    WHERE pa.user_id = ? AND pa.role_in_project = 'engineer' AND p.status='completed'
 ");
 $completedProjects->bind_param("i",$user_id);
 $completedProjects->execute();
@@ -48,9 +49,9 @@ $completedProjects->close();
 $projectsStmt = $conn->prepare("
     SELECT p.project_id, p.project_name, p.status, p.description, p.start_date, p.end_date, u.full_name as client_name
     FROM projects p
-    JOIN project_engineers pe ON p.project_id = pe.project_id
-    LEFT JOIN users u ON p.client_id = u.user_id
-    WHERE pe.engineer_id=?
+    JOIN project_assignments pa ON p.project_id = pa.project_id
+    LEFT JOIN users u ON p.client_id = u.id
+    WHERE pa.user_id = ? AND pa.role_in_project = 'engineer'
     ORDER BY p.status DESC, p.created_at DESC
 ");
 $projectsStmt->bind_param("i",$user_id);
@@ -62,8 +63,8 @@ $tasksStmt = $conn->prepare("
     SELECT t.task_id, t.task_name, t.status, t.deadline, p.project_name, p.project_id
     FROM tasks t
     JOIN projects p ON t.project_id = p.project_id
-    JOIN project_engineers pe ON p.project_id = pe.project_id
-    WHERE pe.engineer_id=?
+    JOIN project_assignments pa ON p.project_id = pa.project_id
+    WHERE pa.user_id = ? AND pa.role_in_project = 'engineer'
     ORDER BY t.deadline ASC
 ");
 $tasksStmt->bind_param("i",$user_id);
@@ -119,6 +120,16 @@ $tasks_list = $tasksStmt->get_result();
     .form-group { margin-bottom: 20px; }
     .form-group label { color: #2c3e50; font-weight: 600; display: block; margin-bottom: 8px; }
     .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #bdc3c7; border-radius: 5px; font-family: 'Poppins', sans-serif; }
+
+@media (max-width: 768px) {
+    body { overflow-x: hidden; }
+    .main-content { margin-left: 0 !important; padding: 16px !important; }
+    .stats-grid, .projects-grid { grid-template-columns: 1fr !important; }
+    .tabs { flex-wrap: wrap; gap: 8px; }
+    .tab { width: 100%; text-align: center; }
+    .project-card { width: 100%; }
+}
+
 </style>
 </head>
 <body>
