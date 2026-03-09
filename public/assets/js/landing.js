@@ -13,25 +13,39 @@ document.addEventListener('DOMContentLoaded', function() {
     initNavbarScroll();
 
 // CONSULTATION MODAL
-const consultBtn = document.getElementById("consultBtn");
-const consultModal = document.getElementById("consultModal");
-const closeConsult = document.getElementById("closeConsult");
+const consultBtn = document.getElementById('consultBtn');
+const consultModal = document.getElementById('consultModal');
+const closeConsult = document.getElementById('closeConsult');
+
+function openConsultModal() {
+    if (!consultModal) return;
+    consultModal.style.display = 'flex';
+    consultModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeConsultModal() {
+    if (!consultModal) return;
+    consultModal.style.display = 'none';
+    consultModal.setAttribute('aria-hidden', 'true');
+}
 
 if (consultBtn) {
-    consultBtn.addEventListener("click", function () {
-        consultModal.style.display = "flex";
-    });
+    consultBtn.addEventListener('click', openConsultModal);
 }
 
 if (closeConsult) {
-    closeConsult.addEventListener("click", function () {
-        consultModal.style.display = "none";
-    });
+    closeConsult.addEventListener('click', closeConsultModal);
 }
 
-window.addEventListener("click", function (event) {
+window.addEventListener('click', function(event) {
     if (event.target === consultModal) {
-        consultModal.style.display = "none";
+        closeConsultModal();
+    }
+});
+
+window.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeConsultModal();
     }
 });
 });

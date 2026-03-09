@@ -950,12 +950,14 @@ z-index:999;
     border-radius:10px;
     text-align:center;
     animation: popupFade 0.3s ease;
+    width: min(92vw, 560px);
 }
 .consult-buttons{
     margin-top:20px;
     display:flex;
-    gap:20px;
+    gap:16px;
     justify-content:center;
+    flex-wrap: wrap;
 }
 
 .consult-option{
@@ -965,6 +967,10 @@ z-index:999;
     text-decoration:none;
     color:#333;
     font-weight:500;
+    border: 1px solid #e6e6e6;
+    border-radius: 10px;
+    padding: 14px;
+    min-width: 150px;
 }
 
 .consult-option img{
@@ -984,6 +990,12 @@ z-index:999;
     padding:8px 16px;
     cursor:pointer;
     border-radius:4px;
+}
+
+@media (max-width: 520px){
+    .consult-option{
+        width: 100%;
+    }
 }
 
 /* Smooth popup animation */

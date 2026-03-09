@@ -281,28 +281,29 @@ New clients may contact us through Facebook, Viber, or Email for project consult
         </div>
     </footer>
 
-<div id="consultModal" class="consult-modal">
+<div id="consultModal" class="consult-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="consultModalTitle">
     <div class="consult-modal-content">
-
-        <h3>Contact Us</h3>
-        <p>Please choose where you want to send your consultation request.</p>
+        <h3 id="consultModalTitle">Request Consultation</h3>
+        <p>Choose your preferred platform:</p>
 
         <div class="consult-buttons">
-
-            <a href="https://www.facebook.com/edgeautomationtsc" target="_blank" class="consult-option">
-                <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png">
-                <span>Facebook Page</span>
+            <a href="https://www.facebook.com/edgeautomationtsc" target="_blank" rel="noopener noreferrer" class="consult-option" aria-label="Facebook Messenger">
+                <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" alt="Facebook Messenger">
+                <span>Facebook Messenger</span>
             </a>
 
-            <a href="viber://chat?number=%2B639070782535" class="consult-option">
-                <img src="https://cdn-icons-png.flaticon.com/512/3670/3670059.png">
+            <a href="viber://chat?number=%2B639070782535" class="consult-option" aria-label="Viber">
+                <img src="https://cdn-icons-png.flaticon.com/512/3670/3670059.png" alt="Viber">
                 <span>Viber</span>
             </a>
 
+            <a href="mailto:ejimenez.edge@gmail.com?subject=Consultation%20Request" class="consult-option" aria-label="Email">
+                <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" alt="Email">
+                <span>Email</span>
+            </a>
         </div>
 
-        <button id="closeConsult" class="consult-close">Close</button>
-
+        <button id="closeConsult" class="consult-close" type="button">Close</button>
     </div>
 </div>
     <script src="/codesamplecaps/public/assets/js/landing.js"></script>
