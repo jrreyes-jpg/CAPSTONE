@@ -945,10 +945,11 @@ z-index:999;
 }
 
 .consult-modal-content{
-background:white;
-padding:30px;
-border-radius:10px;
-text-align:center;
+    background:white;
+    padding:30px;
+    border-radius:10px;
+    text-align:center;
+    animation: popupFade 0.3s ease;
 }
 .consult-buttons{
     margin-top:20px;

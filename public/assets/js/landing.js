@@ -12,26 +12,28 @@ document.addEventListener('DOMContentLoaded', function() {
     initScrollAnimations();
     initNavbarScroll();
 
+// CONSULTATION MODAL
 const consultBtn = document.getElementById("consultBtn");
 const consultModal = document.getElementById("consultModal");
 const closeConsult = document.getElementById("closeConsult");
 
-if (consultBtn && consultModal) {
-    consultBtn.onclick = function() {
+if (consultBtn) {
+    consultBtn.addEventListener("click", function () {
         consultModal.style.display = "flex";
-    };
+    });
 }
 
-if (closeConsult && consultModal) {
-    closeConsult.onclick = function() {
+if (closeConsult) {
+    closeConsult.addEventListener("click", function () {
         consultModal.style.display = "none";
-    };
+    });
 }
-window.onclick = function(event) {
+
+window.addEventListener("click", function (event) {
     if (event.target === consultModal) {
         consultModal.style.display = "none";
     }
-};
+});
 });
 // ===================================================
 // MOBILE MENU TOGGLE
