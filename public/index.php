@@ -197,26 +197,15 @@ session_start();
     <!-- Contact Section (Login-gated) -->
     <section id="contact" class="contact">
         <div class="container">
-            <h2 class="section-title">Get In Touch</h2>
+            <h2 class="section-title">Client & Project Inquiries</h2>
 
 <p class="contact-note">
 For project consultation, please contact us through our Facebook page.
 Client portal accounts are created by our administrators after a project agreement has been confirmed.
 </p>            <div class="contact-content">
                 <?php if (empty($_SESSION['user_id'])): ?>
-                    <div class="login-card">
-                      <h3>Client Portal</h3>
-<p>
-This portal is for existing clients only.  
-If you already have a client account, please login to send a project message.
-</p>
-
-<p>
-New clients may contact us through Facebook, Viber, or Email for project consultation.
-</p>
-                        <div class="login-card-actions">
-                            <a href="login.php" class="btn btn-primary">Login</a>
-                        </div>
+                    
+                        
                     </div>
                 <?php else: ?>
                     <?php if (empty($_SESSION['csrf_token'])) { $_SESSION['csrf_token'] = bin2hex(random_bytes(32)); } ?>
@@ -287,19 +276,17 @@ New clients may contact us through Facebook, Viber, or Email for project consult
         <p>Choose your preferred platform:</p>
 
         <div class="consult-buttons">
-            <a href="https://www.facebook.com/edgeautomationtsc" target="_blank" rel="noopener noreferrer" class="consult-option" aria-label="Facebook Messenger">
-                <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" alt="Facebook Messenger">
-                <span>Facebook Messenger</span>
+<a href="https://www.facebook.com/edgeautomationtsc" target="_blank" rel="noopener noreferrer" class="consult-option" aria-label="Facebook">                <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" alt="Facebook Messenger">
+                <span>Facebook Page</span>
             </a>
 
-            <a href="viber://chat?number=%2B639070782535" class="consult-option" aria-label="Viber">
-                <img src="https://cdn-icons-png.flaticon.com/512/3670/3670059.png" alt="Viber">
-                <span>Viber</span>
+<a href="https://invite.viber.com/?number=639178789571" target="_blank" rel="noopener noreferrer" class="consult-option" aria-label="Viber">                <img src="https://cdn-icons-png.flaticon.com/512/3670/3670059.png" alt="Viber">
+                <span>Viber Chat</span>
             </a>
 
-            <a href="mailto:ejimenez.edge@gmail.com?subject=Consultation%20Request" class="consult-option" aria-label="Email">
-                <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" alt="Email">
+<a href="mailto:edgeautomation@email.com?subject=Request%20Consultation&body=Hello%20Edge%20Automation,%20I%20would%20like%20to%20request%20a%20consultation." class="consult-option">             <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" alt="Email">
                 <span>Email</span>
+           
             </a>
         </div>
 

@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initFormHandling();
     initScrollAnimations();
     initNavbarScroll();
+    initNavbarShadow();
 
 // CONSULTATION MODAL
 const consultBtn = document.getElementById('consultBtn');
@@ -45,7 +46,12 @@ window.addEventListener('click', function(event) {
 
 window.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
+
         closeConsultModal();
+
+        document.querySelector('.nav-menu')?.classList.remove('active');
+        document.querySelector('.hamburger')?.classList.remove('active');
+
     }
 });
 });
@@ -246,6 +252,20 @@ function initNavbarScroll() {
         }
     });
 }
+function initNavbarShadow() {
+    const navbar = document.querySelector('.navbar');
+    if (!navbar) return;
+
+    window.addEventListener('scroll', () => {
+        const currentScrollY = window.scrollY;
+
+        if (currentScrollY > 100) {
+            navbar.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+        } else {
+            navbar.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+        }
+    });
+}
 
 // ===================================================
 // OPTIONAL: SEND FORM DATA TO BACKEND
@@ -297,37 +317,6 @@ function initScrollAnimations() {
     });
 }
 
-// ===================================================
-// KEYBOARD NAVIGATION
-// ===================================================
-
-document.addEventListener('keydown', function(e) {
-    // Press '/' to focus search (if you add search later)
-    // Press 'Escape' to close mobile menu
-    if (e.key === 'Escape') {
-        document.querySelector('.nav-menu')?.classList.remove('active');
-        document.querySelector('.hamburger')?.classList.remove('active');
-    }
-});
-
-// ===================================================
-// NAVBAR STICKY EFFECT ON SCROLL
-// ===================================================
-
-let lastScrollY = 0;
-const navbar = document.querySelector('.navbar');
-
-window.addEventListener('scroll', () => {
-    const currentScrollY = window.scrollY;
-
-    if (currentScrollY > 100) {
-        navbar?.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-    } else {
-        navbar?.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-    }
-
-    lastScrollY = currentScrollY;
-});
 
 // ===================================================
 // CONSOLE BRAND MESSAGE
