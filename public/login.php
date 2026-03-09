@@ -105,10 +105,16 @@ end_login:
     <title>Edge Automation Portal</title>
 
     <link rel="stylesheet" href="/codesamplecaps/public/assets/css/style.css">
+    <link rel="stylesheet"
+href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     </head>
 
     <body>
+        <a href="/codesamplecaps/public/index.php"
+class="back-home animate__animated animate__fadeInDown">
+← Back to Home
+</a>
 
     <canvas id="particles"></canvas>
 
@@ -152,7 +158,7 @@ end_login:
 
 <div class="links">
     <a onclick="showForgot()">Forgot Password?</a>
-</div>            </form>
+</div>         </form>
         </div>
 
     </div>

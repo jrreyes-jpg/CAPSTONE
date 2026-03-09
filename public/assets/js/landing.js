@@ -4,15 +4,35 @@
 // ===================================================
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize all features
+
     initMobileMenu();
     initSmoothScroll();
     initNavHighlight();
     initFormHandling();
     initScrollAnimations();
     initNavbarScroll();
-});
 
+const consultBtn = document.getElementById("consultBtn");
+const consultModal = document.getElementById("consultModal");
+const closeConsult = document.getElementById("closeConsult");
+
+if (consultBtn && consultModal) {
+    consultBtn.onclick = function() {
+        consultModal.style.display = "flex";
+    };
+}
+
+if (closeConsult && consultModal) {
+    closeConsult.onclick = function() {
+        consultModal.style.display = "none";
+    };
+}
+window.onclick = function(event) {
+    if (event.target === consultModal) {
+        consultModal.style.display = "none";
+    }
+};
+});
 // ===================================================
 // MOBILE MENU TOGGLE
 // ===================================================

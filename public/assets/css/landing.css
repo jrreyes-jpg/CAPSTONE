@@ -102,8 +102,9 @@ p {
     margin: 0 auto;
     padding: 1rem 20px;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
 }
 
 .nav-logo {
@@ -203,17 +204,20 @@ p {
     list-style: none;
     gap: 2rem;
     margin-left: auto;
+    margin-right: 1rem;
 }
 
 .nav-actions {
     display: flex;
     gap: 0.75rem;
     align-items: center;
+    margin-left: 2rem;
 }
 
 .nav-actions .btn {
-    padding: 8px 18px;
+    padding: 10px 20px;
     font-size: 0.95rem;
+    border-radius: 8px;
 }
 
 .nav-actions .btn-primary {
@@ -915,7 +919,8 @@ img { max-width: 100%; height: auto; }
 
 @media (max-width: 768px) {
   body { overflow-x: hidden; }
-  .container, .nav-container { padding-left: 14px !important; padding-right: 14px !important; }
+  .container, 
+  .nav-container { padding-left: 14px !important; padding-right: 14px !important; }
   .hero-title { font-size: 1.9rem !important; line-height: 1.2; }
   .hero-subtitle { font-size: 1rem !important; }
   .services-grid,
@@ -923,4 +928,72 @@ img { max-width: 100%; height: auto; }
   .projects-grid { grid-template-columns: 1fr !important; }
   .cta-buttons { width: 100%; display: grid; grid-template-columns: 1fr; gap: 10px; }
   .cta-buttons .btn { width: 100%; text-align: center; }
+}
+/* CONSULTATION MODAL */
+
+.consult-modal{
+display:none;
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.6);
+justify-content:center;
+align-items:center;
+z-index:999;
+}
+
+.consult-modal-content{
+background:white;
+padding:30px;
+border-radius:10px;
+text-align:center;
+}
+.consult-buttons{
+    margin-top:20px;
+    display:flex;
+    gap:20px;
+    justify-content:center;
+}
+
+.consult-option{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-decoration:none;
+    color:#333;
+    font-weight:500;
+}
+
+.consult-option img{
+    width:50px;
+    margin-bottom:8px;
+    transition: transform 0.2s ease;
+}
+
+.consult-option:hover img{
+    transform:scale(1.1);
+}
+
+.consult-close{
+    margin-top:25px;
+    border:none;
+    background:#ddd;
+    padding:8px 16px;
+    cursor:pointer;
+    border-radius:4px;
+}
+
+/* Smooth popup animation */
+
+@keyframes popupFade{
+    from{
+        transform:scale(0.9);
+        opacity:0;
+    }
+    to{
+        transform:scale(1);
+        opacity:1;
+    }
 }

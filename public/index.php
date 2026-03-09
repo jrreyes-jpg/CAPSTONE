@@ -55,8 +55,7 @@ session_start();
             <h1 class="hero-title">Engineering Innovation at Scale</h1>
             <p class="hero-subtitle">Specialists in automation, electrical systems, and industrial solutions</p>
             <div class="cta-buttons">
-                <a href="#contact" class="btn btn-primary">Request Consultation</a>
-                <a href="#services" class="btn btn-secondary">View Services</a>
+<button class="btn btn-primary" id="consultBtn">Request Consultation</button>                <a href="#services" class="btn btn-secondary">View Services</a>
             </div>
         </div>
         <div class="hero-overlay"></div>
@@ -199,11 +198,22 @@ session_start();
     <section id="contact" class="contact">
         <div class="container">
             <h2 class="section-title">Get In Touch</h2>
-            <div class="contact-content">
+
+<p class="contact-note">
+For project consultation, please contact us through our Facebook page.
+Client portal accounts are created by our administrators after a project agreement has been confirmed.
+</p>            <div class="contact-content">
                 <?php if (empty($_SESSION['user_id'])): ?>
                     <div class="login-card">
-                        <h3>Login Required</h3>
-                        <p>You must be logged in to send us a message.</p>
+                      <h3>Client Portal</h3>
+<p>
+This portal is for existing clients only.  
+If you already have a client account, please login to send a project message.
+</p>
+
+<p>
+New clients may contact us through Facebook, Viber, or Email for project consultation.
+</p>
                         <div class="login-card-actions">
                             <a href="login.php" class="btn btn-primary">Login</a>
                         </div>
@@ -232,14 +242,34 @@ session_start();
                     <h3>Contact Information</h3>
                     <p><strong>Company:</strong> Edge Automation Technology Services, Co.</p>
                     <p><strong>Specialization:</strong> Industrial Automation & Engineering</p>
-                    <div class="social-links">
-                        <a href="https://www.facebook.com/edgeautomationtsc" target="_blank" rel="noopener noreferrer" class="social-icon" aria-label="Facebook">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-                                <path fill="currentColor" d="M22.675 0h-21.35C.597 0 0 .597 0 1.326v21.348C0 23.403.597 24 1.326 24H12.82v-9.294H9.692V11.01h3.128V8.412c0-3.1 1.894-4.788 4.659-4.788 1.325 0 2.463.099 2.795.143v3.24l-1.918.001c-1.504 0-1.796.716-1.796 1.763v2.312h3.587l-.467 3.696h-3.12V24h6.116c.73 0 1.326-.597 1.326-1.326V1.326C24 .597 23.403 0 22.675 0z"/>
-                            </svg>
-                        </a>
-                    </div>
-                </div>
+<div class="social-links">
+
+    <!-- Facebook -->
+    <a href="https://www.facebook.com/edgeautomationtsc" 
+       target="_blank" 
+       rel="noopener noreferrer" 
+       class="social-icon" 
+       aria-label="Facebook">
+
+        <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" width="24" height="24">
+
+    </a>
+
+    <!-- Viber -->
+    <a href="https://invite.viber.com/?number=09178789571" 
+       target="_blank" 
+       class="social-icon" 
+       aria-label="Viber">
+
+        <img src="https://cdn-icons-png.flaticon.com/512/3670/3670059.png" width="24" height="24">
+
+    </a>
+    <!-- Gmail -->
+    <a href="mailto:ejimenez.edge@gmail.com" target="_blank" class="social-icon" aria-label="Gmail">
+        <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" width="24" height="24">
+    </a>
+
+</div>                </div>
             </div>
         </div>
     </section>
@@ -251,6 +281,32 @@ session_start();
         </div>
     </footer>
 
+<div id="consultModal" class="consult-modal">
+    <div class="consult-modal-content">
+
+        <h3>Contact Us</h3>
+        <p>Please choose where you want to send your consultation request.</p>
+
+        <div class="consult-buttons">
+
+            <a href="https://www.facebook.com/edgeautomationtsc" target="_blank" class="consult-option">
+                <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png">
+                <span>Facebook Page</span>
+            </a>
+
+            <a href="viber://chat?number=%2B639070782535" class="consult-option">
+                <img src="https://cdn-icons-png.flaticon.com/512/3670/3670059.png">
+                <span>Viber</span>
+            </a>
+
+        </div>
+
+        <button id="closeConsult" class="consult-close">Close</button>
+
+    </div>
+</div>
     <script src="/codesamplecaps/public/assets/js/landing.js"></script>
+
 </body>
+
 </html>

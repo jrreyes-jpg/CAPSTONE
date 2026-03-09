@@ -5,7 +5,6 @@
     </div>
     <ul class="nav-menu">
         <li><a href="/codesamplecaps/views/dashboards/client_dashboard.php">📊 Dashboard</a></li>
-        <li><a href="/codesamplecaps/views/dashboards/client_dashboard.php#engineers-tab">👷 Browse Engineers</a></li>
         <li><a href="/codesamplecaps/views/dashboards/client_dashboard.php#projects-tab">📁 My Projects</a></li>
         <li><a href="/codesamplecaps/views/dashboards/client_dashboard.php#profile-tab">⚙️ Profile Settings</a></li>
         <li><a href="/codesamplecaps/views/dashboards/change_password.php">🔐 Change Password</a></li>

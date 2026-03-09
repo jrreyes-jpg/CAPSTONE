@@ -288,7 +288,7 @@ img { max-width: 100%; height: auto; }
   .left-panel,
   .right-panel {
     width: 100% !important;
-  }
+  } 
   .right-panel {
     padding: 20px 16px;
   }
@@ -302,4 +302,25 @@ img { max-width: 100%; height: auto; }
     gap: 10px;
     justify-content: center;
   }
+}
+.back-home{
+position:absolute;
+top:20px;
+left:25px;
+color:white;
+font-family:'Poppins',sans-serif;
+font-size:14px;
+text-decoration:none;
+padding:8px 14px;
+border-radius:6px;
+background:rgba(0,0,0,0.4);
+-webkit-backdrop-filter: blur(5px);
+backdrop-filter: blur(5px);
+transition:0.3s;
+z-index:100;
+}
+
+.back-home:hover{
+background:#0f9d38;
+transform:translateY(-2px);
 }
