@@ -695,6 +695,7 @@ p {
     display: flex;
     flex-direction: column;
     gap: 2rem;
+    position: relative;
 }
 
 .contact-info h3 {
@@ -929,6 +930,85 @@ img { max-width: 100%; height: auto; }
   .cta-buttons { width: 100%; display: grid; grid-template-columns: 1fr; gap: 10px; }
   .cta-buttons .btn { width: 100%; text-align: center; }
 }
+/* NEW CLIENT POPOVER TOOLTIP */
+
+.tooltip-container {
+    position: relative;
+}
+
+.new-client-popover {
+    opacity: 0;
+    visibility: hidden;
+    position: absolute;
+    top: 120%; /* just below icons */
+    left: 0;
+    background: var(--color-primary);
+    color: var(--color-white);
+    padding: 16px 18px;
+    border-radius: 8px;
+    min-width: 280px;
+    box-shadow: var(--shadow-lg);
+    z-index: 1001;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    transition: opacity 0.3s ease-out, visibility 0.3s ease-out;
+    pointer-events: none;
+}
+
+.new-client-popover p {
+    color: var(--color-white);
+    margin: 0 0 12px 0;
+}
+
+.new-client-popover button {
+    background: var(--color-white);
+    color: var(--color-primary);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: var(--transition);
+}
+
+.new-client-popover button:hover {
+    background: var(--color-accent);
+    color: var(--color-white);
+    transform: translateY(-2px);
+}
+
+.popover-arrow {
+    position: absolute;
+    top: -8px;
+    left: 12%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid var(--color-primary);
+}
+
+.new-client-popover.show {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+@media (max-width: 768px) {
+    .new-client-popover {
+        /* still position relative to container but allow full width */
+        position: absolute;
+        top: 110%;
+        left: 0;
+        right: 0;
+        margin: auto;
+        min-width: 85vw;
+        max-width: 300px;
+    }
+}
+
 /* CONSULTATION MODAL */
 
 .consult-modal{

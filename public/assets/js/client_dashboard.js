@@ -10,3 +10,4 @@ function hireEngineer(engineerId, engineerName) {
         alert('Hire request submitted! This feature requires backend implementation.');
     }
 }
+    

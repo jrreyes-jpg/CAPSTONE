@@ -244,20 +244,16 @@ button:hover{
     font-size: 24px;
     font-weight: bold;
 }
-/* PROFESSIONAL ERROR BOX */
 .error-box{
-    background-color: #ffe6e6;      /* soft red */
-    color: #c80000;                 /* dark red text */
-    padding: 12px 18px;
-    border-left: 5px solid #c80000; /* accent line */
-    border-radius: 8px;
-    margin-bottom: 15px;
-    font-size: 14px;
-    font-weight: 500;
-    animation: fadeIn 0.4s ease forwards;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    background-color:#ffe6e6;
+    color:#c80000;
+    padding:12px 18px;
+    border-left:5px solid #c80000;
+    border-radius:8px;
+    margin-bottom:15px;
+    font-size:14px;
+    font-weight:500;
 }
-
 /* fade in animation */
 @keyframes fadeIn{
     from {opacity: 0; transform: translateY(-5px);}
@@ -323,4 +319,18 @@ z-index:100;
 .back-home:hover{
 background:#0f9d38;
 transform:translateY(-2px);
+}
+
+/* WARNING (8-9 attempts) */
+.error-warning{
+    background:#fff3cd;
+    color:#856404;
+    border-left:5px solid #ff9800;
+}
+
+/* LOCKED ACCOUNT */
+.error-locked{
+    background:#ffd6d6;
+    color:#8b0000;
+    border-left:5px solid #8b0000;
 }

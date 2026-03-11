@@ -13,8 +13,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
 
     $email = trim($_POST['email']);
     $password = trim($_POST['password']);
-    $error = "Email or password is incorrect.";
-
+$error = "Invalid email or password.";
     if (!empty($email) && !empty($password)) {
 
         $checkAttempt = $conn->prepare("SELECT attempts, last_attempt FROM login_attempts WHERE email = ? AND ip_address = ?");
@@ -31,8 +30,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
             $last_attempt = $attemptData['last_attempt'];
 
             if ($attempts >= $max_attempts && strtotime($last_attempt) + $lockout_time > time()) {
-                $error = "Too many failed attempts. Try again later.";
-                $failed_attempts_display = "Failed attempts: $attempts / $max_attempts";
+$error = "Too many failed login attempts.<br><br>
+Your account has been temporarily locked for 15 minutes for security reasons.";
+$failed_attempts_display = "Attempt $attempts of $max_attempts.<br>
+Account will be temporarily locked after $max_attempts failed attempts.";
                 goto end_login;
             }
         }
@@ -135,8 +136,8 @@ class="back-home animate__animated animate__fadeInDown">
             <form method="POST">
                 <h2>Login</h2>
     <?php if($error): ?>
-        <div class="error-box">
-            <?php echo $error; ?>
+<div class="error-box <?php echo ($attempts >= 8 ? 'error-warning' : ($attempts >= $max_attempts ? 'error-locked' : '')); ?>">
+                <?php echo $error; ?>
             <?php if(!empty($failed_attempts_display)): ?>
                 <div style="margin-top:5px; font-size:13px; color:#800000;">
                     <?php echo $failed_attempts_display; ?>

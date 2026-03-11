@@ -199,13 +199,11 @@ session_start();
         <div class="container">
             <h2 class="section-title">Client & Project Inquiries</h2>
 
-<p class="contact-note">
-For project consultation, please contact us through our Facebook page.
-Client portal accounts are created by our administrators after a project agreement has been confirmed.
-</p>            <div class="contact-content">
+
+           <div class="contact-content">
                 <?php if (empty($_SESSION['user_id'])): ?>
                     
-                        
+
                     </div>
                 <?php else: ?>
                     <?php if (empty($_SESSION['csrf_token'])) { $_SESSION['csrf_token'] = bin2hex(random_bytes(32)); } ?>
@@ -231,7 +229,20 @@ Client portal accounts are created by our administrators after a project agreeme
                     <h3>Contact Information</h3>
                     <p><strong>Company:</strong> Edge Automation Technology Services, Co.</p>
                     <p><strong>Specialization:</strong> Industrial Automation & Engineering</p>
-<div class="social-links">
+                    <div class="social-links tooltip-container" style="position:relative;">
+    <div class="new-client-popover" id="newClientTip">
+    <div class="popover-arrow"></div>
+
+        <p>
+        <strong>New client?</strong><br>
+
+        To request a project consultation,
+        please contact us using one of the
+        platforms below.</p>
+
+        <button id="dismissTip">Got it</button>
+
+    </div>
 
     <!-- Facebook -->
     <a href="https://www.facebook.com/edgeautomationtsc" 
@@ -254,7 +265,7 @@ Client portal accounts are created by our administrators after a project agreeme
 
     </a>
     <!-- Gmail -->
-    <a href="mailto:ejimenez.edge@gmail.com" target="_blank" class="social-icon" aria-label="Gmail">
+    <a href="https://mail.google.com/mail/?view=cm&fs=1&to=ejimenez.edge@gmail.com&su=Request%20Consultation&body=Hello%20Edge%20Automation,%20I%20would%20like%20to%20request%20a%20consultation." target="_blank" class="social-icon" aria-label="Gmail">
         <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" width="24" height="24">
     </a>
 
@@ -284,11 +295,10 @@ Client portal accounts are created by our administrators after a project agreeme
                 <span>Viber Chat</span>
             </a>
 
-<a href="mailto:edgeautomation@email.com?subject=Request%20Consultation&body=Hello%20Edge%20Automation,%20I%20would%20like%20to%20request%20a%20consultation." class="consult-option">             <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" alt="Email">
-                <span>Email</span>
-           
-            </a>
-        </div>
+<a href="https://mail.google.com/mail/?view=cm&fs=1&to=ejimenez.edge@gmail.com&su=Request%20Consultation&body=Hello%20Edge%20Automation,%20I%20would%20like%20to%20request%20a%20consultation." target="_blank" class="consult-option">
+    <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" alt="Email">
+    <span>Email</span>
+</a>      </div>
 
         <button id="closeConsult" class="consult-close" type="button">Close</button>
     </div>

@@ -44,8 +44,7 @@ class Config {
         // ============ APP ============
         $this->settings['APP_NAME'] = 'Edge Automation';
         $this->settings['APP_URL'] = getenv('APP_URL') ?: 'http://localhost/codesamplecaps';
-        $this->settings['APP_TIMEZONE'] = 'UTC';
-
+        $this->settings['APP_TIMEZONE'] = 'Asia/Manila';
         // ============ EMAIL/SMTP ============
         $this->settings['MAIL_DRIVER'] = getenv('MAIL_DRIVER') ?: 'smtp';
         $this->settings['MAIL_HOST'] = getenv('MAIL_HOST') ?: 'smtp.gmail.com';
@@ -63,6 +62,7 @@ class Config {
 
         // ============ SESSION ============
         $this->settings['SESSION_TIMEOUT_MINUTES'] = 60;
+        date_default_timezone_set($this->settings['APP_TIMEZONE']);
     }
 
     /**

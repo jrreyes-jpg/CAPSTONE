@@ -3,6 +3,9 @@
 // Smooth scrolling, mobile menu, form handling
 // ===================================================
 
+// RESET TOOLTIP FOR TESTING (Remove this after testing!)
+localStorage.removeItem("tipSeen");
+
 document.addEventListener('DOMContentLoaded', function() {
 
     initMobileMenu();
@@ -42,6 +45,7 @@ window.addEventListener('click', function(event) {
     if (event.target === consultModal) {
         closeConsultModal();
     }
+    
 });
 
 window.addEventListener('keydown', function(event) {
@@ -54,6 +58,34 @@ window.addEventListener('keydown', function(event) {
 
     }
 });
+
+// NEW CLIENT TOOLTIP
+const tip = document.getElementById("newClientTip");
+const dismiss = document.getElementById("dismissTip");
+
+if (tip && dismiss) {
+    // Show tooltip only if it hasn't been dismissed before
+    const tipDismissed = localStorage.getItem("tipSeen");
+    
+    if (!tipDismissed) {
+        // Use requestAnimationFrame to ensure content is rendered
+        requestAnimationFrame(() => {
+            tip.classList.add("show");
+            console.log("Tooltip shown");
+        });
+    } else {
+        console.log("Tooltip already dismissed");
+    }
+
+    dismiss.addEventListener("click", function (e) {
+        e.preventDefault();
+        localStorage.setItem("tipSeen", "true");
+        tip.classList.remove("show");
+        console.log("Tooltip dismissed");
+    });
+} else {
+    console.log("Tooltip elements not found - tip:", tip, "dismiss:", dismiss);
+}
 });
 // ===================================================
 // MOBILE MENU TOGGLE
