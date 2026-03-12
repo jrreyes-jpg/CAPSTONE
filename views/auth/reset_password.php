@@ -74,6 +74,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
             margin-bottom: 15px;
             border: 1px solid #c3e6cb;
         }
+        .error-box {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border: 1px solid #f5c6cb;
+        }
+        .togglePassword{
+            top: 70%;
+        }       
     </style>
 </head>
 <body>
@@ -116,7 +127,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
                             Enter your new password below.
                         </p>
 
-                        <div style="margin-bottom: 20px;">
+                        <div class="password-wrapper">
                             <label for="password" style="display: block; margin-bottom: 8px; font-weight: 500;">New Password</label>
                             <input 
                                 type="password" 
@@ -126,13 +137,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
                                 required
                                 onkeyup="checkPasswordStrength(this.value)"
                             >
-                            <div class="password-strength">
-                                <div class="strength" id="strengthBar"></div>
-                            </div>
-                            <small id="strengthText" style="display: block; margin-top: 5px; color: #666;"></small>
+                            <button type="button" class="togglePassword" data-target="password">Show</button>
                         </div>
+                        <div class="password-strength" style="margin-bottom:20px;">
+                            <div class="strength" id="strengthBar"></div>
+                        </div>
+                        <small id="strengthText" style="display: block; margin-top: 5px; color: #666; margin-bottom:20px;"></small>
 
-                        <div style="margin-bottom: 20px;">
+                        <div class="password-wrapper">
                             <label for="confirm_password" style="display: block; margin-bottom: 8px; font-weight: 500;">Confirm Password</label>
                             <input 
                                 type="password" 
@@ -141,6 +153,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
                                 placeholder="Confirm the password" 
                                 required
                             >
+                            <button type="button" class="togglePassword" data-target="confirm_password">Show</button>
                         </div>
 
                         <button type="submit">Reset Password</button>

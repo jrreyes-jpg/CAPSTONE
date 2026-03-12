@@ -228,6 +228,18 @@ class AuthService {
 
         $user = $this->userRepo->findByEmail($email);
 
+        // Prevent reset spam (60 seconds cooldown)
+if ($user && !empty($user['reset_requested_at'])) {
+    $lastRequest = strtotime($user['reset_requested_at']);
+    if ((time() - $lastRequest) < 60) {
+        return [
+            'success' => false,
+            'error' => 'Please wait before requesting another reset link.'
+        ];
+    }
+}
+
+
         if (!$user) {
             // User not found - don't reveal this
             return ['success' => true, 'message' => 'If the email exists, a reset link will be sent.'];

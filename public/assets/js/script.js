@@ -128,3 +128,15 @@ document.addEventListener('DOMContentLoaded', function () {
         updateCount();
     });
 });
+
+const form = document.querySelector("form");
+
+if(form){
+    form.addEventListener("submit", function () {
+        const btn = document.getElementById("resetBtn");
+        if(btn){
+            btn.disabled = true;
+            btn.innerText = "Sending...";
+        }
+    });
+}

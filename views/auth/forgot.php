@@ -12,6 +12,12 @@ require_once __DIR__ . '/../../services/AuthService.php';
 
 $error = "";
 $success = "";
+
+if(isset($_SESSION['reset_success'])){
+    $success = $_SESSION['reset_success'];
+    unset($_SESSION['reset_success']);
+}
+
 $authService = new AuthService();
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
@@ -20,11 +26,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Use AuthService to request password reset
     $result = $authService->requestPasswordReset($email);
 
-    if ($result['success']) {
-        $success = $result['message'] ?? 'If the email exists, a reset link will be sent.';
-    } else {
-        $error = $result['error'] ?? 'An error occurred.';
-    }
+if ($result['success']) {
+    $_SESSION['reset_success'] = $result['message'] ?? 'If the email exists, a reset link will be sent.';
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+} else {
+    $error = $result['error'] ?? 'An error occurred.';
+}
 }
 
 ?>
@@ -73,7 +81,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
                     <input type="email" name="email" placeholder="Enter your email" required>
 
-                    <button type="submit">Send Reset Link</button>
+                    <button type="submit" id="resetBtn" onclick="disableResetBtn()">Send Reset Link</button>
 
                     <div class="links">
                         <a href="/codesamplecaps/public/login.php">Back to Login</a>

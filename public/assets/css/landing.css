@@ -379,6 +379,7 @@ p {
     margin-bottom: 2rem;
     opacity: 0.95;
     font-weight: 300;
+    color: var(--color-white);
 }
 
 .cta-buttons {
