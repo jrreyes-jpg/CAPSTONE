@@ -10,6 +10,12 @@ $activeTab = $_GET['tab'] ?? 'dashboard';
 $allowedRoles = ['engineer', 'foreman', 'client'];
 $allowedStatuses = ['active', 'inactive'];
 $action = '';
+$old = [
+    'full_name' => '',
+    'email' => '',
+    'phone' => '',
+    'role' => ''
+];
 
 function normalizeRole(string $role): string {
     $role = strtolower(trim($role));
@@ -40,6 +46,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $phone = trim($_POST['phone'] ?? '');
         $password = trim($_POST['password'] ?? '');
         $role = normalizeRole($_POST['role'] ?? '');
+        $old['full_name'] = $fullName;
+$old['email'] = $email;
+$old['phone'] = $phone;
+$old['role'] = $role;
 
         if ($fullName === '' || $email === '' || $password === '' || $role === '') {
             $error = 'Full name, email, password, and role are required.';
@@ -50,13 +60,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!in_array($role, $allowedRoles, true)) {
             $error = 'Invalid role selected.';
             $activeTab = 'create';
-        } elseif (!preg_match('/^09\d{9}$/', $phone)) {
-    $error = 'Phone number must start with 09 and contain 11 digits.';
+      } elseif (!preg_match('/^09\d{9}$/', $phone)) {
+    $error = 'Phone number must be a valid PH mobile number (09xxxxxxxxx).';
     $activeTab = 'create';
-}
-            $error = 'Phone number must be a valid PH mobile number (09xxxxxxxxx).';
-            $activeTab = 'create';
-        } elseif (!isStrongPassword($password)) {
+} elseif (!isStrongPassword($password)) {
             $error = 'Temporary password must be STRONG: 12+ chars with uppercase, lowercase, number, special char.';
             $activeTab = 'create';
         } else {
@@ -156,6 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $activeTab = 'users';
     }
+}
 
 
 function fetchUsersByRoles(mysqli $conn, array $roles): array {
@@ -212,19 +220,18 @@ $totalUsers = count($engineers) + count($foremen) + count($clients);
                                 <form method="POST">
                     <input type="hidden" name="action" value="create_account">
                     <div class="form-row">
-                        <div class="form-group"><label for="full_name">Full Name *</label><input type="text" id="full_name" name="full_name" required></div>
-                        <div class="form-group"><label for="email">Email *</label><input type="email" id="email" name="email" required></div>
+                        <div class="form-group"><label for="full_name">Full Name *</label><input type="text" id="full_name" name="full_name" value="<?php echo htmlspecialchars($old['full_name']); ?>" required></div>
+                        <div class="form-group"><label for="email">Email *</label><input type="email" id="email" name="email" value="<?php echo htmlspecialchars($old['email']); ?>" required></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group"><label for="phone">Phone Number (PH)</label><input type="tel" id="phone" name="phone" pattern="^09[0-9]{9}$" maxlength="11" placeholder="09XXXXXXXXX" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,''); if(!this.value.startsWith('09')){this.value='09';}"></div>
+                        <div class="form-group"><label for="phone">Phone Number (PH)</label><input type="tel" id="phone" name="phone" value="<?php echo htmlspecialchars($old['phone']); ?>" pattern="^09[0-9]{9}$" maxlength="11" placeholder="09XXXXXXXXX" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,''); if(!this.value.startsWith('09')){this.value='09';}"></div>
                         <div class="form-group">
                             <label for="role">Role *</label>
                             <select id="role" name="role" required>
                                 <option value="">Select a role</option>
-                                <option value="engineer">Engineer</option>
-                                <option value="foreman">Foreman</option>
-                                <option value="client">Client</option>
-                            </select>
+                                <option value="engineer" <?php echo $old['role']=='engineer'?'selected':''; ?>>Engineer</option>
+<option value="foreman" <?php echo $old['role']=='foreman'?'selected':''; ?>>Foreman</option>
+<option value="client" <?php echo $old['role']=='client'?'selected':''; ?>>Client</option>                            </select>
                         </div>
                     </div>
                     <div class="form-row">
