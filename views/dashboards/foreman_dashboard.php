@@ -38,7 +38,7 @@ $teamMembers = [];
 </head>
 <body>
 
-<?php include(__DIR__ . '/../components/sidebar_super_admin.php'); ?>
+<?php include(__DIR__ . '/../components/sidebar_foreman.php'); ?>
 
 <div class="main-content">
     <h1>🛠️ Foreman Dashboard</h1>
