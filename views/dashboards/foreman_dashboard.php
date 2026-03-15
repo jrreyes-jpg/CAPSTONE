@@ -22,21 +22,10 @@ $teamMembers = [];
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Foreman Dashboard - Edge Automation</title>
     <link rel="stylesheet" href="/codesamplecaps/public/assets/css/global.css">
-    <style>
-        body { font-family: 'Poppins', sans-serif; background: #f4f6f8; }
-        .main-content { margin-left: 250px; padding: 40px; }
-        .stats-grid { display: flex; gap: 20px; margin-bottom: 20px; }
-        .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); flex: 1; }
-    
-@media (max-width: 768px) {
-    body { overflow-x: hidden; }
-    .main-content { margin-left: 0; padding: 16px; }
-    .stats-grid { flex-direction: column; }
-}
-
-</style>
+    <link rel="stylesheet" href="/codesamplecaps/public/assets/css/foreman_dashboard.css">
+    <link rel="stylesheet" href="/codesamplecaps/public/assets/css/qr_scanner.css">
 </head>
-<body>
+<body class="foreman-dashboard">
 
 <?php include(__DIR__ . '/../components/sidebar_foreman.php'); ?>
 
@@ -63,5 +52,31 @@ $teamMembers = [];
     </div>
 </div>
 
+<!-- QR Scanner Modal -->
+<div class="qr-modal" id="qrScannerModal" aria-hidden="true">
+    <div class="qr-modal-content">
+        <div class="qr-modal-header">
+            <h2>QR Asset Scanner</h2>
+            <button id="qrScannerClose" class="qr-close" type="button" aria-label="Close">×</button>
+        </div>
+        <div class="qr-modal-body">
+            <div class="qr-status" id="qrStatus">Ready to scan.</div>
+            <div class="qr-scanner-area" id="qr-reader"></div>
+            <div class="qr-error" id="qrScannerError"></div>
+            <div class="qr-asset-info" id="qrAssetInfo"></div>
+            <div class="qr-input-row">
+                <input id="qrWorkerName" placeholder="Worker / personnel name" aria-label="Worker name">
+                <textarea id="qrNotes" rows="2" placeholder="Optional notes (location, condition, etc.)" aria-label="Notes"></textarea>
+            </div>
+            <div class="qr-actions">
+                <button class="btn-primary" id="qrLogUsage" type="button">Log Usage</button>
+                <button class="btn-secondary" id="qrScannerCloseSecondary" type="button">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+<script src="/codesamplecaps/public/assets/js/qr_scanner_foreman.js"></script>
 </body>
 </html>

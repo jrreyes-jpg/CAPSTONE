@@ -9,6 +9,7 @@ $isInventory = str_contains($currentPath, '/views/dashboards/inventory.php');
 $isAssets = str_contains($currentPath, '/views/dashboards/assets.php');
 $isReports = str_contains($currentPath, '/views/dashboards/reports.php');
 $isChangePassword = str_contains($currentPath, '/views/dashboards/change_password.php');
+$isScanHistory = str_contains($currentPath, '/views/dashboards/scan_history.php');
 ?>
 <nav class="sidebar" id="sidebar">
     <button id="sidebarToggle" class="sidebar-toggle" type="button">
@@ -28,6 +29,7 @@ $isChangePassword = str_contains($currentPath, '/views/dashboards/change_passwor
         <li><a href="/codesamplecaps/views/dashboards/inventory.php" class="menu-link<?php echo $isInventory ? ' active' : ''; ?>">📦 <span class="menu-text">Inventory</span></a></li>
         <li><a href="/codesamplecaps/views/dashboards/assets.php" class="menu-link<?php echo $isAssets ? ' active' : ''; ?>">🏗️ <span class="menu-text">Assets</span></a></li>
         <li><a href="/codesamplecaps/views/dashboards/reports.php" class="menu-link<?php echo $isReports ? ' active' : ''; ?>">📈 <span class="menu-text">Reports</span></a></li>
+        <li><a href="/codesamplecaps/views/dashboards/scan_history.php" class="menu-link<?php echo $isScanHistory ? ' active' : ''; ?>">🕑 <span class="menu-text">Scan History</span></a></li>
 
         <li><a href="/codesamplecaps/views/dashboards/change_password.php" class="menu-link<?php echo $isChangePassword ? ' active' : ''; ?>">🔐 <span class="menu-text">Change Password</span></a></li>
         <li><a href="/codesamplecaps/views/auth/logout.php" class="menu-link logout">🚪 <span class="menu-text">Logout</span></a></li>
