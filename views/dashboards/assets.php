@@ -11,6 +11,8 @@ require_role('super_admin');
 
 $message = '';
 $error = '';
+$qrPreview = '';
+$createdAssetId = 0;
 
 // -- QR generation helper (SVG, offline) --
 function generateQRDataUri(string $value): string {
@@ -42,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $serial = trim($_POST['serial_number'] ?? '');
 
         if ($assetName === '') {
-            $error = 'Asset name is required.';
+            $_SESSION['assets_error'] = 'Asset name is required.';
         } else {
             $stmt = $conn->prepare('INSERT INTO assets (asset_name, asset_type, serial_number) VALUES (?, ?, ?)');
             $stmt->bind_param('sss', $assetName, $assetType, $serial);
@@ -54,28 +56,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $qrStmt->bind_param('is', $assetId, $qrValue);
                 $qrStmt->execute();
 
-                $message = 'Asset created. QR code generated.';
+                 $_SESSION['assets_message'] = 'Asset created. QR code generated.';
+                $_SESSION['assets_qr_preview'] = $qrValue;
+                $_SESSION['assets_created_asset_id'] = $assetId;
             } else {
-                $error = 'Failed to create asset. Please check the database configuration.';
+                               $_SESSION['assets_error'] = 'Failed to create asset. Please check the database configuration.';
             }
         }
+         header('Location: /codesamplecaps/views/dashboards/assets.php');
+        exit();
     }
 
     if ($action === 'return_asset') {
         $assetId = (int)($_POST['asset_id'] ?? 0);
         if ($assetId <= 0) {
-            $error = 'Invalid asset specified.';
+             $_SESSION['assets_error'] = 'Invalid asset specified.';
         } else {
             $updateStmt = $conn->prepare('UPDATE assets SET asset_status = ? WHERE id = ?');
             $status = 'available';
             $updateStmt->bind_param('si', $status, $assetId);
             if ($updateStmt->execute()) {
-                $message = 'Asset marked as available.';
+                $_SESSION['assets_message'] = 'Asset marked as available.';
             } else {
-                $error = 'Failed to update asset status.';
+                $_SESSION['assets_error'] = 'Failed to update asset status.';
             }
         }
+        header('Location: /codesamplecaps/views/dashboards/assets.php');
+        exit();
     }
+}
+if (isset($_SESSION['assets_message'])) {
+    $message = (string)$_SESSION['assets_message'];
+    unset($_SESSION['assets_message']);
+}
+
+if (isset($_SESSION['assets_error'])) {
+    $error = (string)$_SESSION['assets_error'];
+    unset($_SESSION['assets_error']);
+}
+
+if (isset($_SESSION['assets_qr_preview'])) {
+    $qrPreview = (string)$_SESSION['assets_qr_preview'];
+    unset($_SESSION['assets_qr_preview']);
+}
+
+if (isset($_SESSION['assets_created_asset_id'])) {
+    $createdAssetId = (int)$_SESSION['assets_created_asset_id'];
+    unset($_SESSION['assets_created_asset_id']);
 }
     
     
@@ -114,7 +141,20 @@ if ($result) {
 
         <?php if ($message): ?><div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div><?php endif; ?>
         <?php if ($error): ?><div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
-
+  <?php if ($qrPreview !== ''): ?>
+            <section class="form-section" style="margin-top: 20px;">
+                <h2>QR Preview (Newest Asset)</h2>
+                <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+                    <img src="<?php echo generateQRDataUri($qrPreview); ?>" alt="Latest asset QR preview" style="max-width:180px;">
+                    <div>
+                        <?php if ($createdAssetId > 0): ?>
+                            <p style="margin:0 0 8px;">Asset ID: <strong><?php echo htmlspecialchars((string)$createdAssetId); ?></strong></p>
+                            <a href="/codesamplecaps/views/dashboards/print_qr_codes.php?asset_id=<?php echo $createdAssetId; ?>" target="_blank" class="btn-secondary" rel="noreferrer noopener">Print This QR</a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </section>
+        <?php endif; ?>
         <section class="form-section">
             <h2>Create New Asset</h2>
             <form method="POST" class="asset-form">

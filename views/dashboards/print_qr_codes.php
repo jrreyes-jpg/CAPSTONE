@@ -9,18 +9,14 @@ use chillerlan\QRCode\QROptions;
 require_role('super_admin');
 
 function generateQRDataUri(string $value): string {
+
     $options = new QROptions([
-        'version'      => 5,
-        'outputType'   => QRCode::OUTPUT_IMAGE_SVG,
-        'eccLevel'     => QRCode::ECC_L,
-        'scale'        => 6,
-        'imageBase64'  => false,
+        'outputType' => 'png',
+        'scale' => 8
     ]);
 
-    $svg = (new QRCode($options))->render($value);
-    return 'data:image/svg+xml;base64,' . base64_encode($svg);
-}
-
+    return (new QRCode($options))->render($value);
+}   
 $assetId = isset($_GET['asset_id']) ? (int)$_GET['asset_id'] : 0;
 
 $sql = 'SELECT a.id, a.asset_name, a.asset_type, a.serial_number, a.asset_status, q.qr_code_value
@@ -81,11 +77,11 @@ $assets = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 
         <?php foreach ($assets as $asset): ?>
             <?php
-                $qrValue = $asset['qr_code_value'] ?: 'asset_id=' . $asset['id'];
+                $qrValue = "http://localhost/codesamplecaps/scan_asset.php?id=".$asset['id'];
                 $qrDataUri = generateQRDataUri($qrValue);
             ?>
             <div class="card">
-                <div class="qr"><img src="<?php echo $qrDataUri; ?>" alt="QR code" style="width:100%; height:auto; display:block;"></div>
+                <div class="qr"><img src="<?php echo generateQRDataUri($qrValue); ?>" alt="QR code" style="width:100%; height:auto; display:block;"></div>
                 <h3><?php echo htmlspecialchars($asset['asset_name']); ?> (ID <?php echo $asset['id']; ?>)</h3>
                 <p>Type: <?php echo htmlspecialchars($asset['asset_type'] ?: '—'); ?></p>
                 <p>Status: <?php echo htmlspecialchars($asset['asset_status']); ?></p>
