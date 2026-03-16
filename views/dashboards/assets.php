@@ -77,8 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
-    ?>
-    <?php
+    
+    
 // --- FETCH ALL ASSETS ---
 $assets = []; // initialize bilang empty array para safe
 
@@ -96,266 +96,18 @@ if ($result) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Assets & QR Codes - Super Admin</title>
-    <style>/* ==========================================
-   ASSETS & QR CODES PAGE - CSS3 STYLES
-   Modern UI with Flexbox, Gradients, Transitions
-========================================== */
+<link rel="stylesheet" href="/codesamplecaps/public/assets/css/assets.css">
 
-:root {
-    --primary: #16a34a;
-    --primary-dark: #15803d;
-    --primary-light: #22c55e;
-    --danger: #dc2626;
-    --warning: #f59e0b;
-    --success: #10b981;
-    --bg-light: #f8fafc;
-    --text-dark: #1f2937;
-    --text-light: #6b7280;
-    --shadow-soft: 0 4px 12px rgba(0,0,0,0.05);
-    --shadow-hover: 0 8px 25px rgba(0,0,0,0.1);
-    --border-radius: 8px;
-    --transition: all 0.3s ease;
-}
-
-.container {
-    display: flex;
-    min-height: 100vh;
-}
-
-.main-content {
-    flex: 1;
-    margin-left: 260px;
-    padding: 30px;
-    background: var(--bg-light);
-}
-
-.header {
-    margin-bottom: 30px;
-}
-
-.header h1 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--text-dark);
-    margin: 0;
-    background: linear-gradient(135deg, var(--primary), var(--primary-light));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-}
-
-/* Alerts */
-.alert {
-    padding: 15px 20px;
-    border-radius: var(--border-radius);
-    margin-bottom: 20px;
-    font-weight: 500;
-    transition: var(--transition);
-}
-
-.alert-success {
-    background: linear-gradient(135deg, #d1fae5, #a7f3d0);
-    color: #065f46;
-    border-left: 4px solid var(--success);
-}
-
-.alert-error {
-    background: linear-gradient(135deg, #fee2e2, #fecaca);
-    color: #991b1b;
-    border-left: 4px solid var(--danger);
-}
-
-/* Form Section */
-.form-section {
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(10px);
-    border-radius: var(--border-radius);
-    padding: 30px;
-    box-shadow: var(--shadow-soft);
-    margin-bottom: 30px;
-    transition: var(--transition);
-}
-
-.form-section:hover {
-    box-shadow: var(--shadow-hover);
-}
-
-.form-section h2 {
-    font-size: 1.8rem;
-    font-weight: 600;
-    color: var(--text-dark);
-    margin-bottom: 20px;
-    border-bottom: 2px solid var(--primary);
-    padding-bottom: 10px;
-}
-
-.asset-form {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.form-row {
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
-}
-
-.form-group {
-    flex: 1;
-    min-width: 200px;
-}
-
-.form-group label {
-    display: block;
-    font-weight: 600;
-    color: var(--text-dark);
-    margin-bottom: 8px;
-}
-
-.form-group input {
-    width: 100%;
-    padding: 12px 15px;
-    border: 2px solid #e5e7eb;
-    border-radius: var(--border-radius);
-    font-size: 1rem;
-    transition: var(--transition);
-    background: #fff;
-}
-
-.form-group input:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
-}
-
-/* Buttons */
-.btn-primary {
-    background: linear-gradient(135deg, var(--primary), var(--primary-light));
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: var(--border-radius);
-    font-size: 1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: var(--transition);
-    box-shadow: var(--shadow-soft);
-}
-
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-hover);
-}
-
-.btn-secondary {
-    background: linear-gradient(135deg, #6b7280, #9ca3af);
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: var(--border-radius);
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: var(--transition);
-    text-decoration: none;
-    display: inline-block;
-    text-align: center;
-}
-
-.btn-secondary:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-soft);
-}
-
-/* Table Section */
-.table-wrapper {
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(10px);
-    border-radius: var(--border-radius);
-    overflow: hidden;
-    box-shadow: var(--shadow-soft);
-    transition: var(--transition);
-}
-
-.table-wrapper:hover {
-    box-shadow: var(--shadow-hover);
-}
-
-.responsive-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.9rem;
-}
-
-.responsive-table th,
-.responsive-table td {
-    padding: 15px;
-    text-align: left;
-    border-bottom: 1px solid #e5e7eb;
-}
-
-.responsive-table th {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: white;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.responsive-table tbody tr {
-    transition: var(--transition);
-}
-
-.responsive-table tbody tr:hover {
-    background: rgba(22, 163, 74, 0.05);
-}
-
-.responsive-table tbody tr:last-child td {
-    border-bottom: none;
-}
-
-.responsive-table img {
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-soft);
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .main-content {
-        margin-left: 0;
-        padding: 20px;
-    }
-
-    .form-row {
-        flex-direction: column;
-    }
-
-    .responsive-table {
-        font-size: 0.8rem;
-    }
-
-    .responsive-table th,
-    .responsive-table td {
-        padding: 10px;
-    }
-
-    .header h1 {
-        font-size: 2rem;
-    }
-
-}
-
-</style>
 </head>
 <body>
 <div class="container">
     <?php include __DIR__ . '/../components/sidebar_super_admin.php'; ?>
 
-    <main class="main-content">
+    <main class="main-content assets-content">
         <div class="header">
             <h1>Assets & QR Codes</h1>
         </div>
@@ -441,7 +193,7 @@ if ($result) {
                             </tr>
                         <?php endforeach; ?>
                         <?php if (count($assets) === 0): ?>
-                            <tr><td colspan="5" style="text-align:center; padding: 20px;">No assets yet.</td></tr>
+                            <tr><td colspan="6">No assets yet.</td></tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
