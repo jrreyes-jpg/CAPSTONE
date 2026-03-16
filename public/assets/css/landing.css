@@ -87,10 +87,11 @@ p {
     top: 0;
     left: 0;
     right: 0;
-    background: var(--color-white);
-    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(10px);
+    background: rgba(255,255,255,0.92);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    border-bottom: 1px solid rgba(0,0,0,0.05);
     z-index: 1000;
-    transition: box-shadow 0.3s ease, background 0.3s ease;
 }
 
 .navbar.scrolled {
@@ -367,7 +368,8 @@ p {
 }
 
 .hero-title {
-    font-size: 3.5rem;
+     font-size: clamp(2.2rem,5vw,3.6rem);
+    letter-spacing: -1px;
     margin-bottom: 1.5rem;
     font-weight: 700;
     text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
@@ -408,9 +410,9 @@ p {
 }
 
 .btn-primary {
-    background: var(--color-accent);
-    color: var(--color-white);
-    box-shadow: var(--shadow-md);
+    background: linear-gradient(135deg,#ff9800,#ff7f00);
+    color: white;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
 }
 
 .btn-primary:hover {
@@ -470,17 +472,17 @@ p {
 }
 
 .service-card {
-    background: var(--color-white);
+    background: white;
     padding: 2rem;
-    border-radius: 12px;
-    box-shadow: var(--shadow-sm);
-    transition: var(--transition);
-    border-top: 4px solid var(--color-primary);
+    border-radius: 16px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+    transition: 0.3s ease;
+    border: none;
 }
 
 .service-card:hover {
-    transform: translateY(-8px);
-    box-shadow: var(--shadow-lg);
+    transform: translateY(-10px);
+    box-shadow: 0 18px 40px rgba(0,0,0,0.15);
 }
 
 .service-icon {
@@ -533,14 +535,12 @@ p {
 }
 
 .project-item {
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
-    color: var(--color-white);
+    background: linear-gradient(135deg,#0f9d38,#087f23);
+    color: white;
     padding: 2.5rem;
-    border-radius: 12px;
-    position: relative;
-    overflow: hidden;
-    transition: var(--transition);
-    cursor: pointer;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.15);
+    transition: 0.3s ease;
 }
 
 .project-item::before {
@@ -716,17 +716,14 @@ p {
 }
 
 .social-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 45px;
-    height: 45px;
-    background: var(--color-primary);
-    color: var(--color-white);
-    text-decoration: none;
-    border-radius: 50%;
-    font-weight: 700;
-    transition: var(--transition);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    width:48px;
+    height:48px;
+    border-radius:12px;
+    background:#f3f6f8;
+    transition:0.25s ease;
 }
 
 .social-icon:hover {
@@ -739,7 +736,7 @@ p {
    =================================================== */
 
 .footer {
-    background: var(--color-text);
+    background:#1c1c1c;
     color: var(--color-white);
     padding: 2rem 0;
     text-align: center;
@@ -982,7 +979,7 @@ img { max-width: 100%; height: auto; }
 .popover-arrow {
     position: absolute;
     top: -8px;
-    left: 17.5%;
+    left: 18.5%;
     transform: translateX(-50%);
     width: 0;
     height: 0;

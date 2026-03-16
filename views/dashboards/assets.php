@@ -36,54 +36,88 @@ function getBaseUrl(): string {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
     $action = $_POST['action'] ?? '';
 
+    // CREATE ASSET
     if ($action === 'create_asset') {
+
         $assetName = trim($_POST['asset_name'] ?? '');
         $assetType = trim($_POST['asset_type'] ?? '');
         $serial = trim($_POST['serial_number'] ?? '');
 
         if ($assetName === '') {
+
             $_SESSION['assets_error'] = 'Asset name is required.';
+
         } else {
+
             $stmt = $conn->prepare('INSERT INTO assets (asset_name, asset_type, serial_number) VALUES (?, ?, ?)');
             $stmt->bind_param('sss', $assetName, $assetType, $serial);
+
             if ($stmt->execute()) {
+
                 $assetId = $stmt->insert_id;
-                $qrValue = 'asset_id=' . $assetId;
+                $qrValue = 'asset_id='.$assetId;
 
                 $qrStmt = $conn->prepare('INSERT INTO asset_qr_codes (asset_id, qr_code_value) VALUES (?, ?)');
                 $qrStmt->bind_param('is', $assetId, $qrValue);
                 $qrStmt->execute();
 
-                 $_SESSION['assets_message'] = 'Asset created. QR code generated.';
+                $_SESSION['assets_message'] = 'Asset created. QR generated.';
                 $_SESSION['assets_qr_preview'] = $qrValue;
                 $_SESSION['assets_created_asset_id'] = $assetId;
-            } else {
-                               $_SESSION['assets_error'] = 'Failed to create asset. Please check the database configuration.';
-            }
-        }
-         header('Location: /codesamplecaps/views/dashboards/assets.php');
-        exit();
-    }
 
-    if ($action === 'return_asset') {
-        $assetId = (int)($_POST['asset_id'] ?? 0);
-        if ($assetId <= 0) {
-             $_SESSION['assets_error'] = 'Invalid asset specified.';
-        } else {
-            $updateStmt = $conn->prepare('UPDATE assets SET asset_status = ? WHERE id = ?');
-            $status = 'available';
-            $updateStmt->bind_param('si', $status, $assetId);
-            if ($updateStmt->execute()) {
-                $_SESSION['assets_message'] = 'Asset marked as available.';
             } else {
-                $_SESSION['assets_error'] = 'Failed to update asset status.';
+                $_SESSION['assets_error'] = 'Failed to create asset.';
             }
         }
+
         header('Location: /codesamplecaps/views/dashboards/assets.php');
         exit();
     }
+
+    // RETURN ASSET
+    if ($action === 'return_asset') {
+
+        $assetId = (int)($_POST['asset_id'] ?? 0);
+
+        if ($assetId > 0) {
+
+            $stmt = $conn->prepare('UPDATE assets SET asset_status=? WHERE id=?');
+            $status = 'available';
+            $stmt->bind_param('si', $status, $assetId);
+            $stmt->execute();
+
+            $_SESSION['assets_message'] = 'Asset returned.';
+        }
+
+        header('Location: /codesamplecaps/views/dashboards/assets.php');
+        exit();
+    }
+
+    // DELETE ASSET
+    if ($action === 'delete_asset') {
+
+        $assetId = (int)($_POST['asset_id'] ?? 0);
+
+        if ($assetId > 0) {
+
+            $stmtQR = $conn->prepare("DELETE FROM asset_qr_codes WHERE asset_id=?");
+            $stmtQR->bind_param("i", $assetId);
+            $stmtQR->execute();
+
+            $stmt = $conn->prepare("DELETE FROM assets WHERE id=?");
+            $stmt->bind_param("i", $assetId);
+            $stmt->execute();
+
+            $_SESSION['assets_message'] = 'Asset deleted.';
+        }
+
+        header('Location: /codesamplecaps/views/dashboards/assets.php');
+        exit();
+    }
+
 }
 if (isset($_SESSION['assets_message'])) {
     $message = (string)$_SESSION['assets_message'];
@@ -218,8 +252,18 @@ if ($result) {
                                         <span style="opacity: 0.7;">No QR</span>
                                     <?php endif; ?>
                                 </td>
-                                <td><?php echo htmlspecialchars($asset['created_at']); ?></td>
-                                <td>
+                               <td><?php echo htmlspecialchars($asset['created_at']); ?></td>
+<td>
+
+
+
+<form method="POST" onsubmit="return confirm('Delete this asset?');">
+<input type="hidden" name="action" value="delete_asset">
+<input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
+<button type="submit" class="btn-danger">Delete</button>
+</form>
+
+</td>
                                     <?php if ($asset['asset_status'] === 'in_use'): ?>
                                         <form method="POST" style="margin:0;">
                                             <input type="hidden" name="action" value="return_asset">

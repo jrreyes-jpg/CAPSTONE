@@ -197,8 +197,11 @@ session_start();
 
                 <div class="contact-info">
                     <h3>Contact Information</h3>
-                    <p><strong>Company:</strong> Edge Automation Technology Services, Co.</p>
-                    <p><strong>Specialization:</strong> Industrial Automation & Engineering</p>
+                  <p>
+<strong>Company:</strong> Edge Automation Technology Services, Co.<br>
+<strong>Company Location:</strong> Blk 4 Lot 16 Camella Dos Rios, Brgy. Pittland, Cabuyao, Laguna<br>
+<strong>Specialization:</strong> Industrial Automation & Engineering
+</p>
                     <div class="social-links tooltip-container" style="position:relative;">
     <div class="new-client-popover" id="newClientTip">
     <div class="popover-arrow"></div>
