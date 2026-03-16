@@ -982,7 +982,7 @@ img { max-width: 100%; height: auto; }
 .popover-arrow {
     position: absolute;
     top: -8px;
-    left: 12%;
+    left: 17.5%;
     transform: translateX(-50%);
     width: 0;
     height: 0;

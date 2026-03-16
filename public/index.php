@@ -30,17 +30,9 @@ session_start();
                 <?php endif; ?>
             </ul>
 
-            <?php if (empty($_SESSION['user_id'])): ?>
-                <div class="nav-actions">
-                    <a href="login.php" class="btn btn-primary">Login</a>
-                </div>
-            <?php else: ?>
-                <div class="nav-actions">
-                    <span class="welcome-text">Welcome, <?php echo htmlspecialchars($_SESSION['user_name']); ?></span>
-                    <a href="logout.php" class="btn btn-secondary">Logout</a>
-                </div>
-            <?php endif; ?>
-
+           <div class="nav-actions">
+        <a href="login.php" class="btn btn-primary">Login</a>
+</div>
             <div class="hamburger">
                 <span></span>
                 <span></span>
@@ -201,29 +193,7 @@ session_start();
 
 
            <div class="contact-content">
-                <?php if (empty($_SESSION['user_id'])): ?>
-                    
-
-                    </div>
-                <?php else: ?>
-                    <?php if (empty($_SESSION['csrf_token'])) { $_SESSION['csrf_token'] = bin2hex(random_bytes(32)); } ?>
-                    <form class="contact-form" id="contactForm" method="post" action="contact_submit.php">
-                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
-                        <div class="form-group">
-                            <label for="name">Name</label>
-                            <input type="text" id="name" name="name" required value="<?php echo htmlspecialchars($_SESSION['user_name']); ?>" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label for="email">Email</label>
-                            <input type="email" id="email" name="email" required placeholder="your@email.com" value="<?php echo isset($_SESSION['user_email']) ? htmlspecialchars($_SESSION['user_email']) : ''; ?>">
-                        </div>
-                        <div class="form-group">
-                            <label for="message">Message</label>
-                            <textarea id="message" name="message" required placeholder="Tell us about your project..." rows="6"></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Send Message</button>
-                    </form>
-                <?php endif; ?>
+              
 
                 <div class="contact-info">
                     <h3>Contact Information</h3>
@@ -269,9 +239,7 @@ session_start();
         <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" width="24" height="24">
     </a>
 
-</div>                </div>
-            </div>
-        </div>
+            
     </section>
 
     <!-- Footer -->
