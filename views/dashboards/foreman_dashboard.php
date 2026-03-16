@@ -76,7 +76,7 @@ $teamMembers = [];
     </div>
 </div>
 
-<script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+<script src="/codesamplecaps/public/assets/js/html5-qrcode.min.js"></script>
 <script src="/codesamplecaps/public/assets/js/qr_scanner_foreman.js"></script>
 </body>
 </html>
