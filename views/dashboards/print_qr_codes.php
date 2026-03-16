@@ -77,7 +77,7 @@ $assets = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 
         <?php foreach ($assets as $asset): ?>
             <?php
-                $qrValue = "http://localhost/codesamplecaps/scan_asset.php?id=".$asset['id'];
+                $qrValue = "asset_id=".$asset['id'];
                 $qrDataUri = generateQRDataUri($qrValue);
             ?>
             <div class="card">

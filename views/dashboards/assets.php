@@ -18,7 +18,7 @@ $createdAssetId = 0;
 function generateQRDataUri(string $value): string {
     $options = new QROptions([
         'version'      => 5,
-        'outputType'   => 'svg',       // OUTPUT_IMAGE_SVG sa v3, OUTPUT_SVG sa v6
+        'outputType'   => 'png',       // OUTPUT_IMAGE_SVG sa v3, OUTPUT_SVG sa v6
         'eccLevel'     => 'L',  // ECC_L sa v3, QRErrorCorrectLevel::L sa v6
         'scale'        => 6,
         'imageBase64'  => false,
