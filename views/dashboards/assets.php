@@ -4,8 +4,7 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../vendor/autoload.php';
 
 use chillerlan\QRCode\QRCode;
-use chillerlan\QRCode\QROptions;
-use chillerlan\QRCode\QRErrorCorrectLevel;
+use chillerlan\QRCode\QROptions as QRCodeOptions;
 
 require_role('super_admin');
 
@@ -16,16 +15,16 @@ $createdAssetId = 0;
 
 // -- QR generation helper (SVG, offline) --
 function generateQRDataUri(string $value): string {
-    $options = new QROptions([
+    $options = [
         'version'      => 5,
-        'outputType'   => 'png',       // OUTPUT_IMAGE_SVG sa v3, OUTPUT_SVG sa v6
-        'eccLevel'     => 'L',  // ECC_L sa v3, QRErrorCorrectLevel::L sa v6
+        'outputType'   => 'png',
+        'eccLevel'     => 'L',
         'scale'        => 6,
         'imageBase64'  => false,
-    ]);
+    ];
 
     $svg = (new QRCode($options))->render($value);
-    return 'data:image/svg+xml;base64,' . base64_encode($svg);
+    return $svg;
 }
 // Helper: build absolute URL for QR code (used for QR text)
 function getBaseUrl(): string {
@@ -246,7 +245,7 @@ if ($result) {
                                             $qrValue = $asset['qr_code_value'] ?: 'asset_id=' . $asset['id'];
                                             $qrDataUri = generateQRDataUri($qrValue);
                                         ?>
-                                        <img src="<?php echo $qrDataUri; ?>" alt="QR code" style="max-width:140px;">
+                                        <button onclick="showQR('<?php echo $qrDataUri; ?>')" class="btn-secondary">Preview</button>
                                         <div style="margin-top:4px;"><a href="/codesamplecaps/views/dashboards/print_qr_codes.php?asset_id=<?php echo $asset['id']; ?>" target="_blank" rel="noreferrer noopener">Print</a></div>
                                     <?php else: ?>
                                         <span style="opacity: 0.7;">No QR</span>
@@ -285,6 +284,10 @@ if ($result) {
         </section>
     </main>
 </div>
+<div id="qrModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); justify-content:center; align-items:center;">
+    <img id="qrModalImg" style="max-width:300px; background:#fff; padding:10px;">
+</div>
+
 <script src="/codesamplecaps/public/assets/js/script.js"></script>
 </body>
 </html>

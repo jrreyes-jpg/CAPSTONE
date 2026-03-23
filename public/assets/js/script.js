@@ -140,3 +140,15 @@ if(form){
         }
     });
 }
+
+function showQR(src){
+    document.getElementById('qrModal').style.display = 'flex';
+    document.getElementById('qrModalImg').src = src;
+}
+
+const modal = document.getElementById('qrModal');
+if(modal){
+    modal.onclick = function(){
+        this.style.display = 'none';
+    }
+}
