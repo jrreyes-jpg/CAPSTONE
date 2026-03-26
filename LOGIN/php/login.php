@@ -1,6 +1,6 @@
 <?php
     session_start();
-    require_once __DIR__ . '/../config/database.php';
+    require_once __DIR__ . '/../../config/database.php';
 
     $error = "";
     $failed_attempts_display = "";
@@ -105,9 +105,9 @@ end_login:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edge Automation Portal</title>
 
-    <link rel="stylesheet" href="/codesamplecaps/public/assets/css/style.css">
     <link rel="stylesheet"
 href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+<link rel="stylesheet" href="../../SUPERADMIN/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     </head>
 
@@ -123,7 +123,7 @@ class="back-home animate__animated animate__fadeInDown">
 
     <div class="left-panel">
     <div class="logo" id="logo3d">
-        <img src="/codesamplecaps/public/assets/images/edge.jpg" alt="Edge Logo">
+        <img src="../../IMAGES/edge.jpg" alt="Edge Logo">
     </div>
     <h1 class="company-name">
         EDGE AUTOMATION TECHNOLOGY SERVICES, CO.
@@ -177,6 +177,6 @@ function showForgot(){
 
 </script>
 
-    <script src="/codesamplecaps/public/assets/js/script.js"></script>
+    <script src="../js/script.js"></script>
     </body>
     </html>
