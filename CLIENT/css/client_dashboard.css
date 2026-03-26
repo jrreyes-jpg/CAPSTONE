@@ -42,7 +42,7 @@
 
 @media (max-width: 768px) {
     body { overflow-x: hidden; }
-    .sidebar { position: relative; width: 100%; height: auto; min-height: auto; }
+    .sidebar { position: relative; width: 100%; height: auto; }
     .main-content { margin-left: 0; padding: 16px; }
     .tabs { flex-wrap: wrap; gap: 8px; }
     .tab { width: 100%; text-align: center; }

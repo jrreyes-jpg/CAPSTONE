@@ -67,7 +67,6 @@
 /* Form Section */
 .form-section {
     background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(10px);
     border-radius: var(--border-radius);
     padding: 30px;
     box-shadow: var(--shadow-soft);
@@ -170,7 +169,6 @@
 /* Table Section */
 .table-wrapper {
     background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(10px);
     border-radius: var(--border-radius);
     overflow: hidden;
     box-shadow: var(--shadow-soft);
