@@ -27,44 +27,6 @@
     });
 };
 
-const initSmoothScroll = () => {
-    document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-        anchor.addEventListener('click', (event) => {
-            const targetId = anchor.getAttribute('href');
-            const targetElement = targetId ? document.querySelector(targetId) : null;
-
-            if (!targetElement) {
-                return;
-            }
-
-            event.preventDefault();
-            targetElement.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start',
-            });
-        });
-    });
-};
-
-const initNavHighlight = () => {
-    const sections = document.querySelectorAll('section[id]');
-    const navLinks = document.querySelectorAll('.nav-link');
-
-    window.addEventListener('scroll', () => {
-        let currentSection = '';
-
-        sections.forEach((section) => {
-            if (window.scrollY >= section.offsetTop - 200) {
-                currentSection = section.getAttribute('id') ?? '';
-            }
-        });
-
-        navLinks.forEach((link) => {
-            const href = link.getAttribute('href') ?? '';
-            link.classList.toggle('active', href.slice(1) === currentSection);
-        });
-    });
-};
 
 const validateForm = (formData) => {
     if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
@@ -211,11 +173,57 @@ const initNewClientTooltip = () => {
 
 document.addEventListener('DOMContentLoaded', () => {
     initMobileMenu();
-    initSmoothScroll();
     initNavHighlight();
     initFormHandling();
     initScrollAnimations();
     initNavbarScroll();
     initConsultationModal();
     initNewClientTooltip();
+});
+
+
+function smoothScroll(target, duration = 800) {
+    const targetPosition = target.getBoundingClientRect().top;
+    const startPosition = window.pageYOffset;
+    const navbarHeight = document.querySelector('.navbar').offsetHeight;
+    const offset = targetPosition + startPosition - navbarHeight;
+
+    let startTime = null;
+
+    function animation(currentTime) {
+        if (!startTime) startTime = currentTime;
+        const timeElapsed = currentTime - startTime;
+
+        const run = ease(timeElapsed, startPosition, offset - startPosition, duration);
+        window.scrollTo(0, run);
+
+        if (timeElapsed < duration) requestAnimationFrame(animation);
+    }
+
+    function ease(t, b, c, d) {
+        t /= d / 2;
+        if (t < 1) return c / 2 * t * t + b;
+        t--;
+        return -c / 2 * (t * (t - 2) - 1) + b;
+    }
+
+    requestAnimationFrame(animation);
+}
+
+document.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', function(e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (!target) return;
+
+        smoothScroll(target);
+
+        // Close mobile menu kung bukas
+        const navMenu = document.querySelector('.nav-menu');
+        const hamburger = document.querySelector('.hamburger');
+        if (navMenu?.classList.contains('active')) {
+            navMenu.classList.remove('active');
+            hamburger?.classList.remove('active');
+        }
+    });
 });

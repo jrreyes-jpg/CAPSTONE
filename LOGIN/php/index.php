@@ -9,14 +9,14 @@ session_start();
     <meta name="description" content="Edge Automation Technology Services, Co. - Professional engineering automation and technology solutions">
     <title>Edge Automation Technology Services, Co.</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/codesamplecaps/public/assets/css/landing.css">
+<link rel="stylesheet" href="../css/landing-page.css">
 </head>
 <body>
     <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-logo">
-                <img src="assets/images/edge.jpg" alt="Edge Automation logo" class="logo-img">
+                <img src="../../IMAGES/edge.jpg" alt="Edge Automation logo" class="logo-img">
                 <span class="logo-text">EDGE AUTOMATION</span>
             </div>
             <ul class="nav-menu">
@@ -274,7 +274,7 @@ session_start();
         <button id="closeConsult" class="consult-close" type="button">Close</button>
     </div>
 </div>
-    <script src="/codesamplecaps/public/assets/js/landing.js"></script>
+    <script src="../js/landing-page.js"></script>
 
 </body>
 

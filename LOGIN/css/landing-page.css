@@ -26,7 +26,9 @@
 html {
     scroll-behavior: smooth;
 }
-
+section {
+    scroll-margin-top: 80px;
+}
 body {
     font-size: 16px;
     font-family: 'Poppins', sans-serif;
@@ -735,14 +737,14 @@ p {
    =================================================== */
 
 .footer {
-    background:#1c1c1c;
+    background:#0f9d38;
     color: var(--color-white);
     padding: 2rem 0;
     text-align: center;
 }
 
 .footer p {
-    color: #bbb;
+    color: #ffffff;
     margin: 0;
 }
 
