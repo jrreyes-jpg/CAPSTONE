@@ -195,53 +195,43 @@ session_start();
            <div class="contact-content">
               
 
-                <div class="contact-info">
-                    <h3>Contact Information</h3>
-                  <p>
-<strong>Company:</strong> Edge Automation Technology Services, Co.<br>
-<strong>Company Location:</strong> Blk 4 Lot 16 Camella Dos Rios, Brgy. Pittland, Cabuyao, Laguna<br>
-<strong>Specialization:</strong> Industrial Automation & Engineering
-</p>
-                    <div class="social-links tooltip-container" style="position:relative;">
-    <div class="new-client-popover" id="newClientTip">
-    <div class="popover-arrow"></div>
+           <div class="contact-card">
+    <h3>Contact Information</h3>
+    <p>
+        <strong>Company:</strong> Edge Automation Technology Services, Co.<br>
+        <strong>Company Location:</strong> Blk 4 Lot 16 Camella Dos Rios, Brgy. Pittland, Cabuyao, Laguna<br>
+        <strong>Specialization:</strong> Industrial Automation & Engineering
+    </p>
 
+  <div class="social-links" id="socialLinks">
+
+    <!-- Social Icons -->
+    <a href="https://www.facebook.com/edgeautomationtsc" target="_blank"
+       class="social-icon">
+        <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" width="24">
+    </a>
+
+    <a href="https://invite.viber.com/?number=09178789571" target="_blank"
+       class="social-icon">
+        <img src="https://cdn-icons-png.flaticon.com/512/3670/3670059.png" width="24">
+    </a>
+
+    <a href="https://mail.google.com/mail/?view=cm&fs=1&to=ejimenez.edge@gmail.com"
+       target="_blank" class="social-icon">
+        <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" width="24">
+    </a>
+
+    <!-- ✅ POPUP MESSAGE (NOW CORRECT POSITION) -->
+    <div class="social-tooltip" id="newClientTip">
+        <div class="tooltip-arrow"></div>
         <p>
-        <strong>New client?</strong><br>
-
-        To request a project consultation,
-        please contact us using one of the
-        platforms below.</p>
-
-        <button id="dismissTip">Got it</button>
-
+            <strong>New client?</strong><br>
+            To request a project consultation, please contact us using one of the platforms below.
+        </p>
+        <button id="dismissTip" type="button">Got it</button>
     </div>
 
-    <!-- Facebook -->
-    <a href="https://www.facebook.com/edgeautomationtsc" 
-       target="_blank" 
-       rel="noopener noreferrer" 
-       class="social-icon" 
-       aria-label="Facebook">
-
-        <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" width="24" height="24">
-
-    </a>
-
-    <!-- Viber -->
-    <a href="https://invite.viber.com/?number=09178789571" 
-       target="_blank" 
-       class="social-icon" 
-       aria-label="Viber">
-
-        <img src="https://cdn-icons-png.flaticon.com/512/3670/3670059.png" width="24" height="24">
-
-    </a>
-    <!-- Gmail -->
-    <a href="https://mail.google.com/mail/?view=cm&fs=1&to=ejimenez.edge@gmail.com&su=Request%20Consultation&body=Hello%20Edge%20Automation,%20I%20would%20like%20to%20request%20a%20consultation." target="_blank" class="social-icon" aria-label="Gmail">
-        <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" width="24" height="24">
-    </a>
-
+</div>
             
     </section>
 

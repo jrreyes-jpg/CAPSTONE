@@ -710,23 +710,18 @@ p {
     margin-bottom: 0.5rem;
 }
 
-.social-links {
-    display: flex;
-    gap: 1rem;
-    margin-top: 1rem;
-}
 
 .social-icon {
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    width:48px;
-    height:48px;
-    border-radius:12px;
-    background:#f3f6f8;
-    transition:0.25s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: #f3f6f8;
+    transition: 0.25s ease;
+    position: relative; /* 🔥 important para sa tooltip */
 }
-
 .social-icon:hover {
     background: var(--color-accent);
     transform: translateY(-3px);
@@ -929,71 +924,7 @@ img { max-width: 100%; height: auto; }
   .cta-buttons { width: 100%; display: grid; grid-template-columns: 1fr; gap: 10px; }
   .cta-buttons .btn { width: 100%; text-align: center; }
 }
-/* NEW CLIENT POPOVER TOOLTIP */
 
-.tooltip-container {
-    position: relative;
-}
-
-.new-client-popover {
-    opacity: 0;
-    visibility: hidden;
-    position: absolute;
-    top: 120%; /* just below icons */
-    left: 0;
-    background: var(--color-primary);
-    color: var(--color-white);
-    padding: 16px 18px;
-    border-radius: 8px;
-    min-width: 280px;
-    box-shadow: var(--shadow-lg);
-    z-index: 1001;
-    font-size: 0.95rem;
-    line-height: 1.5;
-    transition: opacity 0.3s ease-out, visibility 0.3s ease-out;
-    pointer-events: none;
-}
-
-.new-client-popover p {
-    color: var(--color-white);
-    margin: 0 0 12px 0;
-}
-
-.new-client-popover button {
-    background: var(--color-white);
-    color: var(--color-primary);
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.9rem;
-    transition: var(--transition);
-}
-
-.new-client-popover button:hover {
-    background: var(--color-accent);
-    color: var(--color-white);
-    transform: translateY(-2px);
-}
-
-.popover-arrow {
-    position: absolute;
-    top: -8px;
-    left: 18.5%;
-    transform: translateX(-50%);
-    width: 0;
-    height: 0;
-    border-left: 8px solid transparent;
-    border-right: 8px solid transparent;
-    border-bottom: 8px solid var(--color-primary);
-}
-
-.new-client-popover.show {
-    opacity: 1;
-    visibility: visible;
-    pointer-events: auto;
-}
 
 @media (max-width: 768px) {
     .new-client-popover {
@@ -1152,4 +1083,89 @@ z-index:999;
 
 .consult-modal.is-open {
     display: flex;
+}
+
+.contact-card {
+    background-color: #fff; /* white card */
+    padding: 20px 25px;
+    border-radius: 10px; /* rounded corners */
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* subtle shadow */
+    transition: transform 0.3s, box-shadow 0.3s;
+    max-width: 600px;
+    margin: 20px auto; /* center sa page at may space sa taas/baba */
+}
+
+.contact-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.contact-card h3 {
+    margin-bottom: 15px;
+    font-size: 1.5rem;
+}
+
+.contact-card p {
+    line-height: 1.6;
+}
+
+.contact-card .social-links {
+    margin-top: 15px;
+    display: flex;
+    gap: 15px;
+}
+
+.contact-card {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    position: relative;
+    max-width: 400px;
+    margin: 20px auto;
+}
+
+/* ===== NEW CLIENT POPUP TOOLTIP (FINAL) ===== */
+
+.social-links {
+    position: relative;
+    display: flex;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.social-icon {
+    background: #f4f6f9;
+    padding: 12px;
+    border-radius: 12px;
+    transition: 0.3s;
+}
+
+.social-icon:hover {
+    transform: translateY(-3px);
+}
+
+.social-tooltip {
+    position: absolute;
+    top: 70px;
+    left: 0;
+    width: 260px;
+    background: #ff0000a2;
+    color: #ffffff;
+    padding: 15px;
+    border-radius: 10px;
+    font-size: 13px;
+    box-shadow: 0 8px 20px rgba(255, 255, 255, 0.25);
+    opacity: 1;
+    z-index: 5;
+}
+
+.tooltip-arrow {
+    position: absolute;
+    top: -8px;
+    left: 18px;
+    width: 16px;
+    height: 16px;
+    background: #ff0000a2;
+    transform: rotate(45deg);
 }

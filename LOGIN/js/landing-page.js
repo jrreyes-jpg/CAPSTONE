@@ -160,13 +160,13 @@ const initNewClientTooltip = () => {
 
     if (!window.localStorage.getItem('tipSeen')) {
         window.requestAnimationFrame(() => {
-            tooltip.classList.add('show');
+           tooltip.classList.remove('hidden');
         });
     }
 
     dismissButton.addEventListener('click', (event) => {
         event.preventDefault();
-        tooltip.classList.remove('show');
+       tooltip.classList.add('hidden');
         window.localStorage.setItem('tipSeen', 'true');
     });
 };
@@ -225,5 +225,14 @@ document.querySelectorAll('.nav-link').forEach(link => {
             navMenu.classList.remove('active');
             hamburger?.classList.remove('active');
         }
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const dismissBtn = document.getElementById('dismissTip');
+    const tooltip = document.getElementById('newClientTip');
+
+    dismissBtn.addEventListener('click', () => {
+        tooltip.classList.add('hidden');
     });
 });
