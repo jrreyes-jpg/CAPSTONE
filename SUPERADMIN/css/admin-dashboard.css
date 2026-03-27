@@ -63,15 +63,18 @@ body.page-loaded {
 /* Retained for compatibility with existing JS toggle logic */
 .sidebar.shrink,
 .sidebar.collapsed {
-    width: 70px;
+    width: 78px;
 }
 
 .sidebar.collapsed .sidebar-header,
-.sidebar.collapsed .sidebar-subtitle {
+.sidebar.collapsed .sidebar-subtitle,
+.sidebar.shrink .sidebar-header,
+.sidebar.shrink .sidebar-subtitle {
     text-align: center;
 }
 
-.sidebar.collapsed .menu-text {
+.sidebar.collapsed .menu-text,
+.sidebar.shrink .menu-text {
     opacity: 0;
     pointer-events: none;
     width: 0;
@@ -174,18 +177,25 @@ body.page-loaded {
     visibility: visible;
 }
 
-/* ===============================
-   MAIN CONTENT
-================================= */
-
 .main-content {
     margin-left: var(--sidebar-width);
     padding: 40px;
-    transition: margin-left var(--transition-slow);
+    transition: margin-left 0.3s ease, width 0.3s ease;
+    width: calc(100% - var(--sidebar-width));
 }
 
-.main-content.sidebar-collapsed {
-    margin-left: 70px;
+.main-content.sidebar-collapsed,
+.main-content.sidebar-shrink {
+    margin-left: 78px; /* match sidebar.shrink width */
+    width: calc(100% - 78px);
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 0 !important;
+        width: 100%;
+        padding: 18px;
+    }
 }
 
 .sidebar.collapsed .menu-link {
@@ -194,7 +204,15 @@ body.page-loaded {
 }
 
 .sidebar.collapsed .sidebar-toggle {
-    right: 10px;
+    right: auto;
+    left: 10px;
+    transform: none;
+}
+
+.sidebar.shrink .sidebar-toggle {
+    right: auto;
+    left: 10px;
+    transform: none;
 }
 
 
