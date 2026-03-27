@@ -1169,3 +1169,7 @@ z-index:999;
     background: #ff0000a2;
     transform: rotate(45deg);
 }
+
+.hidden {
+    display: none !important;
+}

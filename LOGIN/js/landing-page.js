@@ -114,6 +114,19 @@ const initNavbarScroll = () => {
     });
 };
 
+const initNewClientTooltip = () => {
+    const tooltip = document.getElementById('newClientTip');
+    const dismissButton = document.getElementById('dismissTip');
+
+    if (!tooltip || !dismissButton) return;
+
+    tooltip.classList.remove('hidden');
+
+    dismissButton.addEventListener('click', function () {
+        tooltip.classList.add('hidden');
+    });
+};
+
 const initConsultationModal = () => {
     const openButtons = document.querySelectorAll('#consultBtn, #consultBtnSecondary');
     const closeButton = document.getElementById('closeConsult');
@@ -150,30 +163,10 @@ const initConsultationModal = () => {
     });
 };
 
-const initNewClientTooltip = () => {
-    const tooltip = document.getElementById('newClientTip');
-    const dismissButton = document.getElementById('dismissTip');
-
-    if (!tooltip || !dismissButton) {
-        return;
-    }
-
-    if (!window.localStorage.getItem('tipSeen')) {
-        window.requestAnimationFrame(() => {
-           tooltip.classList.remove('hidden');
-        });
-    }
-
-    dismissButton.addEventListener('click', (event) => {
-        event.preventDefault();
-       tooltip.classList.add('hidden');
-        window.localStorage.setItem('tipSeen', 'true');
-    });
-};
 
 document.addEventListener('DOMContentLoaded', () => {
     initMobileMenu();
-    initNavHighlight();
+    // initNavHighlight();
     initFormHandling();
     initScrollAnimations();
     initNavbarScroll();
@@ -228,11 +221,3 @@ document.querySelectorAll('.nav-link').forEach(link => {
     });
 });
 
-document.addEventListener('DOMContentLoaded', function() {
-    const dismissBtn = document.getElementById('dismissTip');
-    const tooltip = document.getElementById('newClientTip');
-
-    dismissBtn.addEventListener('click', () => {
-        tooltip.classList.add('hidden');
-    });
-});
