@@ -58,7 +58,7 @@ Account will be temporarily locked after $max_attempts failed attempts.";
                 $_SESSION['role'] = $user['role'];
 
                 if ($user['role'] == 'super_admin') {
-                    header("Location: /codesamplecaps/views/dashboards/super_admin_dashboard.php");
+                    header("Location: ../../SUPERADMIN/dashboards/super_admin_dashboard.php");
                 } elseif ($user['role'] == 'engineer') {
                     header("Location: /codesamplecaps/views/dashboards/engineer_dashboard.php");
                 } elseif ($user['role'] == 'foreman') {
@@ -177,6 +177,6 @@ function showForgot(){
 
 </script>
 
-    <script src="../js/script.js"></script>
+    <script src="../../SUPERADMIN/js/script.js"></script>
     </body>
     </html>

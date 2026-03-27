@@ -188,12 +188,12 @@ $totalUsers = count($engineers) + count($foremen) + count($clients);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Super Admin Dashboard - Edge Automation</title>
-    <link rel="stylesheet" href="/codesamplecaps/public/assets/css/admin_dashboard.css">
+    <link rel="stylesheet" href="../css/admin-dashboard.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
 <div class="container">
-    <?php include __DIR__ . '/../components/sidebar_super_admin.php'; ?>
+    <?php include __DIR__ . '/../sidebar_super_admin.php'; ?>
 
     <main class="main-content">
         <div class="header">
@@ -314,7 +314,7 @@ $totalUsers = count($engineers) + count($foremen) + count($clients);
     </main>
 </div>
 
-<script src="/codesamplecaps/public/assets/js/script.js"></script>
+<script src="../js/script.js"></script>
 <script>
 function scorePassword(value) {
     let score = 0;
