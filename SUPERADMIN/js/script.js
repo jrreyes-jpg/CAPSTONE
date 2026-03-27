@@ -90,16 +90,32 @@ document.addEventListener('DOMContentLoaded', function () {
             sidebar.classList.add('shrink');
         }
 
-        toggleBtn.addEventListener('click', function () {
-            if (window.innerWidth <= 768) {
-                sidebar.classList.toggle('mobile-open');
-                overlay.classList.toggle('active');
-            } else {
-                sidebar.classList.toggle('shrink');
-                localStorage.setItem('sidebarShrink', sidebar.classList.contains('shrink'));
-            }
-        });
+        const mainContent = document.querySelector('.main-content');
 
+toggleBtn.addEventListener('click', function () {
+    if (window.innerWidth <= 768) {
+        sidebar.classList.toggle('mobile-open');
+        overlay.classList.toggle('active');
+    } else {
+        sidebar.classList.toggle('shrink');
+
+        if (mainContent) {
+            mainContent.classList.toggle('sidebar-collapsed');
+        }
+
+        // 🔥 ADD THIS
+        const icon = document.getElementById('toggleIcon');
+        if (icon) {
+            if (sidebar.classList.contains('shrink')) {
+                icon.textContent = '❯';
+            } else {
+                icon.textContent = '❮';
+            }
+        }
+
+        localStorage.setItem('sidebarShrink', sidebar.classList.contains('shrink'));
+    }
+});
         overlay.addEventListener('click', function () {
             sidebar.classList.remove('mobile-open');
             overlay.classList.remove('active');
