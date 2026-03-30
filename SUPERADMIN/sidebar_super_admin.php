@@ -18,7 +18,7 @@ $isScanHistory = str_contains($currentPath, '/SUPERADMIN/sidebar/scan_history.ph
 
     <div class="sidebar-header">
         <h3>&#127970; <span class="menu-text">EDGE AUTOMATION</span></h3>
-        <p class="sidebar-subtitle menu-text">Super Admin Control Panel</p>
+        <p class="sidebar-subtitle menu-text">Super Admin</p>
     </div>
 
     <ul class="nav-menu">

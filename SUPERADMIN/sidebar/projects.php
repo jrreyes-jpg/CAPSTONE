@@ -270,29 +270,11 @@ foreach ($projects as $project) {
             gap: 24px;
         }
 
-        .hero-panel,
         .form-panel,
         .project-card {
             background: rgba(255, 255, 255, 0.92);
             border-radius: 18px;
             box-shadow: var(--shadow-soft);
-        }
-
-        .hero-panel {
-            padding: 28px;
-            border-left: 6px solid var(--primary);
-        }
-
-        .hero-panel h1 {
-            margin: 0 0 10px;
-            font-size: 2rem;
-        }
-
-        .hero-panel p {
-            margin: 0;
-            color: var(--text-light);
-            max-width: 760px;
-            line-height: 1.7;
         }
 
         .metrics-grid {
@@ -505,14 +487,9 @@ foreach ($projects as $project) {
         }
 
         @media (max-width: 768px) {
-            .hero-panel,
             .form-panel,
             .project-card {
                 padding: 18px;
-            }
-
-            .hero-panel h1 {
-                font-size: 1.55rem;
             }
         }
     </style>
@@ -523,14 +500,6 @@ foreach ($projects as $project) {
 
     <main class="main-content">
         <div class="page-stack">
-            <section class="hero-panel">
-                <h1>Project Management</h1>
-                <p>
-                    This is the working Super Admin project management page. You can create projects,
-                    assign a client and engineer, update project status, and add tasks in one place.
-                </p>
-            </section>
-
             <section class="metrics-grid">
                 <div class="metric-card">
                     <span>Total Projects</span>
@@ -745,5 +714,6 @@ foreach ($projects as $project) {
         </div>
     </main>
 </div>
+<script src="../js/dashboard-sidebar.js"></script>
 </body>
 </html>

@@ -64,7 +64,7 @@ Account will be temporarily locked after $max_attempts failed attempts.";
                 } elseif ($user['role'] == 'foreman') {
                     header("Location: /codesamplecaps/views/dashboards/foreman_dashboard.php");
                 } else {
-                    header("Location: /codesamplecaps/views/dashboards/client_dashboard.php");
+                    header("Location:../../CLIENT/dashboards/client_dashboard.php");
                 }
                 exit();
 

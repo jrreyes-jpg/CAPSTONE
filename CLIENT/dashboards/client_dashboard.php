@@ -3,7 +3,7 @@ session_start();
 require_once __DIR__ . '/../../config/database.php';
 
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 'client') {
-    header("Location: /codesamplecaps/public/login.php");
+    header("Location: ../../LOGIN/php/login.php");
     exit();
 }
 
@@ -60,13 +60,12 @@ $client_projects = $projectsStmt->get_result();
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Client Dashboard - Edge Automation</title>
-<link rel="stylesheet" href="/codesamplecaps/public/assets/css/global.css">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/codesamplecaps/public/assets/css/client_dashboard.css">
+<link rel="stylesheet" href="../../FOREMAN/css/global.css">
 </head>
 <body>
 
-<?php include("../../views/components/sidebar_client.php"); ?>
+<?php include("../sidebar/sidebar_client.php"); ?>
 
 <main class="main-content">
 
@@ -114,11 +113,11 @@ $client_projects = $projectsStmt->get_result();
                 <label>Email</label>
                 <input type="email" value="<?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?>" disabled>
             </div>
-            <button class="btn" onclick="window.location.href='/codesamplecaps/views/dashboards/change_password.php'">🔐 Change Password</button>
+            <button class="btn" onclick="window.location.href='change_password.php'">🔐 Change Password</button>
         </div>
     </div>
 </div>
 
 </body>
-<script src="/codesamplecaps/public/assets/js/client_dashboard.js"></script>
+<script src="../js/client_dashboard.js"></script>
 </html>
