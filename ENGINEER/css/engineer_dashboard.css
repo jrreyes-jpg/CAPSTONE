@@ -99,7 +99,6 @@ h1 {
     transform: translateY(-2px);
     transition: all 0.3s;
 }
-    <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Poppins', sans-serif; background: #ecf0f1; }
         .main-content { margin-left: 250px; padding: 40px; }
@@ -161,4 +160,3 @@ h1 {
             .project-card { width: 100%; }
             .task-item { grid-template-columns: 1fr; }
         }
-    </style>
