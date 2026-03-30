@@ -13,8 +13,8 @@
     const isMobile = () => window.innerWidth <= 768;
 
     const syncMainContent = () => {
-        const shouldCollapse = sidebar.classList.contains('collapsed') && !isMobile();
-        mainContent?.classList.toggle('sidebar-collapsed', shouldCollapse);
+        const shouldCollapse = sidebar.classList.contains('shrink') && !isMobile();
+        mainContent?.classList.toggle('sidebar-shrink', shouldCollapse);
     };
 
     const closeMobileSidebar = () => {
@@ -30,14 +30,14 @@
             return;
         }
 
-        const isCollapsed = sidebar.classList.contains('collapsed');
+        const isCollapsed = sidebar.classList.contains('shrink');
         toggleIcon.textContent = isCollapsed ? '>' : '<';
         toggleButton.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
     };
 
     const applyStoredDesktopState = () => {
         if (isMobile()) {
-            sidebar.classList.remove('collapsed');
+            sidebar.classList.remove('shrink');
             syncMainContent();
             closeMobileSidebar();
             updateToggleLabel();
@@ -45,7 +45,7 @@
         }
 
         const shouldCollapse = window.localStorage.getItem(storageKey) === '1';
-        sidebar.classList.toggle('collapsed', shouldCollapse);
+        sidebar.classList.toggle('shrink', shouldCollapse);
         closeMobileSidebar();
         syncMainContent();
         updateToggleLabel();
@@ -59,7 +59,7 @@
             return;
         }
 
-        const isCollapsed = sidebar.classList.toggle('collapsed');
+        const isCollapsed = sidebar.classList.toggle('shrink');
         window.localStorage.setItem(storageKey, isCollapsed ? '1' : '0');
         syncMainContent();
         updateToggleLabel();

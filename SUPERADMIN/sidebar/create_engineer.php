@@ -4,7 +4,7 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../controllers/UserController.php';
 
 if (!isset($_SESSION['role']) || $_SESSION['role'] != 'super_admin') {
-    header("Location: /codesamplecaps/public/login.php");
+    header("Location: ../../../LOGIN/php/login.php");
     exit();
 }
 
@@ -44,7 +44,7 @@ $engineers_result = $conn->query("SELECT id AS user_id, full_name, email, create
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Create Engineer Account - Super Admin</title>
-<link rel="stylesheet" href="/codesamplecaps/public/assets/css/style.css">
+<link rel="stylesheet" href="../css/style.css">
 <style>
     body {
         background: #f5f5f5;
@@ -181,9 +181,9 @@ $engineers_result = $conn->query("SELECT id AS user_id, full_name, email, create
 <div class="admin-container">
     <div class="sidebar">
         <h3>Super Admin Menu</h3>
-        <a href="/codesamplecaps/views/dashboards/create_engineer.php">Create Engineer</a>
-        <a href="/codesamplecaps/views/dashboards/super_admin_dashboard.php">Dashboard</a>
-        <a href="/codesamplecaps/views/auth/logout.php">Logout</a>
+        <a href="../dashboards/create_engineer.php">Create Engineer</a>
+        <a href="../dashboards/super_admin_dashboard.php">Dashboard</a>
+        <a href="../../LOGIN/php/logout.php">Logout</a>
     </div>
     
     <div class="main-content">

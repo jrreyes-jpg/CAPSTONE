@@ -37,10 +37,100 @@ function isStrongPassword(string $password): bool {
         && preg_match('/[^A-Za-z0-9]/', $password);
 }
 
+function getCsrfToken(): string {
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+
+    return $_SESSION['csrf_token'];
+}
+
+function isValidCsrfToken(?string $token): bool {
+    if (!isset($_SESSION['csrf_token']) || !is_string($token) || $token === '') {
+        return false;
+    }
+
+    return hash_equals($_SESSION['csrf_token'], $token);
+}
+
+function getUserForStatusChange(mysqli $conn, int $userId): ?array {
+    $stmt = $conn->prepare('SELECT id, full_name, role, status FROM users WHERE id = ? LIMIT 1');
+    $stmt->bind_param('i', $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result ? $result->fetch_assoc() : null;
+}
+
+function getCountByQuery(mysqli $conn, string $sql, int $userId): int {
+    $stmt = $conn->prepare($sql);
+    if (!$stmt) {
+        return 0;
+    }
+
+    $stmt->bind_param('i', $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
+
+    return (int)($row['total'] ?? 0);
+}
+
+function getDeactivationBlockers(mysqli $conn, int $userId, string $role): array {
+    $blockers = [];
+
+    if ($role === 'engineer') {
+        $activeProjects = getCountByQuery(
+            $conn,
+            "SELECT COUNT(*) AS total
+             FROM project_assignments pa
+             INNER JOIN projects p ON p.id = pa.project_id
+             WHERE pa.engineer_id = ?
+             AND p.status IN ('pending', 'ongoing', 'on-hold')",
+            $userId
+        );
+
+        $openTasks = getCountByQuery(
+            $conn,
+            "SELECT COUNT(*) AS total
+             FROM tasks
+             WHERE assigned_to = ?
+             AND status IN ('pending', 'ongoing', 'delayed')",
+            $userId
+        );
+
+        if ($activeProjects > 0) {
+            $blockers[] = $activeProjects . ' active project(s)';
+        }
+
+        if ($openTasks > 0) {
+            $blockers[] = $openTasks . ' open task(s)';
+        }
+    }
+
+    if ($role === 'client') {
+        $activeProjects = getCountByQuery(
+            $conn,
+            "SELECT COUNT(*) AS total
+             FROM projects
+             WHERE client_id = ?
+             AND status IN ('pending', 'ongoing', 'on-hold')",
+            $userId
+        );
+
+        if ($activeProjects > 0) {
+            $blockers[] = $activeProjects . ' active project(s)';
+        }
+    }
+
+    return $blockers;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
-
-    if ($action === 'create_account') {
+    if (!isValidCsrfToken($_POST['csrf_token'] ?? null)) {
+        $error = 'Invalid request. Please try again.';
+        $activeTab = $action === 'create_account' ? 'create' : 'users';
+    } elseif ($action === 'create_account') {
         $fullName = trim($_POST['full_name'] ?? '');
         $email = trim($_POST['email'] ?? '');
         $phone = trim($_POST['phone'] ?? '');
@@ -91,19 +181,38 @@ $old['role'] = $role;
         }
     }
 
-    if ($action === 'update_status') {
+    if ($action === 'update_status' && $error === '') {
         $userId = (int)($_POST['user_id'] ?? 0);
         $newStatus = trim($_POST['status'] ?? '');
+        $user = $userId > 0 ? getUserForStatusChange($conn, $userId) : null;
 
         if ($userId <= 0 || !in_array($newStatus, $allowedStatuses, true)) {
             $error = 'Invalid status update request.';
-        } elseif ($userId === (int)$_SESSION['user_id']) {
+        } elseif (!$user) {
+            $error = 'User not found.';
+        } elseif (normalizeRole((string)$user['role']) === 'super_admin') {
+            $error = 'Super admin accounts cannot be changed from this screen.';
+        } elseif ($newStatus === 'inactive' && $userId === (int)$_SESSION['user_id']) {
             $error = 'You cannot deactivate your own super admin account.';
+        } elseif ($newStatus === 'inactive') {
+            $blockers = getDeactivationBlockers($conn, $userId, normalizeRole((string)$user['role']));
+
+            if (!empty($blockers)) {
+                $error = 'Cannot deactivate ' . $user['full_name'] . ' yet. Reassign ' . implode(' and ', $blockers) . ' first.';
+            } else {
+                $stmt = $conn->prepare('UPDATE users SET status = ? WHERE id = ?');
+                $stmt->bind_param('si', $newStatus, $userId);
+                if ($stmt->execute()) {
+                    $message = 'User deactivated successfully.';
+                } else {
+                    $error = 'Failed to update user status.';
+                }
+            }
         } else {
             $stmt = $conn->prepare('UPDATE users SET status = ? WHERE id = ?');
             $stmt->bind_param('si', $newStatus, $userId);
             if ($stmt->execute()) {
-                $message = 'User status updated to ' . $newStatus . '.';
+                $message = 'User reactivated successfully.';
             } else {
                 $error = 'Failed to update user status.';
             }
@@ -111,14 +220,19 @@ $old['role'] = $role;
         $activeTab = 'users';
     }
 
-    if ($action === 'edit_user') {
+    if ($action === 'edit_user' && $error === '') {
         $userId = (int)($_POST['user_id'] ?? 0);
         $fullName = trim($_POST['edit_full_name'] ?? '');
         $email = trim($_POST['edit_email'] ?? '');
         $phone = trim($_POST['edit_phone'] ?? '');
+        $user = $userId > 0 ? getUserForStatusChange($conn, $userId) : null;
 
         if ($userId <= 0 || $fullName === '' || $email === '') {
             $error = 'Invalid edit request. Full name and email are required.';
+        } elseif (!$user) {
+            $error = 'User not found.';
+        } elseif (normalizeRole((string)$user['role']) === 'super_admin') {
+            $error = 'Super admin accounts cannot be edited from this screen.';
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $error = 'Invalid email format.';
         } elseif (!ctype_digit($phone) && $phone !== '') {
@@ -146,23 +260,6 @@ $old['role'] = $role;
         $activeTab = 'users';
     }
 
-    if ($action === 'delete_user') {
-        $userId = (int)($_POST['user_id'] ?? 0);
-        if ($userId <= 0) {
-            $error = 'Invalid delete request.';
-        } elseif ($userId === (int)$_SESSION['user_id']) {
-            $error = 'You cannot delete your own super admin account.';
-        } else {
-            $stmt = $conn->prepare('UPDATE users SET status = "inactive" WHERE id = ?');
-            $stmt->bind_param('i', $userId);
-            if ($stmt->execute()) {
-                $message = 'User account was set to inactive (soft deleted).';
-            } else {
-                $error = 'Failed to delete user.';
-            }
-        }
-        $activeTab = 'users';
-    }
 }
 
 
@@ -181,6 +278,7 @@ $engineers = fetchUsersByRoles($conn, ['engineer']);
 $foremen = fetchUsersByRoles($conn, ['foreman', 'foremen']);
 $clients = fetchUsersByRoles($conn, ['client']);
 $totalUsers = count($engineers) + count($foremen) + count($clients);
+$csrfToken = getCsrfToken();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -219,6 +317,7 @@ $totalUsers = count($engineers) + count($foremen) + count($clients);
                 <h2>Create Account</h2>
                                 <form method="POST">
                     <input type="hidden" name="action" value="create_account">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                     <div class="form-row">
                         <div class="form-group"><label for="full_name">Full Name *</label><input type="text" id="full_name" name="full_name" value="<?php echo htmlspecialchars($old['full_name']); ?>" required></div>
                         <div class="form-group"><label for="email">Email *</label><input type="email" id="email" name="email" value="<?php echo htmlspecialchars($old['email']); ?>" required></div>
@@ -282,19 +381,16 @@ $totalUsers = count($engineers) + count($foremen) + count($clients);
                                                 <button type="button" class="action-btn cancel" data-cancel-btn hidden>Cancel</button>
                                             </div>
                                             <div class="action-group compact row-secondary-actions">
-                                                <form method="POST" style="display:inline-block; margin:0;">
+                                                <form method="POST" style="display:inline-block; margin:0;" onsubmit="return confirm('<?php echo $status === 'active' ? 'Deactivate this user? They will lose access to login.' : 'Reactivate this user?'; ?>');">
                                                     <input type="hidden" name="action" value="update_status">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                     <input type="hidden" name="user_id" value="<?php echo $rowId; ?>">
                                                     <input type="hidden" name="status" value="<?php echo $status === 'active' ? 'inactive' : 'active'; ?>">
-                                                    <button type="submit" class="action-btn <?php echo $status === 'active' ? 'deactivate' : 'activate'; ?>"><?php echo $status === 'active' ? 'Set Inactive' : 'Set Active'; ?></button>
-                                                </form>
-                                                <form method="POST" style="display:inline-block; margin:0;" onsubmit="return confirm('Delete user? This will set the account to inactive.');">
-                                                    <input type="hidden" name="action" value="delete_user">
-                                                    <input type="hidden" name="user_id" value="<?php echo $rowId; ?>">
-                                                    <button type="submit" class="action-btn delete">Delete</button>
+                                                    <button type="submit" class="action-btn <?php echo $status === 'active' ? 'deactivate' : 'activate'; ?>"><?php echo $status === 'active' ? 'Deactivate' : 'Reactivate'; ?></button>
                                                 </form>
                                                 <form method="POST" id="save-form-<?php echo $rowId; ?>" style="display:none;">
                                                     <input type="hidden" name="action" value="edit_user">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                     <input type="hidden" name="user_id" value="<?php echo $rowId; ?>">
                                                     <input type="hidden" name="edit_full_name" data-save-field="full_name">
                                                     <input type="hidden" name="edit_email" data-save-field="email">

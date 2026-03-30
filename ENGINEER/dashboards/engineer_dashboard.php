@@ -2,73 +2,224 @@
 session_start();
 require_once __DIR__ . '/../../config/database.php';
 
-if (!isset($_SESSION['role']) || $_SESSION['role'] != 'engineer') {
-    header("Location: /codesamplecaps/public/login.php");
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'engineer') {
+    header('Location: /codesamplecaps/LOGIN/php/login.php');
     exit();
 }
 
-$user_id = $_SESSION['user_id'];
+$userId = (int)($_SESSION['user_id'] ?? 0);
+$taskStatusOptions = ['pending', 'ongoing', 'completed', 'delayed'];
 
-/* ASSIGNED PROJECTS COUNT */
-$totalAssigned = $conn->prepare("
-    SELECT COUNT(*) FROM project_assignments
-    WHERE engineer_id=?
-");
-$totalAssigned->bind_param("i",$user_id);
-$totalAssigned->execute();
-$totalAssigned->bind_result($assignedCount);
-$totalAssigned->fetch();
-$totalAssigned->close();
+function redirect_engineer_dashboard(string $hash = 'tasks-tab'): void {
+    header('Location: /codesamplecaps/ENGINEER/dashboards/engineer_dashboard.php#' . $hash);
+    exit();
+}
 
-/* IN PROGRESS PROJECTS */
-$inProgress = $conn->prepare("
-    SELECT COUNT(*) FROM projects p
-    JOIN project_assignments pe ON project_id = pe.project_id
-    WHERE pe.engineer_id=? AND p.status='ongoing'
-");
-$inProgress->bind_param("i",$user_id);
-$inProgress->execute();
-$inProgress->bind_result($inProgressCount);
-$inProgress->fetch();
-$inProgress->close();
+function set_engineer_flash(string $type, string $message): void {
+    $_SESSION['engineer_flash'] = [
+        'type' => $type,
+        'message' => $message,
+    ];
+}
 
-/* COMPLETED PROJECTS */
-$completedProjects = $conn->prepare("
-    SELECT COUNT(*) FROM projects p
-    JOIN project_assignments pe ON project_id = pe.project_id
-    WHERE pe.engineer_id=? AND p.status='completed'
-");
-$completedProjects->bind_param("i",$user_id);
-$completedProjects->execute();
-$completedProjects->bind_result($completedCount);
-$completedProjects->fetch();
-$completedProjects->close();
+function get_csrf_token(): string {
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
 
-/* FETCH ASSIGNED PROJECTS */
-$projectsStmt = $conn->prepare("
-    SELECT p.id, p.project_name, p.status, p.description, p.start_date, p.end_date, u.full_name as client_name
-    FROM projects p
-    JOIN project_assignments pe ON p.id = pe.project_id
-    LEFT JOIN users u ON p.client_id = u.id
-    WHERE pe.engineer_id=?
-    ORDER BY p.status DESC, p.created_at DESC
-");
-$projectsStmt->bind_param("i",$user_id);
-$projectsStmt->execute();
-$assigned_projects = $projectsStmt->get_result();
+    return $_SESSION['csrf_token'];
+}
 
-/* FETCH TASKS FOR ENGINEER */
-$tasksStmt = $conn->prepare("
-    SELECT t.id, t.task_name, t.status, t.deadline, p.project_name, p.id
-    FROM tasks t
-    JOIN projects p ON t.project_id = p.id
-    JOIN project_assignments pe ON p.id = pe.project_id
-    WHERE pe.engineer_id=?
-    ORDER BY t.deadline ASC
-");
-$tasksStmt->bind_param("i",$user_id);
-$tasksStmt->execute();
-$tasks_list = $tasksStmt->get_result();
+function is_valid_csrf_token(?string $token): bool {
+    if (!isset($_SESSION['csrf_token']) || !is_string($token) || $token === '') {
+        return false;
+    }
+
+    return hash_equals($_SESSION['csrf_token'], $token);
+}
+
+function get_engineer_task_snapshot(mysqli $conn, int $taskId, int $engineerId): ?array {
+    $stmt = $conn->prepare(
+        "SELECT t.id, t.status, p.status AS project_status
+         FROM tasks t
+         INNER JOIN projects p ON p.id = t.project_id
+         WHERE t.id = ?
+         AND t.assigned_to = ?
+         AND EXISTS (
+             SELECT 1
+             FROM project_assignments pa
+             WHERE pa.project_id = p.id
+             AND pa.engineer_id = ?
+         )
+         LIMIT 1"
+    );
+
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('iii', $taskId, $engineerId, $engineerId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result ? $result->fetch_assoc() : null;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+
+    if (!is_valid_csrf_token($_POST['csrf_token'] ?? null)) {
+        set_engineer_flash('error', 'Security check failed. Please try again.');
+        redirect_engineer_dashboard();
+    }
+
+    if ($action === 'update_task_status') {
+        $taskId = (int)($_POST['task_id'] ?? 0);
+        $status = trim((string)($_POST['status'] ?? ''));
+        $task = $taskId > 0 ? get_engineer_task_snapshot($conn, $taskId, $userId) : null;
+
+        if ($taskId <= 0 || !in_array($status, $taskStatusOptions, true)) {
+            set_engineer_flash('error', 'Invalid task status update.');
+            redirect_engineer_dashboard();
+        }
+
+        if (!$task) {
+            set_engineer_flash('error', 'Task not found.');
+            redirect_engineer_dashboard();
+        }
+
+        if (($task['project_status'] ?? '') === 'completed') {
+            set_engineer_flash('error', 'This task is locked because the project is already completed.');
+            redirect_engineer_dashboard();
+        }
+
+        $updateTask = $conn->prepare('UPDATE tasks SET status = ? WHERE id = ? AND assigned_to = ?');
+
+        if ($updateTask && $updateTask->bind_param('sii', $status, $taskId, $userId) && $updateTask->execute()) {
+            set_engineer_flash('success', 'Task status updated.');
+        } else {
+            set_engineer_flash('error', 'Failed to update task status.');
+        }
+
+        redirect_engineer_dashboard();
+    }
+}
+
+$flash = $_SESSION['engineer_flash'] ?? null;
+unset($_SESSION['engineer_flash']);
+$csrfToken = get_csrf_token();
+
+$assignedCount = 0;
+$inProgressCount = 0;
+$completedCount = 0;
+$assignedProjects = [];
+$tasks = [];
+
+$totalAssigned = $conn->prepare(
+    "SELECT COUNT(DISTINCT project_id)
+     FROM project_assignments
+     WHERE engineer_id = ?"
+);
+if ($totalAssigned) {
+    $totalAssigned->bind_param('i', $userId);
+    $totalAssigned->execute();
+    $totalAssigned->bind_result($assignedCount);
+    $totalAssigned->fetch();
+    $totalAssigned->close();
+}
+
+$inProgress = $conn->prepare(
+    "SELECT COUNT(*)
+     FROM projects p
+     WHERE p.status = 'ongoing'
+     AND EXISTS (
+         SELECT 1
+         FROM project_assignments pe
+         WHERE pe.project_id = p.id
+         AND pe.engineer_id = ?
+     )"
+);
+if ($inProgress) {
+    $inProgress->bind_param('i', $userId);
+    $inProgress->execute();
+    $inProgress->bind_result($inProgressCount);
+    $inProgress->fetch();
+    $inProgress->close();
+}
+
+$completedProjects = $conn->prepare(
+    "SELECT COUNT(*)
+     FROM projects p
+     WHERE p.status = 'completed'
+     AND EXISTS (
+         SELECT 1
+         FROM project_assignments pe
+         WHERE pe.project_id = p.id
+         AND pe.engineer_id = ?
+     )"
+);
+if ($completedProjects) {
+    $completedProjects->bind_param('i', $userId);
+    $completedProjects->execute();
+    $completedProjects->bind_result($completedCount);
+    $completedProjects->fetch();
+    $completedProjects->close();
+}
+
+$projectsStmt = $conn->prepare(
+    "SELECT p.id, p.project_name, p.status, p.description, p.start_date, p.end_date, u.full_name AS client_name
+     FROM projects p
+     LEFT JOIN users u ON p.client_id = u.id
+     WHERE EXISTS (
+         SELECT 1
+         FROM project_assignments pe
+         WHERE pe.project_id = p.id
+         AND pe.engineer_id = ?
+     )
+     ORDER BY p.status DESC, p.created_at DESC"
+);
+if ($projectsStmt) {
+    $projectsStmt->bind_param('i', $userId);
+    $projectsStmt->execute();
+    $projectResult = $projectsStmt->get_result();
+    if ($projectResult) {
+        $assignedProjects = $projectResult->fetch_all(MYSQLI_ASSOC);
+    }
+    $projectsStmt->close();
+}
+
+$tasksStmt = $conn->prepare(
+    "SELECT t.id, t.task_name, t.status, t.deadline, p.project_name, p.id AS project_id, p.status AS project_status
+     FROM tasks t
+     INNER JOIN projects p ON t.project_id = p.id
+     WHERE t.assigned_to = ?
+     AND EXISTS (
+         SELECT 1
+         FROM project_assignments pe
+         WHERE pe.project_id = p.id
+         AND pe.engineer_id = ?
+     )
+     ORDER BY
+         CASE t.status
+             WHEN 'pending' THEN 1
+             WHEN 'ongoing' THEN 2
+             WHEN 'delayed' THEN 3
+             WHEN 'completed' THEN 4
+             ELSE 5
+         END,
+         t.deadline IS NULL,
+         t.deadline ASC,
+         t.id DESC"
+);
+if ($tasksStmt) {
+    $tasksStmt->bind_param('ii', $userId, $userId);
+    $tasksStmt->execute();
+    $taskResult = $tasksStmt->get_result();
+    if ($taskResult) {
+        $tasks = $taskResult->fetch_all(MYSQLI_ASSOC);
+    }
+    $tasksStmt->close();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -77,127 +228,111 @@ $tasks_list = $tasksStmt->get_result();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Engineer Dashboard - Edge Automation</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/codesamplecaps/public/assets/css/global.css">
-<style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Poppins', sans-serif; background: #ecf0f1; }
-    .main-content { margin-left: 250px; padding: 40px; }
-    h1 { color: #2c3e50; margin-bottom: 30px; }
-    h2 { color: #2c3e50; border-bottom: 3px solid #0f9d38; padding-bottom: 10px; margin-bottom: 20px; }
-    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 40px; }
-    .stat-card { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; transition: transform 0.3s; }
-    .stat-card:hover { transform: translateY(-5px); }
-    .stat-card h4 { color: #7f8c8d; font-size: 14px; margin-bottom: 10px; }
-    .stat-card p { font-size: 36px; font-weight: bold; color: #0f9d38; }
-    .tabs { display: flex; gap: 10px; margin: 30px 0; border-bottom: 2px solid #ecf0f1; }
-    .tab { padding: 12px 20px; cursor: pointer; background: none; border: none; font-weight: 600; color: #7f8c8d; border-bottom: 3px solid transparent; transition: all 0.3s; }
-    .tab.active { color: #0f9d38; border-bottom-color: #0f9d38; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-    .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-    .project-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-left: 4px solid #0f9d38; }
-    .project-card:hover { transform: translateY(-3px); box-shadow: 0 8px 16px rgba(0,0,0,0.15); }
-    .project-name { font-size: 18px; font-weight: 700; color: #2c3e50; margin-bottom: 10px; }
-    .status { display: inline-block; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 15px; }
-    .status.pending { background: #fff3cd; color: #856404; }
-    .status.ongoing { background: #d1ecf1; color: #0c5460; }
-    .status.completed { background: #d4edda; color: #155724; }
-    .status.on-hold { background: #f8d7da; color: #721c24; }
-    .tasks-list { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    .task-item { padding: 15px; border-left: 4px solid #0f9d38; background: #f9fafb; margin-bottom: 12px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; }
-    .task-item.completed { border-left-color: #0f9d38; background: #f0fdf4; }
-    .task-item.pending { border-left-color: #f39c12; background: #fffbea; }
-    .task-name { font-weight: 600; color: #2c3e50; }
-    .task-project { font-size: 12px; color: #7f8c8d; margin-top: 5px; }
-    .task-deadline { font-size: 12px; color: #7f8c8d; }
-    .no-data { text-align: center; padding: 50px; color: #7f8c8d; }
-    .btn { padding: 10px 20px; background: #0f9d38; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; margin-top: 15px; }
-    .btn:hover { background: #087f23; }
-    .btn-secondary { background: #95a5a6; }
-    .btn-secondary:hover { background: #7f8c8d; }
-    .profile-form { background: white; padding: 25px; border-radius: 8px; max-width: 500px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    .form-group { margin-bottom: 20px; }
-    .form-group label { color: #2c3e50; font-weight: 600; display: block; margin-bottom: 8px; }
-    .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #bdc3c7; border-radius: 5px; font-family: 'Poppins', sans-serif; }
-
-@media (max-width: 768px) {
-    body { overflow-x: hidden; }
-    .main-content { margin-left: 0 !important; padding: 16px !important; }
-    .stats-grid, .projects-grid { grid-template-columns: 1fr !important; }
-    .tabs { flex-wrap: wrap; gap: 8px; }
-    .tab { width: 100%; text-align: center; }
-    .project-card { width: 100%; }
-}
-
-</style>
+    <link rel="stylesheet" href="../css/engineer_dashboard.css">
 </head>
 <body>
 
-<?php include("../../views/components/sidebar_engineer.php"); ?>
+<?php include '../sidebar/sidebar_engineer.php'; ?>
 
 <div class="main-content">
-    <h1>👨‍💼 Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></h1>
-    
+    <h1>Welcome, <?php echo htmlspecialchars((string)($_SESSION['name'] ?? 'Engineer')); ?></h1>
+
+    <?php if ($flash): ?>
+        <div class="flash <?php echo htmlspecialchars((string)($flash['type'] ?? 'success')); ?>">
+            <?php echo htmlspecialchars((string)($flash['message'] ?? '')); ?>
+        </div>
+    <?php endif; ?>
+
     <div class="stats-grid">
-        <div class="stat-card"><h4>📊 Assigned Projects</h4><p><?php echo $assignedCount; ?></p></div>
-        <div class="stat-card"><h4>⏳ In Progress</h4><p><?php echo $inProgressCount; ?></p></div>
-        <div class="stat-card"><h4>✅ Completed</h4><p><?php echo $completedCount; ?></p></div>
+        <div class="stat-card"><h4>Assigned Projects</h4><p><?php echo (int)$assignedCount; ?></p></div>
+        <div class="stat-card"><h4>In Progress</h4><p><?php echo (int)$inProgressCount; ?></p></div>
+        <div class="stat-card"><h4>Completed</h4><p><?php echo (int)$completedCount; ?></p></div>
     </div>
-    
+
     <div class="tabs">
-        <button class="tab active" onclick="showTab('projects-tab', this)">📁 My Projects</button>
-        <button class="tab" onclick="showTab('tasks-tab', this)">📋 Tasks</button>
-        <button class="tab" onclick="showTab('profile-tab', this)">⚙️ Profile</button>
+        <button class="tab active" onclick="showTab('projects-tab', this)">My Projects</button>
+        <button class="tab" onclick="showTab('tasks-tab', this)">Tasks</button>
+        <button class="tab" onclick="showTab('profile-tab', this)">Profile</button>
     </div>
-    
+
     <div id="projects-tab" class="tab-content active">
         <h2>Assigned Projects</h2>
         <div class="projects-grid">
-        <?php if($assigned_projects->num_rows > 0):
-            while($project = $assigned_projects->fetch_assoc()): ?>
-            <div class="project-card">
-                <div class="project-name">📁 <?php echo htmlspecialchars($project['project_name']); ?></div>
-                <span class="status <?php echo $project['status']; ?>">📊 <?php echo ucfirst($project['status']); ?></span>
-                <p><strong>👤 Client:</strong> <?php echo htmlspecialchars($project['client_name'] ?? 'N/A'); ?></p>
-                <p><strong>📅 Start:</strong> <?php echo $project['start_date'] ?? 'N/A'; ?></p>
-                <p><strong>🏁 End:</strong> <?php echo $project['end_date'] ?? 'N/A'; ?></p>
-                <p style="color: #7f8c8d; font-size: 14px; margin-top: 10px;"><?php echo htmlspecialchars(substr($project['description'] ?? '', 0, 100)); ?></p>
-            </div>
-        <?php endwhile; else: ?>
-            <div class="no-data" style="grid-column: 1/-1;"><p>📭 No assigned projects yet</p></div>
-        <?php endif; ?>
+            <?php if (!empty($assignedProjects)): ?>
+                <?php foreach ($assignedProjects as $project): ?>
+                    <div class="project-card">
+                        <div class="project-name"><?php echo htmlspecialchars((string)$project['project_name']); ?></div>
+                        <span class="status <?php echo htmlspecialchars((string)$project['status']); ?>"><?php echo htmlspecialchars(ucfirst((string)$project['status'])); ?></span>
+                        <p><strong>Client:</strong> <?php echo htmlspecialchars((string)($project['client_name'] ?? 'N/A')); ?></p>
+                        <p><strong>Start:</strong> <?php echo htmlspecialchars((string)($project['start_date'] ?? 'N/A')); ?></p>
+                        <p><strong>End:</strong> <?php echo htmlspecialchars((string)($project['end_date'] ?? 'N/A')); ?></p>
+                        <p style="color: #7f8c8d; font-size: 14px; margin-top: 10px;">
+                            <?php echo htmlspecialchars(substr((string)($project['description'] ?? ''), 0, 100)); ?>
+                        </p>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="no-data" style="grid-column: 1/-1;"><p>No assigned projects yet.</p></div>
+            <?php endif; ?>
         </div>
     </div>
-    
+
     <div id="tasks-tab" class="tab-content">
         <h2>My Tasks</h2>
         <div class="tasks-list">
-        <?php if($tasks_list->num_rows > 0):
-            while($task = $tasks_list->fetch_assoc()): ?>
-            <div class="task-item <?php echo $task['status']; ?>">
-                <div>
-                    <div class="task-name">✓ <?php echo htmlspecialchars($task['task_name']); ?></div>
-                    <div class="task-project">📁 <?php echo htmlspecialchars($task['project_name']); ?></div>
-                    <div class="task-deadline">⏰ Deadline: <?php echo $task['deadline'] ?? 'No deadline'; ?></div>
-                </div>
-                <span class="status <?php echo $task['status']; ?>"><?php echo ucfirst($task['status']); ?></span>
-            </div>
-        <?php endwhile; else: ?>
-            <div class="no-data"><p>✅ No tasks yet</p></div>
-        <?php endif; ?>
+            <?php if (!empty($tasks)): ?>
+                <?php foreach ($tasks as $task): ?>
+                    <div class="task-item <?php echo htmlspecialchars((string)$task['status']); ?>">
+                        <div>
+                            <div class="task-name"><?php echo htmlspecialchars((string)$task['task_name']); ?></div>
+                            <div class="task-project"><?php echo htmlspecialchars((string)$task['project_name']); ?></div>
+                            <div class="task-deadline">Deadline: <?php echo htmlspecialchars((string)($task['deadline'] ?? 'No deadline')); ?></div>
+                            <?php if (($task['project_status'] ?? '') === 'completed'): ?>
+                                <div class="task-note">Project is completed, so this task is locked.</div>
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="task-actions">
+                            <span class="status <?php echo htmlspecialchars((string)$task['status']); ?>"><?php echo htmlspecialchars(ucfirst((string)$task['status'])); ?></span>
+
+                            <?php if (($task['project_status'] ?? '') === 'completed'): ?>
+                                <button type="button" class="btn btn-secondary" disabled>Locked</button>
+                            <?php else: ?>
+                                <form method="POST" class="task-form">
+                                    <input type="hidden" name="action" value="update_task_status">
+                                    <input type="hidden" name="task_id" value="<?php echo (int)$task['id']; ?>">
+                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+
+                                    <select name="status" aria-label="Task status" required>
+                                        <?php foreach ($taskStatusOptions as $statusOption): ?>
+                                            <option value="<?php echo htmlspecialchars($statusOption); ?>" <?php echo ($task['status'] ?? '') === $statusOption ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars(ucfirst($statusOption)); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+
+                                    <button type="submit" class="btn">Save Task Status</button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <div class="no-data"><p>No tasks yet.</p></div>
+            <?php endif; ?>
         </div>
     </div>
-    
+
     <div id="profile-tab" class="tab-content">
         <h2>Profile Settings</h2>
         <div class="profile-form">
             <div class="form-group">
                 <label>Full Name</label>
-                <input type="text" value="<?php echo htmlspecialchars($_SESSION['name']); ?>" disabled>
+                <input type="text" value="<?php echo htmlspecialchars((string)($_SESSION['name'] ?? '')); ?>" disabled>
             </div>
             <div class="form-group">
                 <label>Email</label>
-                <input type="email" value="<?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?>" disabled>
+                <input type="email" value="<?php echo htmlspecialchars((string)($_SESSION['email'] ?? '')); ?>" disabled>
             </div>
             <div class="form-group">
                 <label>Availability Status</label>
@@ -207,18 +342,49 @@ $tasks_list = $tasksStmt->get_result();
                     <option>on-leave</option>
                 </select>
             </div>
-            <button class="btn" onclick="window.location.href='/codesamplecaps/views/dashboards/change_password.php'">🔐 Change Password</button>
+            <button class="btn" onclick="window.location.href='/codesamplecaps/views/dashboards/change_password.php'">Change Password</button>
         </div>
     </div>
 </div>
 
 <script>
 function showTab(tabId, btn) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(function (el) {
+        el.classList.remove('active');
+    });
+    document.querySelectorAll('.tab').forEach(function (el) {
+        el.classList.remove('active');
+    });
     document.getElementById(tabId).classList.add('active');
     btn.classList.add('active');
+    if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', '#' + tabId);
+    }
 }
+
+function activateTabFromHash() {
+    var tabId = window.location.hash.replace('#', '');
+    if (!tabId) {
+        return;
+    }
+
+    var targetTab = document.getElementById(tabId);
+    var buttons = document.querySelectorAll('.tab');
+    var matchedButton = null;
+
+    buttons.forEach(function (button) {
+        var onclickValue = button.getAttribute('onclick') || '';
+        if (onclickValue.indexOf("'" + tabId + "'") !== -1) {
+            matchedButton = button;
+        }
+    });
+
+    if (targetTab && matchedButton) {
+        showTab(tabId, matchedButton);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', activateTabFromHash);
 </script>
 
 </body>

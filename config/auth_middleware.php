@@ -5,7 +5,7 @@
 function require_role($role) {
     session_start();
     if (!isset($_SESSION['role']) || $_SESSION['role'] !== $role) {
-        header('Location: /codesamplecaps/public/login.php');
+        header('Location: /codesamplecaps/LOGIN/php/login.php');
         exit();
     }
 }

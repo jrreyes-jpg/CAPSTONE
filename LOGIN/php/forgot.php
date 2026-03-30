@@ -91,7 +91,7 @@ if ($result['success']) {
         </div>
     </div>
 
-    <script src="/codesamplecaps/public/assets/js/script.js"></script>
+    <script src="../js/script.js"></script>
 </body>
 </html>
 

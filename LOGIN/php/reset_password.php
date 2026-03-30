@@ -51,7 +51,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reset Password - Edge Automation Portal</title>
-    <link rel="stylesheet" href="/codesamplecaps/public/assets/css/style.css">
+    <link rel="stylesheet" href="../css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         .password-strength {
@@ -93,7 +93,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
     <div class="container">
         <div class="left-panel">
             <div class="logo">
-                <img src="/codesamplecaps/public/assets/images/edge.jpg" alt="Edge Logo">
+                <img src="../../IMAGES/edge.jpg" alt="Edge Logo">
             </div>
             <h1 class="company-name">
                 EDGE AUTOMATION TECHNOLOGY SERVICES, CO.
@@ -115,7 +115,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
                         <div class="success-box">
                             <?php echo htmlspecialchars($success); ?>
                             <p style="margin-top: 10px;">
-                                <a href="/codesamplecaps/public/login.php" style="color: #155724; text-decoration: underline;">
+                                <a href="login.php" style="color: #155724; text-decoration: underline;">
                                     Click here to login
                                 </a>
                             </p>
@@ -160,14 +160,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && empty($error)) {
                     <?php endif; ?>
 
                     <div class="links" style="margin-top: 20px;">
-                        <a href="/codesamplecaps/public/login.php">Back to Login</a>
+                        <a href="login.php">Back to Login</a>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <script src="/codesamplecaps/public/assets/js/script.js"></script>
+    <script src="../js/script.js"></script>
     <script>
         /**
          * Check password strength and display visual feedback

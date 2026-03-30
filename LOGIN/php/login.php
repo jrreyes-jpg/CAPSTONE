@@ -60,9 +60,9 @@ Account will be temporarily locked after $max_attempts failed attempts.";
                 if ($user['role'] == 'super_admin') {
                     header("Location: ../../SUPERADMIN/dashboards/super_admin_dashboard.php");
                 } elseif ($user['role'] == 'engineer') {
-                    header("Location: /codesamplecaps/views/dashboards/engineer_dashboard.php");
+                    header("Location: ../../ENGINEER/dashboards/engineer_dashboard.php");
                 } elseif ($user['role'] == 'foreman') {
-                    header("Location: /codesamplecaps/views/dashboards/foreman_dashboard.php");
+                    header("Location: ../../FOREMAN/dashboards/foreman_dashboard.php");
                 } else {
                     header("Location:../../CLIENT/dashboards/client_dashboard.php");
                 }
@@ -112,7 +112,7 @@ href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/
     </head>
 
     <body>
-        <a href="/codesamplecaps/public/index.php"
+        <a href="../php/index.php"
 class="back-home animate__animated animate__fadeInDown">
 ← Back to Home
 </a>

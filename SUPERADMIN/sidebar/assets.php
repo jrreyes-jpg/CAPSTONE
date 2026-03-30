@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['assets_message'] = 'Asset returned.';
         }
 
-        header('Location: /codesamplecaps/views/dashboards/assets.php');
+        header('Location: ../dashboards/assets.php');
         exit();
     }
 
@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['assets_message'] = 'Asset deleted.';
         }
 
-        header('Location: /codesamplecaps/views/dashboards/assets.php');
+        header('Location: ../dashboards/assets.php');
         exit();
     }
 
@@ -288,6 +288,6 @@ if ($result) {
     <img id="qrModalImg" style="max-width:300px; background:#fff; padding:10px;">
 </div>
 
-<script src="/codesamplecaps/public/assets/js/script.js"></script>
+<script src="../js/script.js"></script>
 </body>
 </html>

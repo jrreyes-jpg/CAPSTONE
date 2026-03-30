@@ -27,6 +27,39 @@ function normalize_date_or_null(?string $value): ?string {
     return $value === '' ? null : $value;
 }
 
+function getProjectSnapshot(mysqli $conn, int $projectId): ?array {
+    $stmt = $conn->prepare('SELECT id, project_name, status FROM projects WHERE id = ? LIMIT 1');
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('i', $projectId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result ? $result->fetch_assoc() : null;
+}
+
+function countOpenProjectTasks(mysqli $conn, int $projectId): int {
+    $stmt = $conn->prepare(
+        "SELECT COUNT(*) AS total
+         FROM tasks
+         WHERE project_id = ?
+         AND status IN ('pending', 'ongoing', 'delayed')"
+    );
+
+    if (!$stmt) {
+        return 0;
+    }
+
+    $stmt->bind_param('i', $projectId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
+
+    return (int)($row['total'] ?? 0);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -112,10 +145,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'update_project_status') {
         $projectId = (int)($_POST['project_id'] ?? 0);
         $status = normalize_text($_POST['status'] ?? '');
+        $project = $projectId > 0 ? getProjectSnapshot($conn, $projectId) : null;
 
         if ($projectId <= 0 || !in_array($status, $statusOptions, true)) {
             set_projects_flash('error', 'Invalid project status update.');
             redirect_projects_page();
+        }
+
+        if (!$project) {
+            set_projects_flash('error', 'Project not found.');
+            redirect_projects_page();
+        }
+
+        if (($project['status'] ?? '') === 'completed') {
+            set_projects_flash('error', 'Completed projects are locked. Use Reopen first.');
+            redirect_projects_page();
+        }
+
+        if (($project['status'] ?? '') !== 'pending' && $status === 'pending') {
+            set_projects_flash('error', 'A started project cannot go back to Pending. Use On-hold instead.');
+            redirect_projects_page();
+        }
+
+        if ($status === 'completed') {
+            $openTasks = countOpenProjectTasks($conn, $projectId);
+
+            if ($openTasks > 0) {
+                set_projects_flash('error', 'Complete all open tasks before marking this project as completed.');
+                redirect_projects_page();
+            }
         }
 
         $updateStatus = $conn->prepare('UPDATE projects SET status = ? WHERE id = ?');
@@ -136,9 +194,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $description = normalize_text($_POST['task_description'] ?? '');
         $deadline = normalize_date_or_null($_POST['deadline'] ?? null);
         $createdBy = (int)($_SESSION['user_id'] ?? 0);
+        $project = $projectId > 0 ? getProjectSnapshot($conn, $projectId) : null;
 
         if ($projectId <= 0 || $assignedTo <= 0 || $taskName === '') {
             set_projects_flash('error', 'Task name and assigned engineer are required.');
+            redirect_projects_page();
+        }
+
+        if (!$project) {
+            set_projects_flash('error', 'Project not found.');
+            redirect_projects_page();
+        }
+
+        if (($project['status'] ?? '') === 'completed') {
+            set_projects_flash('error', 'Cannot add tasks to a completed project. Reopen it first.');
             redirect_projects_page();
         }
 
@@ -155,6 +224,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_projects_flash('success', 'Task added successfully.');
         } else {
             set_projects_flash('error', 'Failed to add task.');
+        }
+
+        redirect_projects_page();
+    }
+
+    if ($action === 'reopen_project') {
+        $projectId = (int)($_POST['project_id'] ?? 0);
+        $project = $projectId > 0 ? getProjectSnapshot($conn, $projectId) : null;
+
+        if ($projectId <= 0 || !$project) {
+            set_projects_flash('error', 'Project not found.');
+            redirect_projects_page();
+        }
+
+        if (($project['status'] ?? '') !== 'completed') {
+            set_projects_flash('error', 'Only completed projects can be reopened.');
+            redirect_projects_page();
+        }
+
+        $reopenProject = $conn->prepare("UPDATE projects SET status = 'ongoing' WHERE id = ?");
+
+        if ($reopenProject && $reopenProject->bind_param('i', $projectId) && $reopenProject->execute()) {
+            set_projects_flash('success', 'Project reopened successfully.');
+        } else {
+            set_projects_flash('error', 'Failed to reopen project.');
         }
 
         redirect_projects_page();
@@ -225,6 +319,7 @@ if ($projectsResult) {
 
 $tasksResult = $conn->query("
     SELECT
+        t.id,
         t.project_id,
         t.task_name,
         t.status,
@@ -265,232 +360,18 @@ foreach ($projects as $project) {
     <link rel="stylesheet" href="../css/admin-dashboard.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
-        .page-stack {
-            display: grid;
-            gap: 24px;
+        .project-card.is-locked {
+            border: 1px solid rgba(22, 163, 74, 0.16);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.94));
         }
 
-        .form-panel,
-        .project-card {
-            background: rgba(255, 255, 255, 0.92);
-            border-radius: 18px;
-            box-shadow: var(--shadow-soft);
-        }
-
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 16px;
-        }
-
-        .metric-card {
-            background: linear-gradient(135deg, #ecfdf5, #dcfce7);
-            border-radius: 16px;
-            padding: 18px 20px;
-            border: 1px solid rgba(22, 163, 74, 0.12);
-        }
-
-        .metric-card span {
-            display: block;
-            font-size: 0.84rem;
-            color: var(--text-light);
-            margin-bottom: 8px;
-        }
-
-        .metric-card strong {
-            font-size: 1.8rem;
-            color: var(--text-dark);
-        }
-
-        .form-panel {
-            padding: 24px;
-        }
-
-        .section-title-inline {
-            margin: 0 0 16px;
-            font-size: 1.2rem;
-        }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 16px;
-        }
-
-        .input-group {
-            display: grid;
-            gap: 8px;
-        }
-
-        .input-group label {
-            font-size: 0.92rem;
-            font-weight: 600;
-            color: var(--text-dark);
-        }
-
-        .input-group input,
-        .input-group select,
-        .input-group textarea {
-            width: 100%;
-            padding: 12px 14px;
-            border: 1px solid #d1d5db;
-            border-radius: 12px;
-            font: inherit;
-            background: #fff;
-        }
-
-        .input-group textarea {
-            min-height: 110px;
-            resize: vertical;
-        }
-
-        .form-actions {
-            margin-top: 18px;
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        .btn-primary,
-        .btn-secondary {
-            border: none;
-            border-radius: 12px;
-            padding: 12px 18px;
-            font: inherit;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: #fff;
-        }
-
-        .btn-primary:disabled {
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-
-        .btn-secondary {
-            background: #e5e7eb;
-            color: var(--text-dark);
-        }
-
-        .alert {
-            border-radius: 14px;
+        .lock-note {
             padding: 14px 16px;
-            font-weight: 500;
-        }
-
-        .alert-success {
-            background: #dcfce7;
-            color: #166534;
-            border: 1px solid #86efac;
-        }
-
-        .alert-error {
-            background: #fee2e2;
-            color: #991b1b;
-            border: 1px solid #fca5a5;
-        }
-
-        .projects-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 20px;
-        }
-
-        .project-card {
-            padding: 22px;
-            display: grid;
-            gap: 18px;
-        }
-
-        .project-card h3 {
-            margin: 0;
-            font-size: 1.18rem;
-        }
-
-        .project-meta {
-            display: grid;
-            gap: 8px;
-            color: var(--text-light);
-            font-size: 0.92rem;
-        }
-
-        .status-pill {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 6px 12px;
-            border-radius: 999px;
-            font-size: 0.8rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-
-        .status-pending { background: #fef3c7; color: #92400e; }
-        .status-ongoing { background: #dbeafe; color: #1d4ed8; }
-        .status-completed { background: #dcfce7; color: #166534; }
-        .status-on-hold { background: #fee2e2; color: #991b1b; }
-
-        .card-split {
-            display: grid;
-            gap: 16px;
-        }
-
-        .task-list {
-            display: grid;
-            gap: 10px;
-        }
-
-        .task-item {
-            padding: 12px 14px;
             border-radius: 12px;
-            background: #f8fafc;
-            border: 1px solid #e5e7eb;
-        }
-
-        .task-item strong {
-            display: block;
-            margin-bottom: 4px;
-        }
-
-        .task-item span {
-            display: block;
-            color: var(--text-light);
-            font-size: 0.88rem;
-        }
-
-        .empty-state {
-            padding: 18px;
-            border-radius: 14px;
-            background: #f8fafc;
-            color: var(--text-light);
-            border: 1px dashed #cbd5e1;
-        }
-
-        .mini-form {
-            display: grid;
-            gap: 12px;
-            padding-top: 4px;
-        }
-
-        .mini-form .form-grid {
-            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-        }
-
-        .subheading {
-            margin: 0;
-            font-size: 1rem;
-        }
-
-        @media (max-width: 768px) {
-            .form-panel,
-            .project-card {
-                padding: 18px;
-            }
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1d4ed8;
+            font-weight: 600;
         }
     </style>
 </head>
@@ -599,8 +480,9 @@ foreach ($projects as $project) {
                             $projectId = (int)$project['id'];
                             $projectTasks = $tasksByProject[$projectId] ?? [];
                             $currentEngineerId = (int)($project['engineer_id'] ?? 0);
+                            $isCompleted = ($project['status'] ?? '') === 'completed';
                             ?>
-                            <article class="project-card">
+                            <article class="project-card<?php echo $isCompleted ? ' is-locked' : ''; ?>">
                                 <div class="card-split">
                                     <div>
                                         <h3><?php echo htmlspecialchars($project['project_name']); ?></h3>
@@ -626,27 +508,39 @@ foreach ($projects as $project) {
                                     </div>
                                 <?php endif; ?>
 
-                                <form method="POST" class="mini-form">
-                                    <input type="hidden" name="action" value="update_project_status">
-                                    <input type="hidden" name="project_id" value="<?php echo $projectId; ?>">
-
-                                    <h4 class="subheading">Update Status</h4>
-                                    <div class="form-grid">
-                                        <div class="input-group">
-                                            <label for="status-<?php echo $projectId; ?>">Status</label>
-                                            <select id="status-<?php echo $projectId; ?>" name="status" required>
-                                                <?php foreach ($statusOptions as $statusOption): ?>
-                                                    <option value="<?php echo htmlspecialchars($statusOption); ?>" <?php echo $project['status'] === $statusOption ? 'selected' : ''; ?>>
-                                                        <?php echo htmlspecialchars(ucfirst($statusOption)); ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
+                                <?php if ($isCompleted): ?>
+                                    <div class="lock-note">This project is locked because it is already completed.</div>
+                                    <form method="POST" class="mini-form">
+                                        <input type="hidden" name="action" value="reopen_project">
+                                        <input type="hidden" name="project_id" value="<?php echo $projectId; ?>">
+                                        <div class="form-actions">
+                                            <button type="submit" class="btn-secondary">Reopen Project</button>
                                         </div>
-                                    </div>
-                                    <div class="form-actions">
-                                        <button type="submit" class="btn-secondary">Save Status</button>
-                                    </div>
-                                </form>
+                                    </form>
+                                <?php else: ?>
+                                    <form method="POST" class="mini-form">
+                                        <input type="hidden" name="action" value="update_project_status">
+                                        <input type="hidden" name="project_id" value="<?php echo $projectId; ?>">
+
+                                        <h4 class="subheading">Update Status</h4>
+                                        <div class="form-grid">
+                                            <div class="input-group">
+                                                <label for="status-<?php echo $projectId; ?>">Status</label>
+                                                <select id="status-<?php echo $projectId; ?>" name="status" required>
+                                                    <?php foreach ($statusOptions as $statusOption): ?>
+                                                        <?php if ($statusOption === 'pending' && ($project['status'] ?? '') !== 'pending') { continue; } ?>
+                                                        <option value="<?php echo htmlspecialchars($statusOption); ?>" <?php echo $project['status'] === $statusOption ? 'selected' : ''; ?>>
+                                                            <?php echo htmlspecialchars(ucfirst($statusOption)); ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-actions">
+                                            <button type="submit" class="btn-primary">Save Status</button>
+                                        </div>
+                                    </form>
+                                <?php endif; ?>
 
                                 <div class="card-split">
                                     <h4 class="subheading">Tasks</h4>
@@ -667,45 +561,49 @@ foreach ($projects as $project) {
                                     <?php endif; ?>
                                 </div>
 
-                                <form method="POST" class="mini-form">
-                                    <input type="hidden" name="action" value="add_task">
-                                    <input type="hidden" name="project_id" value="<?php echo $projectId; ?>">
+                                <?php if ($isCompleted): ?>
+                                    <div class="empty-state">Task creation is disabled while this project is completed.</div>
+                                <?php else: ?>
+                                    <form method="POST" class="mini-form">
+                                        <input type="hidden" name="action" value="add_task">
+                                        <input type="hidden" name="project_id" value="<?php echo $projectId; ?>">
 
-                                    <h4 class="subheading">Add Task</h4>
+                                        <h4 class="subheading">Add Task</h4>
 
-                                    <div class="form-grid">
-                                        <div class="input-group">
-                                            <label for="task_name-<?php echo $projectId; ?>">Task Name</label>
-                                            <input type="text" id="task_name-<?php echo $projectId; ?>" name="task_name" required>
+                                        <div class="form-grid">
+                                            <div class="input-group">
+                                                <label for="task_name-<?php echo $projectId; ?>">Task Name</label>
+                                                <input type="text" id="task_name-<?php echo $projectId; ?>" name="task_name" required>
+                                            </div>
+
+                                            <div class="input-group">
+                                                <label for="assigned_to-<?php echo $projectId; ?>">Assign To</label>
+                                                <select id="assigned_to-<?php echo $projectId; ?>" name="assigned_to" required>
+                                                    <option value="">Select engineer</option>
+                                                    <?php foreach ($engineers as $engineer): ?>
+                                                        <option value="<?php echo (int)$engineer['id']; ?>" <?php echo $currentEngineerId === (int)$engineer['id'] ? 'selected' : ''; ?>>
+                                                            <?php echo htmlspecialchars($engineer['full_name']); ?>
+                                                        </option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            </div>
+
+                                            <div class="input-group">
+                                                <label for="deadline-<?php echo $projectId; ?>">Deadline</label>
+                                                <input type="date" id="deadline-<?php echo $projectId; ?>" name="deadline">
+                                            </div>
                                         </div>
 
                                         <div class="input-group">
-                                            <label for="assigned_to-<?php echo $projectId; ?>">Assign To</label>
-                                            <select id="assigned_to-<?php echo $projectId; ?>" name="assigned_to" required>
-                                                <option value="">Select engineer</option>
-                                                <?php foreach ($engineers as $engineer): ?>
-                                                    <option value="<?php echo (int)$engineer['id']; ?>" <?php echo $currentEngineerId === (int)$engineer['id'] ? 'selected' : ''; ?>>
-                                                        <?php echo htmlspecialchars($engineer['full_name']); ?>
-                                                    </option>
-                                                <?php endforeach; ?>
-                                            </select>
+                                            <label for="task_description-<?php echo $projectId; ?>">Task Description</label>
+                                            <textarea id="task_description-<?php echo $projectId; ?>" name="task_description" placeholder="Task details"></textarea>
                                         </div>
 
-                                        <div class="input-group">
-                                            <label for="deadline-<?php echo $projectId; ?>">Deadline</label>
-                                            <input type="date" id="deadline-<?php echo $projectId; ?>" name="deadline">
+                                        <div class="form-actions">
+                                            <button type="submit" class="btn-primary">Add Task</button>
                                         </div>
-                                    </div>
-
-                                    <div class="input-group">
-                                        <label for="task_description-<?php echo $projectId; ?>">Task Description</label>
-                                        <textarea id="task_description-<?php echo $projectId; ?>" name="task_description" placeholder="Task details"></textarea>
-                                    </div>
-
-                                    <div class="form-actions">
-                                        <button type="submit" class="btn-primary">Add Task</button>
-                                    </div>
-                                </form>
+                                    </form>
+                                <?php endif; ?>
                             </article>
                         <?php endforeach; ?>
                     </div>
@@ -714,6 +612,6 @@ foreach ($projects as $project) {
         </div>
     </main>
 </div>
-<script src="../js/dashboard-sidebar.js"></script>
+<script src="../js/script.js"></script>
 </body>
 </html>
