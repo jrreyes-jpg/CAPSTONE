@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3307
--- Generation Time: Mar 30, 2026 at 06:21 PM
+-- Generation Time: Mar 31, 2026 at 04:00 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -222,7 +222,8 @@ CREATE TABLE `projects` (
 
 INSERT INTO `projects` (`id`, `project_name`, `description`, `client_id`, `start_date`, `end_date`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
 (2, 'Vendo Machine', '', 7, '2026-03-30', '2026-03-31', 'completed', 5, '2026-03-30 01:30:58', '2026-03-30 16:07:23'),
-(3, 'Working machine', '', 10, '2026-03-30', '2026-03-30', 'pending', 5, '2026-03-30 01:37:01', '2026-03-30 01:37:01');
+(3, 'Working machine', '', 10, '2026-03-30', '2026-03-30', 'pending', 5, '2026-03-30 01:37:01', '2026-03-30 01:37:01'),
+(4, 'Wirings', '', 9, '2026-03-31', '2026-03-31', 'ongoing', 5, '2026-03-31 01:37:12', '2026-03-31 01:37:12');
 
 -- --------------------------------------------------------
 
@@ -244,7 +245,8 @@ CREATE TABLE `project_assignments` (
 
 INSERT INTO `project_assignments` (`id`, `project_id`, `engineer_id`, `assigned_by`, `assigned_at`) VALUES
 (1, 2, 6, 5, '2026-03-30 01:30:58'),
-(2, 3, 6, 5, '2026-03-30 01:37:01');
+(2, 3, 6, 5, '2026-03-30 01:37:01'),
+(3, 4, 14, 5, '2026-03-31 01:37:12');
 
 -- --------------------------------------------------------
 
@@ -474,7 +476,7 @@ ALTER TABLE `inventory`
 -- AUTO_INCREMENT for table `login_attempts`
 --
 ALTER TABLE `login_attempts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
 
 --
 -- AUTO_INCREMENT for table `password_reset_tokens`
@@ -486,13 +488,13 @@ ALTER TABLE `password_reset_tokens`
 -- AUTO_INCREMENT for table `projects`
 --
 ALTER TABLE `projects`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `project_assignments`
 --
 ALTER TABLE `project_assignments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `tasks`
