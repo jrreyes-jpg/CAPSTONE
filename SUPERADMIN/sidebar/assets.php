@@ -288,6 +288,6 @@ if ($result) {
     <img id="qrModalImg" style="max-width:300px; background:#fff; padding:10px;">
 </div>
 
-<script src="../js/script.js"></script>
+<script src="../js/admin-script.js"></script>
 </body>
 </html>

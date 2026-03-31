@@ -116,9 +116,11 @@ $assignedProjects = [];
 $tasks = [];
 
 $totalAssigned = $conn->prepare(
-    "SELECT COUNT(DISTINCT project_id)
-     FROM project_assignments
-     WHERE engineer_id = ?"
+    "SELECT COUNT(DISTINCT pa.project_id)
+     FROM project_assignments pa
+     INNER JOIN projects p ON p.id = pa.project_id
+     WHERE pa.engineer_id = ?
+     AND p.status <> 'draft'"
 );
 if ($totalAssigned) {
     $totalAssigned->bind_param('i', $userId);
@@ -176,6 +178,7 @@ $projectsStmt = $conn->prepare(
          WHERE pe.project_id = p.id
          AND pe.engineer_id = ?
      )
+     AND p.status <> 'draft'
      ORDER BY p.status DESC, p.created_at DESC"
 );
 if ($projectsStmt) {
@@ -193,6 +196,7 @@ $tasksStmt = $conn->prepare(
      FROM tasks t
      INNER JOIN projects p ON t.project_id = p.id
      WHERE t.assigned_to = ?
+     AND p.status <> 'draft'
      AND EXISTS (
          SELECT 1
          FROM project_assignments pe

@@ -10,7 +10,7 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 'client') {
 $user_id = $_SESSION['user_id'];
 
 /* PROJECT SUMMARY COUNTS */
-$totalProjects = $conn->prepare("SELECT COUNT(*) FROM projects WHERE client_id=?");
+$totalProjects = $conn->prepare("SELECT COUNT(*) FROM projects WHERE client_id=? AND status <> 'draft'");
 $totalProjects->bind_param("i",$user_id);
 $totalProjects->execute();
 $totalProjects->bind_result($totalCount);
@@ -49,6 +49,7 @@ FROM projects p
 LEFT JOIN project_assignments pa ON pa.project_id = p.id
 LEFT JOIN users u ON u.id = pa.engineer_id
 WHERE p.client_id=?
+AND p.status <> 'draft'
 ORDER BY p.created_at DESC
 ");$projectsStmt->bind_param("i",$user_id);
 $projectsStmt->execute();

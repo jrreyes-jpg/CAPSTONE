@@ -4,7 +4,66 @@ require_once __DIR__ . '/../../config/database.php';
 
 require_role('super_admin');
 
-$statusOptions = ['pending', 'ongoing', 'completed', 'on-hold'];
+function get_column_type(mysqli $conn, string $tableName, string $columnName): ?string {
+    static $cache = [];
+    $cacheKey = $tableName . '.' . $columnName;
+
+    if (array_key_exists($cacheKey, $cache)) {
+        return $cache[$cacheKey];
+    }
+
+    $stmt = $conn->prepare(
+        'SELECT COLUMN_TYPE
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = ?
+         AND COLUMN_NAME = ?
+         LIMIT 1'
+    );
+
+    if (!$stmt) {
+        $cache[$cacheKey] = null;
+        return null;
+    }
+
+    $stmt->bind_param('ss', $tableName, $columnName);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
+
+    $cache[$cacheKey] = $row['COLUMN_TYPE'] ?? null;
+
+    return $cache[$cacheKey];
+}
+
+function table_has_column(mysqli $conn, string $tableName, string $columnName): bool {
+    return get_column_type($conn, $tableName, $columnName) !== null;
+}
+
+function enum_supports_value(mysqli $conn, string $tableName, string $columnName, string $value): bool {
+    $columnType = get_column_type($conn, $tableName, $columnName);
+
+    return $columnType !== null && str_contains($columnType, "'" . $value . "'");
+}
+
+function normalize_text_or_null(?string $value): ?string {
+    $value = trim((string)$value);
+    return $value === '' ? null : $value;
+}
+
+function today_date(): string {
+    return (new DateTimeImmutable('today'))->format('Y-m-d');
+}
+
+$supportsDraftStatus = enum_supports_value($conn, 'projects', 'status', 'draft');
+$hasProjectAddressColumn = table_has_column($conn, 'projects', 'project_address');
+$statusOptions = $supportsDraftStatus
+    ? ['draft', 'pending', 'ongoing', 'completed', 'on-hold']
+    : ['pending', 'ongoing', 'completed', 'on-hold'];
+$initialStatusOptions = $supportsDraftStatus
+    ? ['draft', 'pending', 'ongoing']
+    : ['pending', 'ongoing'];
+$todayDate = today_date();
 
 function redirect_projects_page(): void {
     header('Location: /codesamplecaps/SUPERADMIN/sidebar/projects.php');
@@ -66,6 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'create_project') {
         $projectName = normalize_text($_POST['project_name'] ?? '');
         $description = normalize_text($_POST['description'] ?? '');
+        $projectAddress = $hasProjectAddressColumn ? normalize_text_or_null($_POST['project_address'] ?? null) : null;
         $clientId = (int)($_POST['client_id'] ?? 0);
         $engineerId = (int)($_POST['engineer_id'] ?? 0);
         $status = normalize_text($_POST['status'] ?? 'pending');
@@ -78,8 +138,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
-        if (!in_array($status, $statusOptions, true)) {
-            set_projects_flash('error', 'Invalid project status selected.');
+        if (!in_array($status, $initialStatusOptions, true)) {
+            set_projects_flash(
+                'error',
+                $supportsDraftStatus
+                    ? 'Initial project status must be Draft, Pending, or Ongoing only.'
+                    : 'Initial project status must be Pending or Ongoing only.'
+            );
+            redirect_projects_page();
+        }
+
+        if ($hasProjectAddressColumn && $status !== 'draft' && $projectAddress === null) {
+            set_projects_flash('error', 'Project address is required unless the project stays in Draft.');
+            redirect_projects_page();
+        }
+
+        if ($status === 'ongoing' && $startDate === null) {
+            set_projects_flash('error', 'Start date is required when creating an ongoing project.');
+            redirect_projects_page();
+        }
+
+        if ($startDate !== null && $startDate < $todayDate) {
+            set_projects_flash('error', 'Start date cannot be earlier than today.');
+            redirect_projects_page();
+        }
+
+        if ($status === 'ongoing' && $startDate !== $todayDate) {
+            set_projects_flash('error', 'An ongoing project must start today.');
             redirect_projects_page();
         }
 
@@ -88,28 +173,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
+        if ($startDate === null && $endDate !== null && $endDate < $todayDate) {
+            set_projects_flash('error', 'End date cannot be earlier than today.');
+            redirect_projects_page();
+        }
+
         $conn->begin_transaction();
 
         try {
-            $createProject = $conn->prepare(
-                'INSERT INTO projects (project_name, description, client_id, start_date, end_date, status, created_by)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)'
-            );
+            if ($hasProjectAddressColumn) {
+                $createProject = $conn->prepare(
+                    'INSERT INTO projects (project_name, description, client_id, project_address, start_date, end_date, status, created_by)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+                );
+            } else {
+                $createProject = $conn->prepare(
+                    'INSERT INTO projects (project_name, description, client_id, start_date, end_date, status, created_by)
+                     VALUES (?, ?, ?, ?, ?, ?, ?)'
+                );
+            }
 
             if (!$createProject) {
                 throw new RuntimeException('Failed to prepare project creation.');
             }
 
-            $createProject->bind_param(
-                'ssisssi',
-                $projectName,
-                $description,
-                $clientId,
-                $startDate,
-                $endDate,
-                $status,
-                $createdBy
-            );
+            if ($hasProjectAddressColumn) {
+                $createProject->bind_param(
+                    'ssissssi',
+                    $projectName,
+                    $description,
+                    $clientId,
+                    $projectAddress,
+                    $startDate,
+                    $endDate,
+                    $status,
+                    $createdBy
+                );
+            } else {
+                $createProject->bind_param(
+                    'ssisssi',
+                    $projectName,
+                    $description,
+                    $clientId,
+                    $startDate,
+                    $endDate,
+                    $status,
+                    $createdBy
+                );
+            }
 
             if (!$createProject->execute()) {
                 throw new RuntimeException('Failed to create project.');
@@ -162,7 +273,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
-        if (($project['status'] ?? '') !== 'pending' && $status === 'pending') {
+        if (!in_array(($project['status'] ?? ''), ['pending', 'draft'], true) && $status === 'pending') {
             set_projects_flash('error', 'A started project cannot go back to Pending. Use On-hold instead.');
             redirect_projects_page();
         }
@@ -208,6 +319,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (($project['status'] ?? '') === 'completed') {
             set_projects_flash('error', 'Cannot add tasks to a completed project. Reopen it first.');
+            redirect_projects_page();
+        }
+
+        if (($project['status'] ?? '') === 'draft') {
+            set_projects_flash('error', 'Cannot add tasks to a draft project. Change its status to Pending or Ongoing first.');
             redirect_projects_page();
         }
 
@@ -273,12 +389,14 @@ if ($engineerResult) {
 
 $projects = [];
 $tasksByProject = [];
+$projectAddressSelect = $hasProjectAddressColumn ? 'p.project_address,' : 'NULL AS project_address,';
 
 $projectsQuery = "
     SELECT
         p.id,
         p.project_name,
         p.description,
+        {$projectAddressSelect}
         p.client_id,
         p.start_date,
         p.end_date,
@@ -359,23 +477,8 @@ foreach ($projects as $project) {
     <title>Project Management - Super Admin</title>
     <link rel="stylesheet" href="../css/admin-dashboard.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <style>
-        .project-card.is-locked {
-            border: 1px solid rgba(22, 163, 74, 0.16);
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.94));
-        }
-
-        .lock-note {
-            padding: 14px 16px;
-            border-radius: 12px;
-            background: #eff6ff;
-            border: 1px solid #bfdbfe;
-            color: #1d4ed8;
-            font-weight: 600;
-        }
-    </style>
 </head>
-<body class="page-loaded">
+<body>
 <div class="container">
     <?php include __DIR__ . '/../sidebar_super_admin.php'; ?>
 
@@ -438,26 +541,74 @@ foreach ($projects as $project) {
                         </div>
 
                         <div class="input-group">
-                            <label for="status">Initial Status</label>
+                            <div class="field-label-row">
+                                <label for="status">Initial Status</label>
+                                <button type="button" class="field-tip" aria-label="Project status reminder">
+                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                    <span class="field-tip__bubble">
+                                        <?php if ($supportsDraftStatus): ?>
+                                            Use Draft for incomplete or possibly wrong project entries. Use Pending for approved work, and choose Ongoing only when work starts today.
+                                        <?php else: ?>
+                                            Use Pending for approved work. Choose Ongoing only when work starts today.
+                                        <?php endif; ?>
+                                    </span>
+                                </button>
+                            </div>
                             <select id="status" name="status" required>
-                                <?php foreach ($statusOptions as $statusOption): ?>
-                                    <option value="<?php echo htmlspecialchars($statusOption); ?>"><?php echo htmlspecialchars(ucfirst($statusOption)); ?></option>
+                                <?php foreach ($initialStatusOptions as $statusOption): ?>
+                                    <option value="<?php echo htmlspecialchars($statusOption); ?>" <?php echo $statusOption === 'pending' ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars(ucfirst($statusOption)); ?>
+                                    </option>
                                 <?php endforeach; ?>
                             </select>
+                            <small id="initial-status-help" class="form-help-text">
+                                <?php if ($supportsDraftStatus): ?>
+                                    Draft is safe for incomplete or mistaken entries. Pending stays as the default.
+                                <?php else: ?>
+                                    Use Pending for planned projects. Choose Ongoing only if work starts now.
+                                <?php endif; ?>
+                            </small>
+                        </div>
+
+                        <?php if ($hasProjectAddressColumn): ?>
+                            <div class="input-group input-group-wide">
+                                <div class="field-label-row">
+                                    <label for="project_address">Project Address / Site Location</label>
+                                    <button type="button" class="field-tip" aria-label="Project address reminder">
+                                        <span class="field-tip__icon" aria-hidden="true">i</span>
+                                        <span class="field-tip__bubble">Save the actual site or client location here. This is recommended for planning and required once the project moves out of Draft.</span>
+                                    </button>
+                                </div>
+                                <textarea id="project_address" name="project_address" rows="2" placeholder="Street, barangay, city, landmark, or site location"></textarea>
+                            </div>
+                        <?php endif; ?>
+
+                        <div class="input-group">
+                            <div class="field-label-row">
+                                <label for="start_date">Start Date</label>
+                                <button type="button" class="field-tip" aria-label="Start date reminder">
+                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                    <span class="field-tip__bubble">Start Date cannot be in the past. If Initial Status is Ongoing, Start Date must be today.</span>
+                                </button>
+                            </div>
+                            <input type="date" id="start_date" name="start_date" min="<?php echo htmlspecialchars($todayDate); ?>">
+                            <small id="start-date-help" class="form-help-text">Optional while pending. Required if the project starts as ongoing.</small>
                         </div>
 
                         <div class="input-group">
-                            <label for="start_date">Start Date</label>
-                            <input type="date" id="start_date" name="start_date">
-                        </div>
-
-                        <div class="input-group">
-                            <label for="end_date">End Date</label>
-                            <input type="date" id="end_date" name="end_date">
+                            <div class="field-label-row">
+                                <label for="end_date">End Date</label>
+                                <button type="button" class="field-tip" aria-label="End date reminder">
+                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                    <span class="field-tip__bubble">End Date can be the same day as Start Date or any later day, but it can never be earlier than Start Date.</span>
+                                </button>
+                            </div>
+                            <input type="date" id="end_date" name="end_date" min="<?php echo htmlspecialchars($todayDate); ?>">
+                            <small class="form-help-text">Same-day end dates are allowed. Earlier-than-start dates are invalid.</small>
                         </div>
                     </div>
 
-                    <div class="input-group" style="margin-top: 16px;">
+                    <div class="input-group input-group-spaced">
                         <label for="description">Description</label>
                         <textarea id="description" name="description" placeholder="Project description"></textarea>
                     </div>
@@ -480,13 +631,14 @@ foreach ($projects as $project) {
                             $projectId = (int)$project['id'];
                             $projectTasks = $tasksByProject[$projectId] ?? [];
                             $currentEngineerId = (int)($project['engineer_id'] ?? 0);
+                            $isDraft = ($project['status'] ?? '') === 'draft';
                             $isCompleted = ($project['status'] ?? '') === 'completed';
                             ?>
-                            <article class="project-card<?php echo $isCompleted ? ' is-locked' : ''; ?>">
+                            <article class="project-card<?php echo $isCompleted ? ' is-locked' : ''; ?><?php echo $isDraft ? ' is-draft' : ''; ?>">
                                 <div class="card-split">
                                     <div>
                                         <h3><?php echo htmlspecialchars($project['project_name']); ?></h3>
-                                        <div style="margin-top: 10px;">
+                                        <div class="status-pill-wrap">
                                             <span class="status-pill status-<?php echo htmlspecialchars($project['status']); ?>">
                                                 <?php echo htmlspecialchars(ucfirst($project['status'])); ?>
                                             </span>
@@ -496,6 +648,9 @@ foreach ($projects as $project) {
                                     <div class="project-meta">
                                         <div><strong>Client:</strong> <?php echo htmlspecialchars($project['client_name'] ?? 'N/A'); ?></div>
                                         <div><strong>Engineer:</strong> <?php echo htmlspecialchars($project['engineer_name'] ?? 'Not assigned'); ?></div>
+                                        <?php if ($hasProjectAddressColumn): ?>
+                                            <div><strong>Project Site:</strong> <?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></div>
+                                        <?php endif; ?>
                                         <div><strong>Start:</strong> <?php echo htmlspecialchars($project['start_date'] ?? 'N/A'); ?></div>
                                         <div><strong>End:</strong> <?php echo htmlspecialchars($project['end_date'] ?? 'N/A'); ?></div>
                                         <div><strong>Tasks:</strong> <?php echo (int)$project['completed_tasks']; ?> / <?php echo (int)$project['total_tasks']; ?> completed</div>
@@ -503,9 +658,13 @@ foreach ($projects as $project) {
                                 </div>
 
                                 <?php if (!empty($project['description'])): ?>
-                                    <div class="empty-state" style="border-style: solid;">
+                                    <div class="empty-state empty-state-solid">
                                         <?php echo nl2br(htmlspecialchars($project['description'])); ?>
                                     </div>
+                                <?php endif; ?>
+
+                                <?php if ($isDraft): ?>
+                                    <div class="draft-note">This project is still in draft. Finalize the address and dates, then change the status to Pending or Ongoing when ready.</div>
                                 <?php endif; ?>
 
                                 <?php if ($isCompleted): ?>
@@ -528,7 +687,7 @@ foreach ($projects as $project) {
                                                 <label for="status-<?php echo $projectId; ?>">Status</label>
                                                 <select id="status-<?php echo $projectId; ?>" name="status" required>
                                                     <?php foreach ($statusOptions as $statusOption): ?>
-                                                        <?php if ($statusOption === 'pending' && ($project['status'] ?? '') !== 'pending') { continue; } ?>
+                                                        <?php if ($statusOption === 'pending' && !in_array(($project['status'] ?? ''), ['pending', 'draft'], true)) { continue; } ?>
                                                         <option value="<?php echo htmlspecialchars($statusOption); ?>" <?php echo $project['status'] === $statusOption ? 'selected' : ''; ?>>
                                                             <?php echo htmlspecialchars(ucfirst($statusOption)); ?>
                                                         </option>
@@ -563,6 +722,8 @@ foreach ($projects as $project) {
 
                                 <?php if ($isCompleted): ?>
                                     <div class="empty-state">Task creation is disabled while this project is completed.</div>
+                                <?php elseif ($isDraft): ?>
+                                    <div class="empty-state">Task creation is disabled while this project is still in draft.</div>
                                 <?php else: ?>
                                     <form method="POST" class="mini-form">
                                         <input type="hidden" name="action" value="add_task">
@@ -612,6 +773,6 @@ foreach ($projects as $project) {
         </div>
     </main>
 </div>
-<script src="../js/script.js"></script>
+<script src="../js/admin-script.js"></script>
 </body>
 </html>

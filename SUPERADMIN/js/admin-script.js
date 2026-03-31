@@ -251,3 +251,74 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
 });
+
+document.addEventListener('DOMContentLoaded', function () {
+    const statusField = document.getElementById('status');
+    const startDateField = document.getElementById('start_date');
+    const endDateField = document.getElementById('end_date');
+    const startDateHelp = document.getElementById('start-date-help');
+    const initialStatusHelp = document.getElementById('initial-status-help');
+    const today = new Date().toISOString().split('T')[0];
+
+    if (statusField && startDateField) {
+        const syncCreateProjectFields = function () {
+            const isDraft = statusField.value === 'draft';
+            const isOngoing = statusField.value === 'ongoing';
+            startDateField.required = isOngoing;
+            startDateField.min = today;
+
+            if (startDateHelp) {
+                if (isDraft) {
+                    startDateHelp.textContent = 'Optional while draft. If you set one, it cannot be earlier than today.';
+                } else if (isOngoing) {
+                    startDateHelp.textContent = 'Required now. Ongoing projects must use today as the Start Date.';
+                } else {
+                    startDateHelp.textContent = 'Optional while pending. Start Date cannot be earlier than today.';
+                }
+            }
+
+            if (initialStatusHelp) {
+                initialStatusHelp.textContent = isDraft
+                    ? 'Draft is safe for incomplete or mistaken entries. Finalize it later before adding tasks.'
+                    : isOngoing
+                        ? 'Ongoing means work starts today, so today will be enforced as the Start Date.'
+                        : 'Pending is the safe default for approved projects that have not started yet.';
+            }
+
+            if (isOngoing) {
+                startDateField.max = today;
+                if (!startDateField.value || startDateField.value !== today) {
+                    startDateField.value = today;
+                }
+            } else {
+                startDateField.removeAttribute('max');
+            }
+
+            if (startDateField.value && startDateField.value < today) {
+                startDateField.value = today;
+            }
+
+            startDateField.setCustomValidity('');
+        };
+
+        syncCreateProjectFields();
+        statusField.addEventListener('change', syncCreateProjectFields);
+        startDateField.addEventListener('input', syncCreateProjectFields);
+    }
+
+    if (startDateField && endDateField) {
+        const syncEndDateMinimum = function () {
+            const minimumEndDate = startDateField.value || today;
+            endDateField.min = minimumEndDate;
+
+            if (endDateField.value && endDateField.value < minimumEndDate) {
+                endDateField.value = minimumEndDate;
+            }
+        };
+
+        syncEndDateMinimum();
+        startDateField.addEventListener('change', syncEndDateMinimum);
+        startDateField.addEventListener('input', syncEndDateMinimum);
+        endDateField.addEventListener('input', syncEndDateMinimum);
+    }
+});
