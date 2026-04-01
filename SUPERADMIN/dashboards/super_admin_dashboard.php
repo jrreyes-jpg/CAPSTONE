@@ -592,7 +592,6 @@ $lowStockItems = (int)($inventoryMetricRow['low_stock_items'] ?? 0);
 $outOfStockItems = (int)($inventoryMetricRow['out_of_stock_items'] ?? 0);
 $totalAssets = (int)($assetMetricRow['total_assets'] ?? 0);
 $assetsThisMonth = (int)($assetMetricRow['assets_this_month'] ?? 0);
-$assetsMissingSerial = (int)($assetMetricRow['assets_missing_serial'] ?? 0);
 $rangeDays = (int)($_GET['range'] ?? 7);
 if (!in_array($rangeDays, [7, 14, 30, 90], true)) {
     $rangeDays = 7;
@@ -686,24 +685,6 @@ if ($inactiveAssignmentResult) {
     $inactiveAssignmentAlerts = $inactiveAssignmentResult->fetch_all(MYSQLI_ASSOC);
 }
 
-$dataQualityAlerts = [];
-$dataQualityResult = $conn->query(
-    "SELECT
-        a.asset_name,
-        a.serial_number,
-        q.id AS qr_id
-     FROM assets a
-     LEFT JOIN asset_qr_codes q ON q.asset_id = a.id
-     WHERE q.id IS NULL
-     OR a.serial_number IS NULL
-     OR TRIM(a.serial_number) = ''
-     ORDER BY a.created_at DESC
-     LIMIT 5"
-);
-if ($dataQualityResult) {
-    $dataQualityAlerts = $dataQualityResult->fetch_all(MYSQLI_ASSOC);
-}
-
 $auditLogFeed = [];
 if (audit_log_table_exists($conn)) {
     $recentActivityResult = $conn->query(
@@ -750,24 +731,10 @@ if (audit_log_table_exists($conn)) {
         <?php if ($error): ?><div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
 
         <div id="dashboard" class="tab-content <?php echo $activeTab === 'dashboard' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'dashboard' ? 'display: block;' : 'display: none;'; ?>">
-            <section class="header page-header-card dashboard-hero">
-                <div class="header-copy">
-                    <h1>Operations Command Center</h1>
-                    <p>Track projects, users, inventory, and asset movement from one command center.</p>
-                </div>
-                <div class="dashboard-actions">
-                    <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="action-chip">Projects</a>
-                    <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=create" class="action-chip">Create User</a>
-                    <a href="/codesamplecaps/SUPERADMIN/sidebar/assets.php" class="action-chip">Add Asset</a>
-                    <a href="/codesamplecaps/SUPERADMIN/sidebar/inventory.php" class="action-chip">Update Inventory</a>
-                    <a href="/codesamplecaps/SUPERADMIN/sidebar/scan_history.php" class="action-chip">Scan History</a>
-                </div>
-            </section>
-
             <section class="dashboard-panel problems-panel">
                     <div class="panel-heading">
                         <div>
-                            <h2 class="dashboard-section-title">Problems</h2>
+                            <h2 class="dashboard-section-title">Needs Attention</h2>
                             <p class="panel-copy">Check these first.</p>
                         </div>
                     </div>
@@ -775,7 +742,7 @@ if (audit_log_table_exists($conn)) {
                     <div class="alert-group">
                         <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?status=ongoing" class="alert-card alert-card-danger alert-card-link">
                             <div class="alert-card-head">
-                                <h3>Project Problems</h3>
+                                <h3>Projects</h3>
                                 <span><?php echo count($projectRiskAlerts); ?></span>
                             </div>
                             <?php if (empty($projectRiskAlerts)): ?>
@@ -805,7 +772,7 @@ if (audit_log_table_exists($conn)) {
 
                         <a href="/codesamplecaps/SUPERADMIN/sidebar/inventory.php?status=attention" class="alert-card alert-card-warning alert-card-link">
                             <div class="alert-card-head">
-                                <h3>Stock Problems</h3>
+                                <h3>Stock</h3>
                                 <span><?php echo count($lowStockAlerts); ?></span>
                             </div>
                             <?php if (empty($lowStockAlerts)): ?>
@@ -824,7 +791,7 @@ if (audit_log_table_exists($conn)) {
 
                         <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=users&amp;status=inactive" class="alert-card alert-card-link">
                             <div class="alert-card-head">
-                                <h3>User Problems</h3>
+                                <h3>Users</h3>
                                 <span><?php echo count($inactiveAssignmentAlerts); ?></span>
                             </div>
                             <?php if (empty($inactiveAssignmentAlerts)): ?>
@@ -841,35 +808,6 @@ if (audit_log_table_exists($conn)) {
                             <?php endif; ?>
                         </a>
 
-                        <a href="/codesamplecaps/SUPERADMIN/sidebar/assets.php?filter=quality" class="alert-card alert-card-link">
-                            <div class="alert-card-head">
-                                <h3>Asset Problems</h3>
-                                <span><?php echo count($dataQualityAlerts); ?></span>
-                            </div>
-                            <?php if (empty($dataQualityAlerts)): ?>
-                                <p class="alert-empty">No asset problems found.</p>
-                            <?php else: ?>
-                                <ul class="alert-list">
-                                    <?php foreach ($dataQualityAlerts as $dataAlert): ?>
-                                        <li>
-                                            <strong><?php echo htmlspecialchars($dataAlert['asset_name']); ?></strong>
-                                            <span>
-                                                <?php
-                                                $qualityParts = [];
-                                                if (empty($dataAlert['serial_number'])) {
-                                                    $qualityParts[] = 'missing serial';
-                                                }
-                                                if (empty($dataAlert['qr_id'])) {
-                                                    $qualityParts[] = 'missing QR';
-                                                }
-                                                echo htmlspecialchars(implode(' | ', $qualityParts) ?: 'Needs checking');
-                                                ?>
-                                            </span>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            <?php endif; ?>
-                        </a>
                     </div>
             </section>
 

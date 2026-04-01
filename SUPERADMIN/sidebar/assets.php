@@ -207,21 +207,10 @@ if (isset($_SESSION['assets_created_asset_id'])) {
     unset($_SESSION['assets_created_asset_id']);
 }
 
-$assetFilter = trim((string)($_GET['filter'] ?? ''));
-if (!in_array($assetFilter, ['quality'], true)) {
-    $assetFilter = '';
-}
-
 $assets = [];
 $assetQuery = 'SELECT a.*, q.qr_code_value
     FROM assets a
     LEFT JOIN asset_qr_codes q ON a.id = q.asset_id';
-if ($assetFilter === 'quality') {
-    $assetQuery .= "
-    WHERE q.id IS NULL
-    OR a.serial_number IS NULL
-    OR TRIM(a.serial_number) = ''";
-}
 $assetQuery .= ' ORDER BY a.created_at DESC';
 $result = $conn->query($assetQuery);
 
@@ -307,11 +296,6 @@ if ($result) {
                     <?php endif; ?>
                 </div>
             </div>
-            <div class="dashboard-actions">
-                <a href="/codesamplecaps/SUPERADMIN/sidebar/assets.php" class="action-chip<?php echo $assetFilter === '' ? ' active-chip' : ''; ?>">All Assets</a>
-                <a href="/codesamplecaps/SUPERADMIN/sidebar/assets.php?filter=quality" class="action-chip<?php echo $assetFilter === 'quality' ? ' active-chip' : ''; ?>">Data Quality</a>
-            </div>
-
             <div class="table-wrapper">
                 <table class="responsive-table mobile-card-table assets-table">
                     <thead>

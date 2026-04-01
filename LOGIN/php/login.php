@@ -177,6 +177,6 @@ function showForgot(){
 
 </script>
 
-    <script src="../../SUPERADMIN/js/script.js"></script>
+    <script src="../../SUPERADMIN/js/admin-script.js"></script>
     </body>
     </html>

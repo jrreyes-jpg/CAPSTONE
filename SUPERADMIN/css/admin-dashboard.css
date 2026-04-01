@@ -565,13 +565,6 @@ tbody tr:hover {
     gap: 10px;
 }
 
-.dashboard-hero {
-    margin-top: 24px;
-    margin-bottom: 24px;
-    align-items: flex-start;
-    gap: 18px;
-}
-
 .dashboard-panel {
     margin-top: 24px;
     padding: 24px;
@@ -947,8 +940,7 @@ tbody tr:hover {
         gap: 14px;
     }
 
-    .dashboard-panel,
-    .dashboard-hero {
+    .dashboard-panel {
         margin-top: 20px;
         padding: 20px 16px;
         border-radius: 18px;
