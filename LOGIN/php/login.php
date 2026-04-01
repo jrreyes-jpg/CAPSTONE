@@ -105,9 +105,9 @@ end_login:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edge Automation Portal</title>
 
-    <link rel="stylesheet"
+<link rel="stylesheet"
 href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
-<link rel="stylesheet" href="../../SUPERADMIN/css/style.css">
+<link rel="stylesheet" href="../css/login.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     </head>
 
@@ -168,15 +168,15 @@ class="back-home animate__animated animate__fadeInDown">
 
 <script>
 function showLogin(){
-    window.location.href = '/codesamplecaps/public/login.php';
+    window.location.href = '/codesamplecaps/LOGIN/php/login.php';
 }
 
 function showForgot(){
-    window.location.href = '/codesamplecaps/views/auth/forgot.php';
+    window.location.href = '/codesamplecaps/LOGIN/php/forgot.php';
 }
 
 </script>
 
-    <script src="../../SUPERADMIN/js/admin-script.js"></script>
+    <script src="../js/login.js"></script>
     </body>
     </html>

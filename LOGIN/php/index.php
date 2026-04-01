@@ -9,7 +9,7 @@ session_start();
     <meta name="description" content="Edge Automation Technology Services, Co. - Professional engineering automation and technology solutions">
     <title>Edge Automation Technology Services, Co.</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/landing-page.css">
+<link rel="stylesheet" href="../css/index.css">
 </head>
 <body>
     <!-- Navigation -->
@@ -264,7 +264,7 @@ session_start();
         <button id="closeConsult" class="consult-close" type="button">Close</button>
     </div>
 </div>
-    <script src="../js/landing-page.js"></script>
+    <script src="../js/index.js"></script>
 
 </body>
 

@@ -65,7 +65,7 @@ class EmailService {
             $this->mailer->addAddress($recipientEmail);
             
             $appUrl = $this->config->get('APP_URL');
-            $resetLink = $appUrl . '/views/auth/reset_password.php?token=' . $resetToken;
+            $resetLink = $appUrl . '/LOGIN/php/reset_password.php?token=' . $resetToken;
             
             $this->mailer->isHTML(true);
             $this->mailer->Subject = 'Password Reset Request - ' . $this->config->get('APP_NAME');
@@ -216,7 +216,7 @@ class EmailService {
                     <p>Hello $name,</p>
                     <p>A Super Admin has created your account on $appName as a <strong>" . ucfirst(str_replace('_', ' ', $role)) . "</strong>.</p>
                     <p>You can now log in to the portal:</p>
-                    <a href='$appUrl/public/login.php' class='button'>Go to Login</a>
+                    <a href='$appUrl/LOGIN/php/login.php' class='button'>Go to Login</a>
                     <p>If you have any questions, please contact support.</p>
                     <hr>
                     <p style='font-size: 12px; color: #7f8c8d;'>This is an automated message, please do not reply.</p>

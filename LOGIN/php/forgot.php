@@ -1,11 +1,4 @@
 <?php
-/**
- * Forgot Password Page
- * 
- * Uses AuthService for password reset logic
- * No database queries here - all in AuthService
- */
-
 session_start();
 
 require_once __DIR__ . '/../../services/AuthService.php';
@@ -13,7 +6,7 @@ require_once __DIR__ . '/../../services/AuthService.php';
 $error = "";
 $success = "";
 
-if(isset($_SESSION['reset_success'])){
+if (isset($_SESSION['reset_success'])) {
     $success = $_SESSION['reset_success'];
     unset($_SESSION['reset_success']);
 }
@@ -23,16 +16,15 @@ $authService = new AuthService();
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = trim($_POST['email'] ?? '');
 
-    // Use AuthService to request password reset
     $result = $authService->requestPasswordReset($email);
 
-if ($result['success']) {
-    $_SESSION['reset_success'] = $result['message'] ?? 'If the email exists, a reset link will be sent.';
-    header("Location: " . $_SERVER['PHP_SELF']);
-    exit;
-} else {
-    $error = $result['error'] ?? 'An error occurred.';
-}
+    if ($result['success']) {
+        $_SESSION['reset_success'] = $result['message'] ?? 'If the email exists, a reset link will be sent.';
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit;
+    } else {
+        $error = $result['error'] ?? 'An error occurred.';
+    }
 }
 
 ?>
@@ -42,7 +34,8 @@ if ($result['success']) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Forgot Password - Edge Automation Portal</title>
-    <link rel="stylesheet" href="/codesamplecaps/public/assets/css/style.css">
+    <link rel="stylesheet" href="../../SUPERADMIN/css/style.css">
+    <link rel="stylesheet" href="../css/forgot.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -51,7 +44,7 @@ if ($result['success']) {
     <div class="container">
         <div class="left-panel">
             <div class="logo">
-                <img src="/codesamplecaps/public/assets/images/edge.jpg" alt="Edge Logo">
+                <img src="../../IMAGES/edge.jpg" alt="Edge Logo">
             </div>
             <h1 class="company-name">
                 EDGE AUTOMATION TECHNOLOGY SERVICES, CO.
@@ -75,23 +68,23 @@ if ($result['success']) {
                         </div>
                     <?php endif; ?>
 
-                    <p style="margin: 20px 0; font-size: 14px; color: #555;">
+                    <p class="auth-helper-text">
                         Enter your email address and we'll send you a link to reset your password.
                     </p>
 
                     <input type="email" name="email" placeholder="Enter your email" required>
 
-                    <button type="submit" id="resetBtn" onclick="disableResetBtn()">Send Reset Link</button>
+                    <button type="submit" id="resetBtn" data-loading-text="Sending reset link...">Send Reset Link</button>
 
                     <div class="links">
-                        <a href="/codesamplecaps/public/login.php">Back to Login</a>
+                        <a href="/codesamplecaps/LOGIN/php/login.php">Back to Login</a>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    <script src="../js/script.js"></script>
+    <script src="../js/forgot.js"></script>
 </body>
 </html>
 
