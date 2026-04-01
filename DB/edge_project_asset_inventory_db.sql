@@ -228,6 +228,38 @@ INSERT INTO `projects` (`id`, `project_name`, `description`, `client_id`, `start
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `project_inventory_deployments`
+--
+
+CREATE TABLE `project_inventory_deployments` (
+  `id` int(11) NOT NULL,
+  `project_id` int(11) NOT NULL,
+  `inventory_id` int(11) NOT NULL,
+  `quantity` int(11) NOT NULL DEFAULT 1,
+  `deployed_by` int(11) NOT NULL,
+  `deployed_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `returned_at` timestamp NULL DEFAULT NULL,
+  `notes` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `project_inventory_return_logs`
+--
+
+CREATE TABLE `project_inventory_return_logs` (
+  `id` int(11) NOT NULL,
+  `deployment_id` int(11) NOT NULL,
+  `quantity` int(11) NOT NULL DEFAULT 1,
+  `returned_by` int(11) NOT NULL,
+  `returned_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `notes` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `project_assignments`
 --
 
@@ -393,6 +425,25 @@ ALTER TABLE `projects`
   ADD KEY `idx_client` (`client_id`),
   ADD KEY `idx_status` (`status`);
 
+-- 
+-- Indexes for table `project_inventory_deployments`
+--
+ALTER TABLE `project_inventory_deployments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_project_inventory_deployments_project` (`project_id`),
+  ADD KEY `idx_project_inventory_deployments_inventory` (`inventory_id`),
+  ADD KEY `idx_project_inventory_deployments_returned` (`returned_at`),
+  ADD KEY `idx_project_inventory_deployments_user` (`deployed_by`);
+
+--
+-- Indexes for table `project_inventory_return_logs`
+--
+ALTER TABLE `project_inventory_return_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_project_inventory_return_logs_deployment` (`deployment_id`),
+  ADD KEY `idx_project_inventory_return_logs_returned_at` (`returned_at`),
+  ADD KEY `idx_project_inventory_return_logs_user` (`returned_by`);
+
 --
 -- Indexes for table `project_assignments`
 --
@@ -490,6 +541,18 @@ ALTER TABLE `password_reset_tokens`
 ALTER TABLE `projects`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
+-- 
+-- AUTO_INCREMENT for table `project_inventory_deployments`
+--
+ALTER TABLE `project_inventory_deployments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `project_inventory_return_logs`
+--
+ALTER TABLE `project_inventory_return_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
 --
 -- AUTO_INCREMENT for table `project_assignments`
 --
@@ -535,6 +598,21 @@ ALTER TABLE `password_reset_tokens`
 --
 ALTER TABLE `projects`
   ADD CONSTRAINT `fk_project_client` FOREIGN KEY (`client_id`) REFERENCES `users` (`id`);
+
+-- 
+-- Constraints for table `project_inventory_deployments`
+--
+ALTER TABLE `project_inventory_deployments`
+  ADD CONSTRAINT `fk_project_inventory_deployments_inventory` FOREIGN KEY (`inventory_id`) REFERENCES `inventory` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_project_inventory_deployments_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_project_inventory_deployments_user` FOREIGN KEY (`deployed_by`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `project_inventory_return_logs`
+--
+ALTER TABLE `project_inventory_return_logs`
+  ADD CONSTRAINT `fk_project_inventory_return_logs_deployment` FOREIGN KEY (`deployment_id`) REFERENCES `project_inventory_deployments` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_project_inventory_return_logs_user` FOREIGN KEY (`returned_by`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `project_assignments`

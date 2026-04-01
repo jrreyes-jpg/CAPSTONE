@@ -55,6 +55,61 @@ function today_date(): string {
     return (new DateTimeImmutable('today'))->format('Y-m-d');
 }
 
+function ensure_project_inventory_deployments_table(mysqli $conn): void {
+    $conn->query(
+        "CREATE TABLE IF NOT EXISTS project_inventory_deployments (
+            id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            project_id INT(11) NOT NULL,
+            inventory_id INT(11) NOT NULL,
+            quantity INT(11) NOT NULL DEFAULT 1,
+            deployed_by INT(11) NOT NULL,
+            deployed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            returned_at TIMESTAMP NULL DEFAULT NULL,
+            notes TEXT DEFAULT NULL,
+            KEY idx_project_inventory_deployments_project (project_id),
+            KEY idx_project_inventory_deployments_inventory (inventory_id),
+            KEY idx_project_inventory_deployments_returned (returned_at),
+            CONSTRAINT fk_project_inventory_deployments_project FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+            CONSTRAINT fk_project_inventory_deployments_inventory FOREIGN KEY (inventory_id) REFERENCES inventory (id) ON DELETE CASCADE,
+            CONSTRAINT fk_project_inventory_deployments_user FOREIGN KEY (deployed_by) REFERENCES users (id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
+function ensure_project_inventory_return_logs_table(mysqli $conn): void {
+    $conn->query(
+        "CREATE TABLE IF NOT EXISTS project_inventory_return_logs (
+            id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            deployment_id INT(11) NOT NULL,
+            quantity INT(11) NOT NULL DEFAULT 1,
+            returned_by INT(11) NOT NULL,
+            returned_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            notes TEXT DEFAULT NULL,
+            KEY idx_project_inventory_return_logs_deployment (deployment_id),
+            KEY idx_project_inventory_return_logs_returned_at (returned_at),
+            CONSTRAINT fk_project_inventory_return_logs_deployment FOREIGN KEY (deployment_id) REFERENCES project_inventory_deployments (id) ON DELETE CASCADE,
+            CONSTRAINT fk_project_inventory_return_logs_user FOREIGN KEY (returned_by) REFERENCES users (id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
+function normalize_positive_int($value): int {
+    $normalized = (int)$value;
+    return $normalized > 0 ? $normalized : 0;
+}
+
+function determine_inventory_status(int $quantity, ?int $minStock): string {
+    if ($quantity <= 0) {
+        return 'out-of-stock';
+    }
+
+    if ($minStock !== null && $quantity <= $minStock) {
+        return 'low-stock';
+    }
+
+    return 'available';
+}
+
 $supportsDraftStatus = enum_supports_value($conn, 'projects', 'status', 'draft');
 $hasProjectAddressColumn = table_has_column($conn, 'projects', 'project_address');
 $statusOptions = $supportsDraftStatus
@@ -65,8 +120,22 @@ $initialStatusOptions = $supportsDraftStatus
     : ['pending', 'ongoing'];
 $todayDate = today_date();
 
+ensure_project_inventory_deployments_table($conn);
+ensure_project_inventory_return_logs_table($conn);
+
+function get_projects_redirect_target(): string {
+    $redirectTo = $_POST['redirect_to'] ?? $_GET['redirect_to'] ?? '';
+    $redirectTo = is_string($redirectTo) ? trim($redirectTo) : '';
+
+    if ($redirectTo !== '' && str_starts_with($redirectTo, '/CAPSTONE/SUPERADMIN/sidebar/')) {
+        return $redirectTo;
+    }
+
+    return '/CAPSTONE/SUPERADMIN/sidebar/projects.php';
+}
+
 function redirect_projects_page(): void {
-    header('Location: /codesamplecaps/SUPERADMIN/sidebar/projects.php');
+    header('Location: ' . get_projects_redirect_target());
     exit();
 }
 
@@ -117,6 +186,64 @@ function countOpenProjectTasks(mysqli $conn, int $projectId): int {
     $row = $result ? $result->fetch_assoc() : null;
 
     return (int)($row['total'] ?? 0);
+}
+
+function countActiveProjectInventoryDeployments(mysqli $conn, int $projectId): int {
+    $stmt = $conn->prepare(
+        'SELECT COUNT(*) AS total
+         FROM (
+             SELECT pid.id
+             FROM project_inventory_deployments pid
+             LEFT JOIN (
+                 SELECT deployment_id, SUM(quantity) AS returned_quantity
+                 FROM project_inventory_return_logs
+                 GROUP BY deployment_id
+             ) returns ON returns.deployment_id = pid.id
+             WHERE pid.project_id = ?
+             AND (pid.quantity - COALESCE(returns.returned_quantity, 0)) > 0
+         ) active_deployments'
+    );
+
+    if (!$stmt) {
+        return 0;
+    }
+
+    $stmt->bind_param('i', $projectId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
+
+    return (int)($row['total'] ?? 0);
+}
+
+function getActiveProjectInventoryDeployment(mysqli $conn, int $deploymentId): ?array {
+    $stmt = $conn->prepare(
+        'SELECT
+            pid.id,
+            pid.project_id,
+            pid.inventory_id,
+            pid.quantity,
+            COALESCE(returns.returned_quantity, 0) AS returned_quantity,
+            (pid.quantity - COALESCE(returns.returned_quantity, 0)) AS remaining_quantity
+         FROM project_inventory_deployments pid
+         LEFT JOIN (
+             SELECT deployment_id, SUM(quantity) AS returned_quantity
+             FROM project_inventory_return_logs
+             GROUP BY deployment_id
+         ) returns ON returns.deployment_id = pid.id
+         WHERE pid.id = ?
+         AND (pid.quantity - COALESCE(returns.returned_quantity, 0)) > 0
+         LIMIT 1'
+    );
+
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('i', $deploymentId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return $result ? $result->fetch_assoc() : null;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -280,9 +407,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($status === 'completed') {
             $openTasks = countOpenProjectTasks($conn, $projectId);
+            $activeDeployments = countActiveProjectInventoryDeployments($conn, $projectId);
+
+            if (in_array(($project['status'] ?? ''), ['pending', 'draft'], true)) {
+                set_projects_flash('error', 'A pending or draft project cannot jump directly to Completed. Move it to Ongoing or On-hold first.');
+                redirect_projects_page();
+            }
 
             if ($openTasks > 0) {
                 set_projects_flash('error', 'Complete all open tasks before marking this project as completed.');
+                redirect_projects_page();
+            }
+
+            if ($activeDeployments > 0) {
+                set_projects_flash('error', 'Return all deployed inventory before marking this project as completed.');
                 redirect_projects_page();
             }
         }
@@ -293,6 +431,126 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_projects_flash('success', 'Project status updated.');
         } else {
             set_projects_flash('error', 'Failed to update project status.');
+        }
+
+        redirect_projects_page();
+    }
+
+    if ($action === 'update_project_details') {
+        $projectId = (int)($_POST['project_id'] ?? 0);
+        $projectName = normalize_text($_POST['project_name'] ?? '');
+        $description = normalize_text($_POST['description'] ?? '');
+        $projectAddress = $hasProjectAddressColumn ? normalize_text_or_null($_POST['project_address'] ?? null) : null;
+        $clientId = (int)($_POST['client_id'] ?? 0);
+        $engineerId = (int)($_POST['engineer_id'] ?? 0);
+        $startDate = normalize_date_or_null($_POST['start_date'] ?? null);
+        $endDate = normalize_date_or_null($_POST['end_date'] ?? null);
+        $project = $projectId > 0 ? getProjectSnapshot($conn, $projectId) : null;
+        $updatedBy = (int)($_SESSION['user_id'] ?? 0);
+
+        if ($projectId <= 0 || !$project) {
+            set_projects_flash('error', 'Project not found.');
+            redirect_projects_page();
+        }
+
+        if (($project['status'] ?? '') === 'completed') {
+            set_projects_flash('error', 'Completed projects are locked. Reopen first before editing details.');
+            redirect_projects_page();
+        }
+
+        if ($projectName === '' || $clientId <= 0 || $engineerId <= 0) {
+            set_projects_flash('error', 'Project name, client, and engineer are required.');
+            redirect_projects_page();
+        }
+
+        if ($hasProjectAddressColumn && ($project['status'] ?? '') !== 'draft' && $projectAddress === null) {
+            set_projects_flash('error', 'Project address is required unless the project stays in Draft.');
+            redirect_projects_page();
+        }
+
+        if ($startDate !== null && $startDate < $todayDate) {
+            set_projects_flash('error', 'Start date cannot be earlier than today.');
+            redirect_projects_page();
+        }
+
+        if (($project['status'] ?? '') === 'ongoing' && $startDate === null) {
+            set_projects_flash('error', 'Ongoing projects must have a start date.');
+            redirect_projects_page();
+        }
+
+        if (($project['status'] ?? '') === 'ongoing' && $startDate !== $todayDate) {
+            set_projects_flash('error', 'Ongoing projects must start today when updating details.');
+            redirect_projects_page();
+        }
+
+        if ($startDate !== null && $endDate !== null && $endDate < $startDate) {
+            set_projects_flash('error', 'End date cannot be earlier than start date.');
+            redirect_projects_page();
+        }
+
+        if ($startDate === null && $endDate !== null && $endDate < $todayDate) {
+            set_projects_flash('error', 'End date cannot be earlier than today.');
+            redirect_projects_page();
+        }
+
+        $conn->begin_transaction();
+
+        try {
+            if ($hasProjectAddressColumn) {
+                $updateProject = $conn->prepare(
+                    'UPDATE projects
+                     SET project_name = ?, description = ?, client_id = ?, project_address = ?, start_date = ?, end_date = ?
+                     WHERE id = ?'
+                );
+            } else {
+                $updateProject = $conn->prepare(
+                    'UPDATE projects
+                     SET project_name = ?, description = ?, client_id = ?, start_date = ?, end_date = ?
+                     WHERE id = ?'
+                );
+            }
+
+            if (!$updateProject) {
+                throw new RuntimeException('Failed to prepare project update.');
+            }
+
+            if ($hasProjectAddressColumn) {
+                if (
+                    !$updateProject->bind_param('ssisssi', $projectName, $description, $clientId, $projectAddress, $startDate, $endDate, $projectId) ||
+                    !$updateProject->execute()
+                ) {
+                    throw new RuntimeException('Failed to update project details.');
+                }
+            } else {
+                if (
+                    !$updateProject->bind_param('ssissi', $projectName, $description, $clientId, $startDate, $endDate, $projectId) ||
+                    !$updateProject->execute()
+                ) {
+                    throw new RuntimeException('Failed to update project details.');
+                }
+            }
+
+            $reassignEngineer = $conn->prepare(
+                'INSERT IGNORE INTO project_assignments (project_id, engineer_id, assigned_by)
+                 VALUES (?, ?, ?)'
+            );
+
+            if (!$reassignEngineer) {
+                throw new RuntimeException('Failed to prepare engineer reassignment.');
+            }
+
+            if (
+                !$reassignEngineer->bind_param('iii', $projectId, $engineerId, $updatedBy) ||
+                !$reassignEngineer->execute()
+            ) {
+                throw new RuntimeException('Failed to update engineer assignment.');
+            }
+
+            $conn->commit();
+            set_projects_flash('success', 'Project details updated successfully.');
+        } catch (Throwable $exception) {
+            $conn->rollback();
+            set_projects_flash('error', $exception->getMessage());
         }
 
         redirect_projects_page();
@@ -324,6 +582,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (($project['status'] ?? '') === 'draft') {
             set_projects_flash('error', 'Cannot add tasks to a draft project. Change its status to Pending or Ongoing first.');
+            redirect_projects_page();
+        }
+
+        if ($deadline !== null && $deadline < $todayDate) {
+            set_projects_flash('error', 'Task deadline cannot be earlier than today.');
+            redirect_projects_page();
+        }
+
+        if (!empty($project['start_date']) && $deadline !== null && $deadline < $project['start_date']) {
+            set_projects_flash('error', 'Task deadline cannot be earlier than the project start date.');
             redirect_projects_page();
         }
 
@@ -369,6 +637,218 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         redirect_projects_page();
     }
+
+    if ($action === 'deploy_inventory_to_project') {
+        $projectId = (int)($_POST['project_id'] ?? 0);
+        $inventoryId = (int)($_POST['inventory_id'] ?? 0);
+        $quantity = normalize_positive_int($_POST['deployment_quantity'] ?? 0);
+        $notes = normalize_text_or_null($_POST['deployment_notes'] ?? null);
+        $deployedBy = (int)($_SESSION['user_id'] ?? 0);
+        $project = $projectId > 0 ? getProjectSnapshot($conn, $projectId) : null;
+
+        if ($projectId <= 0 || $inventoryId <= 0 || $quantity <= 0) {
+            set_projects_flash('error', 'Project, inventory item, and quantity are required for deployment.');
+            redirect_projects_page();
+        }
+
+        if (!$project) {
+            set_projects_flash('error', 'Project not found.');
+            redirect_projects_page();
+        }
+
+        if (($project['status'] ?? '') === 'draft') {
+            set_projects_flash('error', 'Cannot deploy assets to a draft project.');
+            redirect_projects_page();
+        }
+
+        if (($project['status'] ?? '') === 'completed') {
+            set_projects_flash('error', 'Cannot deploy assets to a completed project.');
+            redirect_projects_page();
+        }
+
+        $inventoryStmt = $conn->prepare(
+            'SELECT i.id, i.quantity, i.min_stock, a.asset_name
+             FROM inventory i
+             INNER JOIN assets a ON a.id = i.asset_id
+             WHERE i.id = ?
+             LIMIT 1'
+        );
+
+        if (!$inventoryStmt) {
+            set_projects_flash('error', 'Failed to prepare inventory lookup.');
+            redirect_projects_page();
+        }
+
+        $inventoryStmt->bind_param('i', $inventoryId);
+        $inventoryStmt->execute();
+        $inventoryResult = $inventoryStmt->get_result();
+        $inventoryItem = $inventoryResult ? $inventoryResult->fetch_assoc() : null;
+
+        if (!$inventoryItem) {
+            set_projects_flash('error', 'Selected inventory item not found.');
+            redirect_projects_page();
+        }
+
+        $availableQuantity = (int)($inventoryItem['quantity'] ?? 0);
+
+        if ($availableQuantity < $quantity) {
+            set_projects_flash('error', 'Not enough stock available for that deployment quantity.');
+            redirect_projects_page();
+        }
+
+        $remainingQuantity = $availableQuantity - $quantity;
+        $minStock = array_key_exists('min_stock', $inventoryItem) && $inventoryItem['min_stock'] !== null
+            ? (int)$inventoryItem['min_stock']
+            : null;
+        $nextStatus = determine_inventory_status($remainingQuantity, $minStock);
+
+        $conn->begin_transaction();
+
+        try {
+            $deployStmt = $conn->prepare(
+                'INSERT INTO project_inventory_deployments (project_id, inventory_id, quantity, deployed_by, notes)
+                 VALUES (?, ?, ?, ?, ?)'
+            );
+
+            if (
+                !$deployStmt ||
+                !$deployStmt->bind_param('iiiis', $projectId, $inventoryId, $quantity, $deployedBy, $notes) ||
+                !$deployStmt->execute()
+            ) {
+                throw new RuntimeException('Failed to save project inventory deployment.');
+            }
+
+            $updateInventory = $conn->prepare(
+                'UPDATE inventory
+                 SET quantity = ?, status = ?
+                 WHERE id = ?'
+            );
+
+            if (
+                !$updateInventory ||
+                !$updateInventory->bind_param('isi', $remainingQuantity, $nextStatus, $inventoryId) ||
+                !$updateInventory->execute()
+            ) {
+                throw new RuntimeException('Failed to update inventory quantity after deployment.');
+            }
+
+            $conn->commit();
+            set_projects_flash('success', 'Inventory deployed to project successfully.');
+        } catch (Throwable $exception) {
+            $conn->rollback();
+            set_projects_flash('error', $exception->getMessage());
+        }
+
+        redirect_projects_page();
+    }
+
+    if ($action === 'return_project_inventory') {
+        $deploymentId = (int)($_POST['deployment_id'] ?? 0);
+        $returnQuantity = normalize_positive_int($_POST['return_quantity'] ?? 0);
+        $returnNotes = normalize_text_or_null($_POST['return_notes'] ?? null);
+        $returnedBy = (int)($_SESSION['user_id'] ?? 0);
+        $deployment = $deploymentId > 0 ? getActiveProjectInventoryDeployment($conn, $deploymentId) : null;
+
+        if (!$deployment) {
+            set_projects_flash('error', 'Active inventory deployment not found.');
+            redirect_projects_page();
+        }
+
+        if ($returnQuantity <= 0) {
+            set_projects_flash('error', 'Return quantity must be greater than zero.');
+            redirect_projects_page();
+        }
+
+        $remainingQuantity = (int)($deployment['remaining_quantity'] ?? 0);
+
+        if ($returnQuantity > $remainingQuantity) {
+            set_projects_flash('error', 'Return quantity cannot be greater than the remaining deployed quantity.');
+            redirect_projects_page();
+        }
+
+        $inventoryStmt = $conn->prepare(
+            'SELECT id, quantity, min_stock
+             FROM inventory
+             WHERE id = ?
+             LIMIT 1'
+        );
+
+        if (!$inventoryStmt) {
+            set_projects_flash('error', 'Failed to prepare inventory lookup for return.');
+            redirect_projects_page();
+        }
+
+        $inventoryId = (int)$deployment['inventory_id'];
+
+        $inventoryStmt->bind_param('i', $inventoryId);
+        $inventoryStmt->execute();
+        $inventoryResult = $inventoryStmt->get_result();
+        $inventoryItem = $inventoryResult ? $inventoryResult->fetch_assoc() : null;
+
+        if (!$inventoryItem) {
+            set_projects_flash('error', 'Inventory record not found for this deployment.');
+            redirect_projects_page();
+        }
+
+        $nextQuantity = (int)$inventoryItem['quantity'] + $returnQuantity;
+        $minStock = $inventoryItem['min_stock'] !== null ? (int)$inventoryItem['min_stock'] : null;
+        $nextStatus = determine_inventory_status($nextQuantity, $minStock);
+        $willBeFullyReturned = $returnQuantity === $remainingQuantity;
+
+        $conn->begin_transaction();
+
+        try {
+            $logReturn = $conn->prepare(
+                'INSERT INTO project_inventory_return_logs (deployment_id, quantity, returned_by, notes)
+                 VALUES (?, ?, ?, ?)'
+            );
+
+            if (
+                !$logReturn ||
+                !$logReturn->bind_param('iiis', $deploymentId, $returnQuantity, $returnedBy, $returnNotes) ||
+                !$logReturn->execute()
+            ) {
+                throw new RuntimeException('Failed to save inventory return log.');
+            }
+
+            $returnStmt = $conn->prepare(
+                'UPDATE project_inventory_deployments
+                 SET returned_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE returned_at END
+                 WHERE id = ?
+                 AND (returned_at IS NULL OR ? = 0)'
+            );
+
+            if (
+                !$returnStmt ||
+                !$returnStmt->bind_param('iii', $willBeFullyReturned, $deploymentId, $willBeFullyReturned) ||
+                !$returnStmt->execute()
+            ) {
+                throw new RuntimeException('Failed to mark the deployment as returned.');
+            }
+
+            $updateInventory = $conn->prepare(
+                'UPDATE inventory
+                 SET quantity = ?, status = ?
+                 WHERE id = ?'
+            );
+
+            if (
+                !$updateInventory ||
+                !$updateInventory->bind_param('isi', $nextQuantity, $nextStatus, $inventoryId) ||
+                !$updateInventory->execute()
+            ) {
+                throw new RuntimeException('Failed to restore inventory quantity.');
+            }
+
+            $conn->commit();
+            set_projects_flash('success', 'Inventory return saved successfully.');
+        } catch (Throwable $exception) {
+            $conn->rollback();
+            set_projects_flash('error', $exception->getMessage());
+        }
+
+        redirect_projects_page();
+    }
 }
 
 $flash = $_SESSION['projects_flash'] ?? null;
@@ -388,8 +868,87 @@ if ($engineerResult) {
 }
 
 $projects = [];
-$tasksByProject = [];
 $projectAddressSelect = $hasProjectAddressColumn ? 'p.project_address,' : 'NULL AS project_address,';
+$searchQuery = trim((string)($_GET['q'] ?? ''));
+$statusFilter = trim((string)($_GET['status'] ?? ''));
+$currentPage = max(1, (int)($_GET['page'] ?? 1));
+$perPage = 8;
+$offset = ($currentPage - 1) * $perPage;
+$whereClauses = [];
+
+if ($searchQuery !== '') {
+    $escapedSearch = $conn->real_escape_string($searchQuery);
+    $searchLike = "'%" . $escapedSearch . "%'";
+    $searchColumns = [
+        'p.project_name',
+        'p.description',
+        'client.full_name',
+        'engineer.full_name',
+    ];
+
+    if ($hasProjectAddressColumn) {
+        $searchColumns[] = 'p.project_address';
+    }
+
+    $searchConditions = array_map(
+        static fn(string $column): string => "{$column} LIKE {$searchLike}",
+        $searchColumns
+    );
+    $whereClauses[] = '(' . implode(' OR ', $searchConditions) . ')';
+}
+
+if ($statusFilter !== '' && in_array($statusFilter, $statusOptions, true)) {
+    $escapedStatus = $conn->real_escape_string($statusFilter);
+    $whereClauses[] = "p.status = '{$escapedStatus}'";
+}
+
+$whereSql = empty($whereClauses) ? '' : 'WHERE ' . implode(' AND ', $whereClauses);
+
+$projectMetricsResult = $conn->query("
+    SELECT
+        COUNT(*) AS total_projects,
+        SUM(CASE WHEN p.status = 'ongoing' THEN 1 ELSE 0 END) AS ongoing_projects,
+        SUM(CASE WHEN p.status = 'completed' THEN 1 ELSE 0 END) AS completed_projects
+    FROM projects p
+");
+$projectMetrics = $projectMetricsResult ? $projectMetricsResult->fetch_assoc() : [];
+$totalProjects = (int)($projectMetrics['total_projects'] ?? 0);
+$ongoingProjects = (int)($projectMetrics['ongoing_projects'] ?? 0);
+$completedProjects = (int)($projectMetrics['completed_projects'] ?? 0);
+
+$taskMetricsResult = $conn->query("SELECT COUNT(*) AS total_tasks FROM tasks");
+$taskMetrics = $taskMetricsResult ? $taskMetricsResult->fetch_assoc() : [];
+$totalTasks = (int)($taskMetrics['total_tasks'] ?? 0);
+
+$projectCountQuery = "
+    SELECT COUNT(*) AS total
+    FROM projects p
+    LEFT JOIN users client ON client.id = p.client_id
+    LEFT JOIN (
+        SELECT pa.project_id, pa.engineer_id
+        FROM project_assignments pa
+        INNER JOIN (
+            SELECT project_id, MAX(id) AS latest_id
+            FROM project_assignments
+            GROUP BY project_id
+        ) latest ON latest.latest_id = pa.id
+    ) latest_assignment ON latest_assignment.project_id = p.id
+    LEFT JOIN users engineer ON engineer.id = latest_assignment.engineer_id
+    {$whereSql}
+";
+
+$projectCountResult = $conn->query($projectCountQuery);
+$filteredProjects = 0;
+if ($projectCountResult) {
+    $projectCountRow = $projectCountResult->fetch_assoc();
+    $filteredProjects = (int)($projectCountRow['total'] ?? 0);
+}
+
+$totalPages = max(1, (int)ceil($filteredProjects / $perPage));
+if ($currentPage > $totalPages) {
+    $currentPage = $totalPages;
+    $offset = ($currentPage - 1) * $perPage;
+}
 
 $projectsQuery = "
     SELECT
@@ -427,46 +986,14 @@ $projectsQuery = "
         FROM tasks
         GROUP BY project_id
     ) task_totals ON task_totals.project_id = p.id
+    {$whereSql}
     ORDER BY p.created_at DESC, p.id DESC
+    LIMIT {$perPage} OFFSET {$offset}
 ";
 
 $projectsResult = $conn->query($projectsQuery);
 if ($projectsResult) {
     $projects = $projectsResult->fetch_all(MYSQLI_ASSOC);
-}
-
-$tasksResult = $conn->query("
-    SELECT
-        t.id,
-        t.project_id,
-        t.task_name,
-        t.status,
-        t.deadline,
-        assignee.full_name AS assignee_name
-    FROM tasks t
-    LEFT JOIN users assignee ON assignee.id = t.assigned_to
-    ORDER BY t.project_id DESC, t.deadline IS NULL, t.deadline ASC, t.id DESC
-");
-
-if ($tasksResult) {
-    while ($task = $tasksResult->fetch_assoc()) {
-        $tasksByProject[(int)$task['project_id']][] = $task;
-    }
-}
-
-$totalProjects = count($projects);
-$ongoingProjects = 0;
-$completedProjects = 0;
-$totalTasks = 0;
-
-foreach ($projects as $project) {
-    if (($project['status'] ?? '') === 'ongoing') {
-        $ongoingProjects++;
-    }
-    if (($project['status'] ?? '') === 'completed') {
-        $completedProjects++;
-    }
-    $totalTasks += (int)($project['total_tasks'] ?? 0);
 }
 ?>
 <!DOCTYPE html>
@@ -561,13 +1088,6 @@ foreach ($projects as $project) {
                                     </option>
                                 <?php endforeach; ?>
                             </select>
-                            <small id="initial-status-help" class="form-help-text">
-                                <?php if ($supportsDraftStatus): ?>
-                                    Draft is safe for incomplete or mistaken entries. Pending stays as the default.
-                                <?php else: ?>
-                                    Use Pending for planned projects. Choose Ongoing only if work starts now.
-                                <?php endif; ?>
-                            </small>
                         </div>
 
                         <?php if ($hasProjectAddressColumn): ?>
@@ -592,7 +1112,6 @@ foreach ($projects as $project) {
                                 </button>
                             </div>
                             <input type="date" id="start_date" name="start_date" min="<?php echo htmlspecialchars($todayDate); ?>">
-                            <small id="start-date-help" class="form-help-text">Optional while pending. Required if the project starts as ongoing.</small>
                         </div>
 
                         <div class="input-group">
@@ -604,7 +1123,6 @@ foreach ($projects as $project) {
                                 </button>
                             </div>
                             <input type="date" id="end_date" name="end_date" min="<?php echo htmlspecialchars($todayDate); ?>">
-                            <small class="form-help-text">Same-day end dates are allowed. Earlier-than-start dates are invalid.</small>
                         </div>
                     </div>
 
@@ -625,16 +1143,39 @@ foreach ($projects as $project) {
                 <?php if (empty($projects)): ?>
                     <div class="empty-state">No projects yet. Create your first project above.</div>
                 <?php else: ?>
-                    <div class="projects-grid">
+                    <form method="GET" class="project-toolbar" id="project-search-form">
+                        <input type="search" id="project-search" name="q" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search project, client, engineer, or site">
+                        <select id="project-status-filter" name="status">
+                            <option value="">All statuses</option>
+                            <?php foreach ($statusOptions as $statusOption): ?>
+                                <option value="<?php echo htmlspecialchars($statusOption); ?>" <?php echo $statusFilter === $statusOption ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars(ucfirst($statusOption)); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <button type="submit" class="btn-primary">Search</button>
+                    </form>
+
+                    <div class="project-results-meta">
+                        <span>Showing <?php echo count($projects); ?> of <?php echo $filteredProjects; ?> matching projects</span>
+                        <span>Page <?php echo $currentPage; ?> of <?php echo $totalPages; ?></span>
+                    </div>
+
+                    <div class="projects-grid" id="projects-grid">
                         <?php foreach ($projects as $project): ?>
                             <?php
-                            $projectId = (int)$project['id'];
-                            $projectTasks = $tasksByProject[$projectId] ?? [];
-                            $currentEngineerId = (int)($project['engineer_id'] ?? 0);
                             $isDraft = ($project['status'] ?? '') === 'draft';
                             $isCompleted = ($project['status'] ?? '') === 'completed';
+                            $searchText = strtolower(trim(implode(' ', [
+                                $project['project_name'] ?? '',
+                                $project['client_name'] ?? '',
+                                $project['engineer_name'] ?? '',
+                                $project['project_address'] ?? '',
+                                $project['status'] ?? '',
+                            ])));
+                            $detailsPath = '/CAPSTONE/SUPERADMIN/sidebar/project_details.php?id=' . (int)$project['id'];
                             ?>
-                            <article class="project-card<?php echo $isCompleted ? ' is-locked' : ''; ?><?php echo $isDraft ? ' is-draft' : ''; ?>">
+                            <article class="project-card<?php echo $isCompleted ? ' is-locked' : ''; ?><?php echo $isDraft ? ' is-draft' : ''; ?>" data-project-card data-status="<?php echo htmlspecialchars($project['status']); ?>" data-search="<?php echo htmlspecialchars($searchText); ?>">
                                 <div class="card-split">
                                     <div>
                                         <h3><?php echo htmlspecialchars($project['project_name']); ?></h3>
@@ -658,121 +1199,70 @@ foreach ($projects as $project) {
                                 </div>
 
                                 <?php if (!empty($project['description'])): ?>
-                                    <div class="empty-state empty-state-solid">
-                                        <?php echo nl2br(htmlspecialchars($project['description'])); ?>
-                                    </div>
+                                    <div class="empty-state empty-state-solid"><?php echo nl2br(htmlspecialchars($project['description'])); ?></div>
                                 <?php endif; ?>
 
-                                <?php if ($isDraft): ?>
-                                    <div class="draft-note">This project is still in draft. Finalize the address and dates, then change the status to Pending or Ongoing when ready.</div>
-                                <?php endif; ?>
-
-                                <?php if ($isCompleted): ?>
-                                    <div class="lock-note">This project is locked because it is already completed.</div>
-                                    <form method="POST" class="mini-form">
-                                        <input type="hidden" name="action" value="reopen_project">
-                                        <input type="hidden" name="project_id" value="<?php echo $projectId; ?>">
-                                        <div class="form-actions">
-                                            <button type="submit" class="btn-secondary">Reopen Project</button>
-                                        </div>
-                                    </form>
-                                <?php else: ?>
-                                    <form method="POST" class="mini-form">
-                                        <input type="hidden" name="action" value="update_project_status">
-                                        <input type="hidden" name="project_id" value="<?php echo $projectId; ?>">
-
-                                        <h4 class="subheading">Update Status</h4>
-                                        <div class="form-grid">
-                                            <div class="input-group">
-                                                <label for="status-<?php echo $projectId; ?>">Status</label>
-                                                <select id="status-<?php echo $projectId; ?>" name="status" required>
-                                                    <?php foreach ($statusOptions as $statusOption): ?>
-                                                        <?php if ($statusOption === 'pending' && !in_array(($project['status'] ?? ''), ['pending', 'draft'], true)) { continue; } ?>
-                                                        <option value="<?php echo htmlspecialchars($statusOption); ?>" <?php echo $project['status'] === $statusOption ? 'selected' : ''; ?>>
-                                                            <?php echo htmlspecialchars(ucfirst($statusOption)); ?>
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div class="form-actions">
-                                            <button type="submit" class="btn-primary">Save Status</button>
-                                        </div>
-                                    </form>
-                                <?php endif; ?>
-
-                                <div class="card-split">
-                                    <h4 class="subheading">Tasks</h4>
-
-                                    <?php if (empty($projectTasks)): ?>
-                                        <div class="empty-state">No tasks yet for this project.</div>
-                                    <?php else: ?>
-                                        <div class="task-list">
-                                            <?php foreach ($projectTasks as $task): ?>
-                                                <div class="task-item">
-                                                    <strong><?php echo htmlspecialchars($task['task_name']); ?></strong>
-                                                    <span>Status: <?php echo htmlspecialchars(ucfirst($task['status'])); ?></span>
-                                                    <span>Assigned To: <?php echo htmlspecialchars($task['assignee_name'] ?? 'N/A'); ?></span>
-                                                    <span>Deadline: <?php echo htmlspecialchars($task['deadline'] ?? 'No deadline'); ?></span>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php endif; ?>
+                                <div class="form-actions">
+                                    <a href="<?php echo htmlspecialchars($detailsPath); ?>" class="btn-primary">View Details</a>
                                 </div>
-
-                                <?php if ($isCompleted): ?>
-                                    <div class="empty-state">Task creation is disabled while this project is completed.</div>
-                                <?php elseif ($isDraft): ?>
-                                    <div class="empty-state">Task creation is disabled while this project is still in draft.</div>
-                                <?php else: ?>
-                                    <form method="POST" class="mini-form">
-                                        <input type="hidden" name="action" value="add_task">
-                                        <input type="hidden" name="project_id" value="<?php echo $projectId; ?>">
-
-                                        <h4 class="subheading">Add Task</h4>
-
-                                        <div class="form-grid">
-                                            <div class="input-group">
-                                                <label for="task_name-<?php echo $projectId; ?>">Task Name</label>
-                                                <input type="text" id="task_name-<?php echo $projectId; ?>" name="task_name" required>
-                                            </div>
-
-                                            <div class="input-group">
-                                                <label for="assigned_to-<?php echo $projectId; ?>">Assign To</label>
-                                                <select id="assigned_to-<?php echo $projectId; ?>" name="assigned_to" required>
-                                                    <option value="">Select engineer</option>
-                                                    <?php foreach ($engineers as $engineer): ?>
-                                                        <option value="<?php echo (int)$engineer['id']; ?>" <?php echo $currentEngineerId === (int)$engineer['id'] ? 'selected' : ''; ?>>
-                                                            <?php echo htmlspecialchars($engineer['full_name']); ?>
-                                                        </option>
-                                                    <?php endforeach; ?>
-                                                </select>
-                                            </div>
-
-                                            <div class="input-group">
-                                                <label for="deadline-<?php echo $projectId; ?>">Deadline</label>
-                                                <input type="date" id="deadline-<?php echo $projectId; ?>" name="deadline">
-                                            </div>
-                                        </div>
-
-                                        <div class="input-group">
-                                            <label for="task_description-<?php echo $projectId; ?>">Task Description</label>
-                                            <textarea id="task_description-<?php echo $projectId; ?>" name="task_description" placeholder="Task details"></textarea>
-                                        </div>
-
-                                        <div class="form-actions">
-                                            <button type="submit" class="btn-primary">Add Task</button>
-                                        </div>
-                                    </form>
-                                <?php endif; ?>
                             </article>
                         <?php endforeach; ?>
                     </div>
+
+                    <?php if ($totalPages > 1): ?>
+                        <div class="pagination">
+                            <?php for ($page = 1; $page <= $totalPages; $page++): ?>
+                                <?php
+                                $pageParams = [];
+                                if ($searchQuery !== '') {
+                                    $pageParams['q'] = $searchQuery;
+                                }
+                                if ($statusFilter !== '') {
+                                    $pageParams['status'] = $statusFilter;
+                                }
+                                $pageParams['page'] = $page;
+                                $pageLink = '/CAPSTONE/SUPERADMIN/sidebar/projects.php?' . http_build_query($pageParams);
+                                ?>
+                                <a href="<?php echo htmlspecialchars($pageLink); ?>" class="pagination-link<?php echo $page === $currentPage ? ' is-active' : ''; ?>">
+                                    <?php echo $page; ?>
+                                </a>
+                            <?php endfor; ?>
+                        </div>
+                    <?php endif; ?>
                 <?php endif; ?>
             </section>
         </div>
     </main>
 </div>
 <script src="../js/admin-script.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const searchInput = document.getElementById('project-search');
+    const statusFilter = document.getElementById('project-status-filter');
+    const cards = Array.from(document.querySelectorAll('[data-project-card]'));
+
+    function applyProjectFilters() {
+        const query = (searchInput?.value || '').trim().toLowerCase();
+        const status = (statusFilter?.value || '').trim().toLowerCase();
+
+        cards.forEach((card) => {
+            const cardSearch = (card.getAttribute('data-search') || '').toLowerCase();
+            const cardStatus = (card.getAttribute('data-status') || '').toLowerCase();
+            const matchesQuery = query === '' || cardSearch.includes(query);
+            const matchesStatus = status === '' || cardStatus === status;
+
+            card.hidden = !(matchesQuery && matchesStatus);
+        });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', applyProjectFilters);
+    }
+
+    if (statusFilter) {
+        statusFilter.addEventListener('change', applyProjectFilters);
+    }
+});
+</script>
 </body>
 </html>
