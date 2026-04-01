@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/audit_log.php';
 
 require_role('super_admin');
 
@@ -17,7 +18,7 @@ function determine_inventory_status_for_page(int $quantity, ?int $minStock): str
 }
 
 function redirect_inventory_page(): void {
-    header('Location: /CAPSTONE/SUPERADMIN/sidebar/inventory.php');
+    header('Location: /codesamplecaps/SUPERADMIN/sidebar/inventory.php');
     exit();
 }
 
@@ -26,6 +27,26 @@ function set_inventory_flash(string $type, string $message): void {
         'type' => $type,
         'message' => $message,
     ];
+}
+
+function getInventoryItemSnapshot(mysqli $conn, int $inventoryId): ?array {
+    $stmt = $conn->prepare(
+        'SELECT i.id, i.quantity, i.min_stock, i.status, a.asset_name
+         FROM inventory i
+         INNER JOIN assets a ON a.id = i.asset_id
+         WHERE i.id = ?
+         LIMIT 1'
+    );
+
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('i', $inventoryId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result ? $result->fetch_assoc() : null;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -64,6 +85,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $insertStmt->bind_param('iiis', $assetId, $quantity, $minStock, $status) &&
             $insertStmt->execute()
         ) {
+            $assetLabel = '';
+            $assetStmt = $conn->prepare('SELECT asset_name FROM assets WHERE id = ? LIMIT 1');
+            if ($assetStmt) {
+                $assetStmt->bind_param('i', $assetId);
+                $assetStmt->execute();
+                $assetResult = $assetStmt->get_result();
+                $assetRow = $assetResult ? $assetResult->fetch_assoc() : null;
+                $assetLabel = (string)($assetRow['asset_name'] ?? '');
+            }
+            audit_log_event(
+                $conn,
+                (int)($_SESSION['user_id'] ?? 0),
+                'create_inventory_item',
+                'inventory',
+                (int)$insertStmt->insert_id,
+                null,
+                [
+                    'asset_id' => $assetId,
+                    'asset_name' => $assetLabel,
+                    'quantity' => $quantity,
+                    'min_stock' => $minStock,
+                    'status' => $status,
+                ]
+            );
             set_inventory_flash('success', 'Inventory item created successfully.');
         } else {
             set_inventory_flash('error', 'Failed to create inventory item.');
@@ -83,6 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_inventory_page();
         }
 
+        $beforeUpdate = getInventoryItemSnapshot($conn, $inventoryId);
         $status = determine_inventory_status_for_page($quantity, $minStock);
         $updateStmt = $conn->prepare(
             'UPDATE inventory
@@ -95,6 +141,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $updateStmt->bind_param('iisi', $quantity, $minStock, $status, $inventoryId) &&
             $updateStmt->execute()
         ) {
+            audit_log_event(
+                $conn,
+                (int)($_SESSION['user_id'] ?? 0),
+                'update_inventory_item',
+                'inventory',
+                $inventoryId,
+                $beforeUpdate ? [
+                    'asset_name' => $beforeUpdate['asset_name'] ?? null,
+                    'quantity' => (int)($beforeUpdate['quantity'] ?? 0),
+                    'min_stock' => $beforeUpdate['min_stock'] !== null ? (int)$beforeUpdate['min_stock'] : null,
+                    'status' => $beforeUpdate['status'] ?? null,
+                ] : null,
+                [
+                    'asset_name' => $beforeUpdate['asset_name'] ?? null,
+                    'quantity' => $quantity,
+                    'min_stock' => $minStock,
+                    'status' => $status,
+                ]
+            );
             set_inventory_flash('success', 'Inventory item updated successfully.');
         } else {
             set_inventory_flash('error', 'Failed to update inventory item.');
@@ -106,6 +171,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $flash = $_SESSION['inventory_flash'] ?? null;
 unset($_SESSION['inventory_flash']);
+$statusFilter = trim((string)($_GET['status'] ?? ''));
+$allowedInventoryFilters = ['available', 'low-stock', 'out-of-stock', 'attention'];
+if (!in_array($statusFilter, $allowedInventoryFilters, true)) {
+    $statusFilter = '';
+}
 
 $assetsWithoutInventory = [];
 $assetsWithoutInventoryResult = $conn->query(
@@ -120,8 +190,7 @@ if ($assetsWithoutInventoryResult) {
 }
 
 $inventoryItems = [];
-$inventoryResult = $conn->query(
-    "SELECT
+$inventoryQuery = "SELECT
         i.id,
         i.asset_id,
         i.quantity,
@@ -132,9 +201,16 @@ $inventoryResult = $conn->query(
         a.asset_type,
         a.serial_number
      FROM inventory i
-     INNER JOIN assets a ON a.id = i.asset_id
-     ORDER BY a.asset_name ASC, i.id ASC"
-);
+     INNER JOIN assets a ON a.id = i.asset_id";
+$whereSql = '';
+if ($statusFilter === 'attention') {
+    $whereSql = " WHERE i.status IN ('low-stock', 'out-of-stock')";
+} elseif ($statusFilter !== '') {
+    $escapedStatus = $conn->real_escape_string($statusFilter);
+    $whereSql = " WHERE i.status = '{$escapedStatus}'";
+}
+$inventoryQuery .= $whereSql . ' ORDER BY a.asset_name ASC, i.id ASC';
+$inventoryResult = $conn->query($inventoryQuery);
 if ($inventoryResult) {
     $inventoryItems = $inventoryResult->fetch_all(MYSQLI_ASSOC);
 }
@@ -244,6 +320,13 @@ foreach ($inventoryItems as $item) {
 
             <section class="page-stack">
                 <h2 class="section-title-inline">Inventory Items</h2>
+                <div class="dashboard-actions">
+                    <a href="/codesamplecaps/SUPERADMIN/sidebar/inventory.php" class="action-chip<?php echo $statusFilter === '' ? ' active-chip' : ''; ?>">All</a>
+                    <a href="/codesamplecaps/SUPERADMIN/sidebar/inventory.php?status=attention" class="action-chip<?php echo $statusFilter === 'attention' ? ' active-chip' : ''; ?>">Attention</a>
+                    <a href="/codesamplecaps/SUPERADMIN/sidebar/inventory.php?status=low-stock" class="action-chip<?php echo $statusFilter === 'low-stock' ? ' active-chip' : ''; ?>">Low Stock</a>
+                    <a href="/codesamplecaps/SUPERADMIN/sidebar/inventory.php?status=out-of-stock" class="action-chip<?php echo $statusFilter === 'out-of-stock' ? ' active-chip' : ''; ?>">Out of Stock</a>
+                    <a href="/codesamplecaps/SUPERADMIN/sidebar/inventory.php?status=available" class="action-chip<?php echo $statusFilter === 'available' ? ' active-chip' : ''; ?>">Available</a>
+                </div>
 
                 <?php if (empty($inventoryItems)): ?>
                     <div class="empty-state">No inventory records yet.</div>

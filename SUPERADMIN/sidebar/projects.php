@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/audit_log.php';
 
 require_role('super_admin');
 
@@ -223,9 +224,12 @@ function getActiveProjectInventoryDeployment(mysqli $conn, int $deploymentId): ?
             pid.project_id,
             pid.inventory_id,
             pid.quantity,
+            a.asset_name,
             COALESCE(returns.returned_quantity, 0) AS returned_quantity,
             (pid.quantity - COALESCE(returns.returned_quantity, 0)) AS remaining_quantity
          FROM project_inventory_deployments pid
+         INNER JOIN inventory i ON i.id = pid.inventory_id
+         INNER JOIN assets a ON a.id = i.asset_id
          LEFT JOIN (
              SELECT deployment_id, SUM(quantity) AS returned_quantity
              FROM project_inventory_return_logs
@@ -371,6 +375,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $conn->commit();
+            audit_log_event(
+                $conn,
+                $createdBy,
+                'create_project',
+                'project',
+                $projectId,
+                null,
+                [
+                    'project_name' => $projectName,
+                    'status' => $status,
+                    'client_id' => $clientId,
+                    'engineer_id' => $engineerId,
+                ]
+            );
             set_projects_flash('success', 'Project created successfully.');
         } catch (Throwable $exception) {
             $conn->rollback();
@@ -428,6 +446,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $updateStatus = $conn->prepare('UPDATE projects SET status = ? WHERE id = ?');
 
         if ($updateStatus && $updateStatus->bind_param('si', $status, $projectId) && $updateStatus->execute()) {
+            audit_log_event(
+                $conn,
+                (int)($_SESSION['user_id'] ?? 0),
+                'update_project_status',
+                'project',
+                $projectId,
+                [
+                    'project_name' => $project['project_name'] ?? null,
+                    'status' => $project['status'] ?? null,
+                ],
+                [
+                    'project_name' => $project['project_name'] ?? null,
+                    'status' => $status,
+                ]
+            );
             set_projects_flash('success', 'Project status updated.');
         } else {
             set_projects_flash('error', 'Failed to update project status.');
@@ -547,6 +580,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $conn->commit();
+            audit_log_event(
+                $conn,
+                $updatedBy,
+                'update_project_details',
+                'project',
+                $projectId,
+                [
+                    'project_name' => $project['project_name'] ?? null,
+                    'status' => $project['status'] ?? null,
+                ],
+                [
+                    'project_name' => $projectName,
+                    'client_id' => $clientId,
+                    'engineer_id' => $engineerId,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                ]
+            );
             set_projects_flash('success', 'Project details updated successfully.');
         } catch (Throwable $exception) {
             $conn->rollback();
@@ -605,6 +656,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $insertTask->bind_param('iisssi', $projectId, $assignedTo, $taskName, $description, $deadline, $createdBy) &&
             $insertTask->execute()
         ) {
+            audit_log_event(
+                $conn,
+                $createdBy,
+                'add_task',
+                'task',
+                (int)$insertTask->insert_id,
+                null,
+                [
+                    'project_name' => $project['project_name'] ?? null,
+                    'task_name' => $taskName,
+                    'assigned_to' => $assignedTo,
+                    'deadline' => $deadline,
+                ]
+            );
             set_projects_flash('success', 'Task added successfully.');
         } else {
             set_projects_flash('error', 'Failed to add task.');
@@ -630,6 +695,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $reopenProject = $conn->prepare("UPDATE projects SET status = 'ongoing' WHERE id = ?");
 
         if ($reopenProject && $reopenProject->bind_param('i', $projectId) && $reopenProject->execute()) {
+            audit_log_event(
+                $conn,
+                (int)($_SESSION['user_id'] ?? 0),
+                'update_project_status',
+                'project',
+                $projectId,
+                [
+                    'project_name' => $project['project_name'] ?? null,
+                    'status' => $project['status'] ?? null,
+                ],
+                [
+                    'project_name' => $project['project_name'] ?? null,
+                    'status' => 'ongoing',
+                ]
+            );
             set_projects_flash('success', 'Project reopened successfully.');
         } else {
             set_projects_flash('error', 'Failed to reopen project.');
@@ -733,6 +813,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $conn->commit();
+            audit_log_event(
+                $conn,
+                $deployedBy,
+                'deploy_inventory_to_project',
+                'deployment',
+                (int)$deployStmt->insert_id,
+                null,
+                [
+                    'project_name' => $project['project_name'] ?? null,
+                    'asset_name' => $inventoryItem['asset_name'] ?? null,
+                    'quantity' => $quantity,
+                    'remaining_quantity' => $remainingQuantity,
+                ]
+            );
             set_projects_flash('success', 'Inventory deployed to project successfully.');
         } catch (Throwable $exception) {
             $conn->rollback();
@@ -841,6 +935,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             $conn->commit();
+            audit_log_event(
+                $conn,
+                $returnedBy,
+                'return_project_inventory',
+                'deployment',
+                $deploymentId,
+                [
+                    'quantity' => $remainingQuantity,
+                ],
+                [
+                    'asset_name' => $deployment['asset_name'] ?? null,
+                    'quantity' => $returnQuantity,
+                    'next_inventory_quantity' => $nextQuantity,
+                ]
+            );
             set_projects_flash('success', 'Inventory return saved successfully.');
         } catch (Throwable $exception) {
             $conn->rollback();

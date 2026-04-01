@@ -1,14 +1,40 @@
 <?php
-require_once __DIR__ . '/../../config/auth_middleware.php';
-require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../config/auth_middleware.php';
+require_once __DIR__ . '/../config/database.php';
 
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
 
 require_role('super_admin');
 
+$qrLibraryReady = false;
+$qrAutoloadPath = __DIR__ . '/../vendor/autoload.php';
+$qrRequiredFiles = [
+    __DIR__ . '/../vendor/symfony/polyfill-ctype/bootstrap.php',
+    __DIR__ . '/../vendor/chillerlan/php-qrcode/src/QRCode.php',
+];
+
+if (is_file($qrAutoloadPath)) {
+    $missingQrDependency = false;
+    foreach ($qrRequiredFiles as $requiredFile) {
+        if (!is_file($requiredFile)) {
+            $missingQrDependency = true;
+            break;
+        }
+    }
+
+    if (!$missingQrDependency) {
+        require_once $qrAutoloadPath;
+        $qrLibraryReady = class_exists(QRCode::class) && class_exists(QROptions::class);
+    }
+}
+
 function generateQRDataUri(string $value): string {
+    global $qrLibraryReady;
+
+    if (!$qrLibraryReady) {
+        return '';
+    }
 
     $options = new QROptions([
         'outputType' => 'png',
@@ -69,6 +95,11 @@ $assets = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
         <h1>Print QR Codes</h1>
         <button class="btn btn-primary" onclick="window.print();">Print / Save as PDF</button>
     </div>
+    <?php if (!$qrLibraryReady): ?>
+        <div style="margin-bottom:16px; padding:12px 14px; border-radius:10px; background:#fee2e2; color:#991b1b;">
+            QR printing is unavailable because Composer packages are incomplete in vendor.
+        </div>
+    <?php endif; ?>
 
     <div class="cards">
         <?php if (count($assets) === 0): ?>
@@ -78,12 +109,18 @@ $assets = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
         <?php foreach ($assets as $asset): ?>
             <?php
                 $qrValue = "asset_id=".$asset['id'];
-                $qrDataUri = generateQRDataUri($qrValue);
+                $qrDataUri = $qrLibraryReady ? generateQRDataUri($qrValue) : '';
             ?>
             <div class="card">
-                <div class="qr"><img src="<?php echo generateQRDataUri($qrValue); ?>" alt="QR code" style="width:100%; height:auto; display:block;"></div>
+                <div class="qr">
+                    <?php if ($qrLibraryReady): ?>
+                        <img src="<?php echo $qrDataUri; ?>" alt="QR code" style="width:100%; height:auto; display:block;">
+                    <?php else: ?>
+                        <div style="display:flex; align-items:center; justify-content:center; height:100%; text-align:center; font-size:12px; color:#666;">QR unavailable</div>
+                    <?php endif; ?>
+                </div>
                 <h3><?php echo htmlspecialchars($asset['asset_name']); ?> (ID <?php echo $asset['id']; ?>)</h3>
-                <p>Type: <?php echo htmlspecialchars($asset['asset_type'] ?: '—'); ?></p>
+                <p>Type: <?php echo htmlspecialchars($asset['asset_type'] ?: '-'); ?></p>
                 <p>Status: <?php echo htmlspecialchars($asset['asset_status']); ?></p>
                 <p style="font-size: 12px; color:#555;">Scan value: <code><?php echo htmlspecialchars($qrValue); ?></code></p>
             </div>

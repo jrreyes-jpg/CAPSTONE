@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/audit_log.php';
 
 require_role('super_admin');
 
@@ -54,7 +55,7 @@ function isValidCsrfToken(?string $token): bool {
 }
 
 function getUserForStatusChange(mysqli $conn, int $userId): ?array {
-    $stmt = $conn->prepare('SELECT id, full_name, role, status FROM users WHERE id = ? LIMIT 1');
+    $stmt = $conn->prepare('SELECT id, full_name, email, phone, role, status FROM users WHERE id = ? LIMIT 1');
     $stmt->bind_param('i', $userId);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -73,6 +74,200 @@ function getCountByQuery(mysqli $conn, string $sql, int $userId): int {
     $row = $result ? $result->fetch_assoc() : null;
 
     return (int)($row['total'] ?? 0);
+}
+
+function getScalarInt(mysqli $conn, string $sql): int {
+    $result = $conn->query($sql);
+    if (!$result) {
+        return 0;
+    }
+
+    $row = $result->fetch_assoc();
+    if (!$row) {
+        return 0;
+    }
+
+    return (int)array_values($row)[0];
+}
+
+function hasTable(mysqli $conn, string $tableName): bool {
+    $stmt = $conn->prepare(
+        'SELECT 1
+         FROM INFORMATION_SCHEMA.TABLES
+         WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = ?
+         LIMIT 1'
+    );
+
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param('s', $tableName);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return (bool)($result && $result->fetch_assoc());
+}
+
+function formatRelativeDate(?string $dateTime): string {
+    if (!$dateTime) {
+        return 'Unknown time';
+    }
+
+    try {
+        $date = new DateTimeImmutable($dateTime);
+        $now = new DateTimeImmutable();
+        $diff = $now->getTimestamp() - $date->getTimestamp();
+
+        if ($diff < 60) {
+            return 'Just now';
+        }
+
+        if ($diff < 3600) {
+            return floor($diff / 60) . ' min ago';
+        }
+
+        if ($diff < 86400) {
+            return floor($diff / 3600) . ' hr ago';
+        }
+
+        if ($diff < 604800) {
+            return floor($diff / 86400) . ' day(s) ago';
+        }
+
+        return $date->format('M d, Y g:i A');
+    } catch (Throwable $exception) {
+        return $dateTime;
+    }
+}
+
+function getDateRangeTrend(mysqli $conn, string $tableName, string $dateColumn, int $rangeDays, ?string $whereSql = null): array {
+    $days = [];
+    for ($offset = $rangeDays - 1; $offset >= 0; $offset--) {
+        $date = new DateTimeImmutable("-{$offset} days");
+        $key = $date->format('Y-m-d');
+        $days[$key] = [
+            'date' => $key,
+            'label' => $date->format($rangeDays > 14 ? 'M d' : 'D'),
+            'value' => 0,
+        ];
+    }
+
+    $whereClause = $whereSql ? " AND {$whereSql}" : '';
+    $result = $conn->query(
+        "SELECT DATE({$dateColumn}) AS metric_date, COUNT(*) AS total
+         FROM {$tableName}
+         WHERE DATE({$dateColumn}) >= DATE_SUB(CURDATE(), INTERVAL " . ($rangeDays - 1) . " DAY)
+         {$whereClause}
+         GROUP BY DATE({$dateColumn})"
+    );
+
+    if ($result) {
+        while ($row = $result->fetch_assoc()) {
+            $metricDate = (string)($row['metric_date'] ?? '');
+            if (isset($days[$metricDate])) {
+                $days[$metricDate]['value'] = (int)($row['total'] ?? 0);
+            }
+        }
+    }
+
+    return array_values($days);
+}
+
+function getTrendPeak(array $trend): int {
+    $values = array_map(static fn(array $item): int => (int)($item['value'] ?? 0), $trend);
+    $peak = max($values ?: [0]);
+
+    return $peak > 0 ? $peak : 1;
+}
+
+function buildAuditSummaryClean(array $entry): array {
+    $summary = buildAuditSummary($entry);
+    $summary['details'] = str_replace(
+        ['â€¢', '•'],
+        '|',
+        (string)($summary['details'] ?? '')
+    );
+
+    return $summary;
+}
+
+function decodeAuditPayload(?string $payload): array {
+    if (!$payload) {
+        return [];
+    }
+
+    $decoded = json_decode($payload, true);
+
+    return is_array($decoded) ? $decoded : [];
+}
+
+function formatAuditActionLabel(string $action): string {
+    return ucwords(str_replace('_', ' ', $action));
+}
+
+function buildAuditSummary(array $entry): array {
+    $action = (string)($entry['action'] ?? 'activity');
+    $entityType = (string)($entry['entity_type'] ?? 'record');
+    $actorName = (string)($entry['actor_name'] ?? 'System');
+    $oldValues = decodeAuditPayload($entry['old_values'] ?? null);
+    $newValues = decodeAuditPayload($entry['new_values'] ?? null);
+    $title = formatAuditActionLabel($action);
+    $details = 'Actor: ' . $actorName;
+
+    if ($action === 'create_user') {
+        $title = 'User created';
+        $details = ($newValues['full_name'] ?? 'Unknown user') . ' • ' . ucwords(str_replace('_', ' ', (string)($newValues['role'] ?? 'user')));
+    } elseif ($action === 'update_user_status') {
+        $title = 'User status updated';
+        $details = 'Status: ' . ucfirst((string)($oldValues['status'] ?? 'unknown')) . ' -> ' . ucfirst((string)($newValues['status'] ?? 'unknown'));
+    } elseif ($action === 'update_user_profile') {
+        $title = 'User profile updated';
+        $details = ($newValues['full_name'] ?? 'User record updated') . ' • by ' . $actorName;
+    } elseif ($action === 'create_project') {
+        $title = 'Project created';
+        $details = (string)($newValues['project_name'] ?? 'New project') . ' • ' . ucfirst((string)($newValues['status'] ?? 'pending'));
+    } elseif ($action === 'update_project_status') {
+        $title = 'Project status changed';
+        $details = (string)($newValues['project_name'] ?? 'Project') . ' • ' . ucfirst((string)($oldValues['status'] ?? '')) . ' -> ' . ucfirst((string)($newValues['status'] ?? ''));
+    } elseif ($action === 'update_project_details') {
+        $title = 'Project details updated';
+        $details = (string)($newValues['project_name'] ?? 'Project') . ' • by ' . $actorName;
+    } elseif ($action === 'add_task') {
+        $title = 'Task added';
+        $details = (string)($newValues['task_name'] ?? 'Task') . ' • ' . (string)($newValues['project_name'] ?? 'Project');
+    } elseif ($action === 'deploy_inventory_to_project') {
+        $title = 'Inventory deployed';
+        $details = (string)($newValues['asset_name'] ?? 'Inventory item') . ' • Qty ' . (int)($newValues['quantity'] ?? 0);
+    } elseif ($action === 'return_project_inventory') {
+        $title = 'Inventory returned';
+        $details = (string)($newValues['asset_name'] ?? 'Inventory item') . ' • Qty ' . (int)($newValues['quantity'] ?? 0);
+    } elseif ($action === 'create_inventory_item') {
+        $title = 'Inventory record created';
+        $details = (string)($newValues['asset_name'] ?? 'Inventory item') . ' • Qty ' . (int)($newValues['quantity'] ?? 0);
+    } elseif ($action === 'update_inventory_item') {
+        $title = 'Inventory updated';
+        $details = (string)($newValues['asset_name'] ?? 'Inventory item') . ' • Qty ' . (int)($newValues['quantity'] ?? 0);
+    } elseif ($action === 'create_asset') {
+        $title = 'Asset created';
+        $details = (string)($newValues['asset_name'] ?? 'Asset') . ' • ' . (string)($newValues['asset_type'] ?? 'Unspecified');
+    } elseif ($action === 'delete_asset') {
+        $title = 'Asset deleted';
+        $details = (string)($oldValues['asset_name'] ?? 'Asset') . ' • by ' . $actorName;
+    } elseif ($action === 'return_asset') {
+        $title = 'Asset returned';
+        $details = (string)($newValues['asset_name'] ?? 'Asset') . ' • status available';
+    } else {
+        $title = formatAuditActionLabel($action);
+        $details = ucfirst($entityType) . ' • by ' . $actorName;
+    }
+
+    return [
+        'title' => $title,
+        'details' => $details,
+        'badge' => $entityType !== '' ? $entityType : 'audit',
+    ];
 }
 
 function getDeactivationBlockers(mysqli $conn, int $userId, string $role): array {
@@ -171,6 +366,22 @@ $old['role'] = $role;
                 $createStmt->bind_param('sssssi', $fullName, $email, $passwordHash, $role, $phone, $_SESSION['user_id']);
 
                 if ($createStmt->execute()) {
+                    $createdUserId = (int)$createStmt->insert_id;
+                    audit_log_event(
+                        $conn,
+                        (int)($_SESSION['user_id'] ?? 0),
+                        'create_user',
+                        'user',
+                        $createdUserId,
+                        null,
+                        [
+                            'full_name' => $fullName,
+                            'email' => $email,
+                            'phone' => $phone,
+                            'role' => $role,
+                            'status' => 'active',
+                        ]
+                    );
                     $message = ucfirst($role) . ' account created successfully.';
                     $activeTab = 'users';
                 } else {
@@ -203,6 +414,15 @@ $old['role'] = $role;
                 $stmt = $conn->prepare('UPDATE users SET status = ? WHERE id = ?');
                 $stmt->bind_param('si', $newStatus, $userId);
                 if ($stmt->execute()) {
+                    audit_log_event(
+                        $conn,
+                        (int)($_SESSION['user_id'] ?? 0),
+                        'update_user_status',
+                        'user',
+                        $userId,
+                        ['status' => $user['status'] ?? null],
+                        ['status' => $newStatus]
+                    );
                     $message = 'User deactivated successfully.';
                 } else {
                     $error = 'Failed to update user status.';
@@ -212,6 +432,15 @@ $old['role'] = $role;
             $stmt = $conn->prepare('UPDATE users SET status = ? WHERE id = ?');
             $stmt->bind_param('si', $newStatus, $userId);
             if ($stmt->execute()) {
+                audit_log_event(
+                    $conn,
+                    (int)($_SESSION['user_id'] ?? 0),
+                    'update_user_status',
+                    'user',
+                    $userId,
+                    ['status' => $user['status'] ?? null],
+                    ['status' => $newStatus]
+                );
                 $message = 'User reactivated successfully.';
             } else {
                 $error = 'Failed to update user status.';
@@ -251,6 +480,23 @@ $old['role'] = $role;
                 $stmt = $conn->prepare('UPDATE users SET full_name = ?, email = ?, phone = ? WHERE id = ?');
                 $stmt->bind_param('sssi', $fullName, $email, $phone, $userId);
                 if ($stmt->execute()) {
+                    audit_log_event(
+                        $conn,
+                        (int)($_SESSION['user_id'] ?? 0),
+                        'update_user_profile',
+                        'user',
+                        $userId,
+                        [
+                            'full_name' => $user['full_name'] ?? null,
+                            'email' => $user['email'] ?? null,
+                            'phone' => $user['phone'] ?? null,
+                        ],
+                        [
+                            'full_name' => $fullName,
+                            'email' => $email,
+                            'phone' => $phone,
+                        ]
+                    );
                     $message = 'User profile updated successfully.';
                 } else {
                     $error = 'Failed to update user profile.';
@@ -263,10 +509,18 @@ $old['role'] = $role;
 }
 
 
-function fetchUsersByRoles(mysqli $conn, array $roles): array {
+function fetchUsersByRoles(mysqli $conn, array $roles, string $statusFilter = ''): array {
     $placeholders = implode(',', array_fill(0, count($roles), '?'));
     $types = str_repeat('s', count($roles));
-    $sql = "SELECT id, full_name, email, phone, status, role FROM users WHERE role IN ($placeholders) ORDER BY id DESC";
+    $sql = "SELECT id, full_name, email, phone, status, role FROM users WHERE role IN ($placeholders)";
+
+    if ($statusFilter !== '') {
+        $sql .= ' AND status = ?';
+        $types .= 's';
+        $roles[] = $statusFilter;
+    }
+
+    $sql .= ' ORDER BY id DESC';
     $stmt = $conn->prepare($sql);
     $stmt->bind_param($types, ...$roles);
     $stmt->execute();
@@ -274,11 +528,204 @@ function fetchUsersByRoles(mysqli $conn, array $roles): array {
     return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
-$engineers = fetchUsersByRoles($conn, ['engineer']);
-$foremen = fetchUsersByRoles($conn, ['foreman', 'foremen']);
-$clients = fetchUsersByRoles($conn, ['client']);
+$userStatusFilter = trim((string)($_GET['status'] ?? ''));
+if (!in_array($userStatusFilter, $allowedStatuses, true)) {
+    $userStatusFilter = '';
+}
+
+$engineers = fetchUsersByRoles($conn, ['engineer'], $activeTab === 'users' ? $userStatusFilter : '');
+$foremen = fetchUsersByRoles($conn, ['foreman', 'foremen'], $activeTab === 'users' ? $userStatusFilter : '');
+$clients = fetchUsersByRoles($conn, ['client'], $activeTab === 'users' ? $userStatusFilter : '');
 $totalUsers = count($engineers) + count($foremen) + count($clients);
 $csrfToken = getCsrfToken();
+
+$projectMetrics = $conn->query(
+    "SELECT
+        COUNT(*) AS total_projects,
+        SUM(CASE WHEN status = 'ongoing' THEN 1 ELSE 0 END) AS ongoing_projects,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_projects,
+        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_projects,
+        SUM(CASE WHEN status = 'on-hold' THEN 1 ELSE 0 END) AS on_hold_projects
+     FROM projects"
+);
+$projectMetricRow = $projectMetrics ? $projectMetrics->fetch_assoc() : [];
+
+$taskMetrics = $conn->query(
+    "SELECT
+        COUNT(*) AS total_tasks,
+        SUM(CASE WHEN status IN ('pending', 'ongoing', 'delayed') THEN 1 ELSE 0 END) AS open_tasks,
+        SUM(CASE WHEN status = 'delayed' THEN 1 ELSE 0 END) AS delayed_tasks
+     FROM tasks"
+);
+$taskMetricRow = $taskMetrics ? $taskMetrics->fetch_assoc() : [];
+
+$inventoryMetrics = $conn->query(
+    "SELECT
+        COUNT(*) AS inventory_items,
+        COALESCE(SUM(quantity), 0) AS total_units,
+        SUM(CASE WHEN status = 'low-stock' THEN 1 ELSE 0 END) AS low_stock_items,
+        SUM(CASE WHEN status = 'out-of-stock' THEN 1 ELSE 0 END) AS out_of_stock_items
+     FROM inventory"
+);
+$inventoryMetricRow = $inventoryMetrics ? $inventoryMetrics->fetch_assoc() : [];
+
+$assetMetrics = $conn->query(
+    "SELECT
+        COUNT(*) AS total_assets,
+        SUM(CASE WHEN created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01') THEN 1 ELSE 0 END) AS assets_this_month,
+        SUM(CASE WHEN serial_number IS NULL OR TRIM(serial_number) = '' THEN 1 ELSE 0 END) AS assets_missing_serial
+     FROM assets"
+);
+$assetMetricRow = $assetMetrics ? $assetMetrics->fetch_assoc() : [];
+
+$totalProjects = (int)($projectMetricRow['total_projects'] ?? 0);
+$ongoingProjects = (int)($projectMetricRow['ongoing_projects'] ?? 0);
+$completedProjects = (int)($projectMetricRow['completed_projects'] ?? 0);
+$pendingProjects = (int)($projectMetricRow['pending_projects'] ?? 0);
+$onHoldProjects = (int)($projectMetricRow['on_hold_projects'] ?? 0);
+$totalTasks = (int)($taskMetricRow['total_tasks'] ?? 0);
+$openTasks = (int)($taskMetricRow['open_tasks'] ?? 0);
+$delayedTasks = (int)($taskMetricRow['delayed_tasks'] ?? 0);
+$inventoryItems = (int)($inventoryMetricRow['inventory_items'] ?? 0);
+$totalUnits = (int)($inventoryMetricRow['total_units'] ?? 0);
+$lowStockItems = (int)($inventoryMetricRow['low_stock_items'] ?? 0);
+$outOfStockItems = (int)($inventoryMetricRow['out_of_stock_items'] ?? 0);
+$totalAssets = (int)($assetMetricRow['total_assets'] ?? 0);
+$assetsThisMonth = (int)($assetMetricRow['assets_this_month'] ?? 0);
+$assetsMissingSerial = (int)($assetMetricRow['assets_missing_serial'] ?? 0);
+$rangeDays = (int)($_GET['range'] ?? 7);
+if (!in_array($rangeDays, [7, 14, 30, 90], true)) {
+    $rangeDays = 7;
+}
+$scansToday = getScalarInt($conn, "SELECT COUNT(*) FROM asset_scan_history WHERE DATE(scan_time) = CURDATE()");
+$scanTrend = getDateRangeTrend($conn, 'asset_scan_history', 'scan_time', $rangeDays);
+$projectTrend = getDateRangeTrend($conn, 'projects', 'created_at', $rangeDays);
+$userTrend = getDateRangeTrend($conn, 'users', 'created_at', $rangeDays, "role IN ('engineer', 'foreman', 'foremen', 'client')");
+$scanTrendPeak = getTrendPeak($scanTrend);
+$projectTrendPeak = getTrendPeak($projectTrend);
+$userTrendPeak = getTrendPeak($userTrend);
+$activeDeployments = hasTable($conn, 'project_inventory_deployments')
+    ? getScalarInt(
+        $conn,
+        "SELECT COUNT(*)
+         FROM (
+             SELECT pid.id
+             FROM project_inventory_deployments pid
+             LEFT JOIN (
+                 SELECT deployment_id, SUM(quantity) AS returned_quantity
+                 FROM project_inventory_return_logs
+                 GROUP BY deployment_id
+             ) returns ON returns.deployment_id = pid.id
+             WHERE (pid.quantity - COALESCE(returns.returned_quantity, 0)) > 0
+         ) active_deployments"
+    )
+    : 0;
+
+$lowStockAlerts = [];
+$lowStockResult = $conn->query(
+    "SELECT a.asset_name, i.quantity, i.min_stock, i.status
+     FROM inventory i
+     INNER JOIN assets a ON a.id = i.asset_id
+     WHERE i.status IN ('low-stock', 'out-of-stock')
+     ORDER BY FIELD(i.status, 'out-of-stock', 'low-stock'), i.quantity ASC, a.asset_name ASC
+     LIMIT 5"
+);
+if ($lowStockResult) {
+    $lowStockAlerts = $lowStockResult->fetch_all(MYSQLI_ASSOC);
+}
+
+$projectRiskAlerts = [];
+$projectRiskResult = $conn->query(
+    "SELECT
+        p.project_name,
+        p.status,
+        p.end_date,
+        COALESCE(task_totals.open_tasks, 0) AS open_tasks,
+        COALESCE(task_totals.delayed_tasks, 0) AS delayed_tasks
+     FROM projects p
+     LEFT JOIN (
+         SELECT
+             project_id,
+             SUM(CASE WHEN status IN ('pending', 'ongoing', 'delayed') THEN 1 ELSE 0 END) AS open_tasks,
+             SUM(CASE WHEN status = 'delayed' THEN 1 ELSE 0 END) AS delayed_tasks
+         FROM tasks
+         GROUP BY project_id
+     ) task_totals ON task_totals.project_id = p.id
+     WHERE p.status IN ('pending', 'ongoing', 'on-hold')
+     AND (
+         COALESCE(task_totals.delayed_tasks, 0) > 0
+         OR (p.end_date IS NOT NULL AND p.end_date < CURDATE())
+     )
+     ORDER BY
+        COALESCE(task_totals.delayed_tasks, 0) DESC,
+        p.end_date ASC,
+        p.updated_at DESC
+     LIMIT 5"
+);
+if ($projectRiskResult) {
+    $projectRiskAlerts = $projectRiskResult->fetch_all(MYSQLI_ASSOC);
+}
+
+$inactiveAssignmentAlerts = [];
+$inactiveAssignmentResult = $conn->query(
+    "SELECT
+        u.full_name,
+        u.role,
+        COUNT(DISTINCT p.id) AS active_projects
+     FROM users u
+     LEFT JOIN project_assignments pa ON pa.engineer_id = u.id
+     LEFT JOIN projects p ON p.id = pa.project_id AND p.status IN ('pending', 'ongoing', 'on-hold')
+     WHERE u.status = 'inactive'
+     AND u.role IN ('engineer', 'foreman', 'client')
+     GROUP BY u.id, u.full_name, u.role
+     HAVING active_projects > 0
+     ORDER BY active_projects DESC, u.full_name ASC
+     LIMIT 5"
+);
+if ($inactiveAssignmentResult) {
+    $inactiveAssignmentAlerts = $inactiveAssignmentResult->fetch_all(MYSQLI_ASSOC);
+}
+
+$dataQualityAlerts = [];
+$dataQualityResult = $conn->query(
+    "SELECT
+        a.asset_name,
+        a.serial_number,
+        q.id AS qr_id
+     FROM assets a
+     LEFT JOIN asset_qr_codes q ON q.asset_id = a.id
+     WHERE q.id IS NULL
+     OR a.serial_number IS NULL
+     OR TRIM(a.serial_number) = ''
+     ORDER BY a.created_at DESC
+     LIMIT 5"
+);
+if ($dataQualityResult) {
+    $dataQualityAlerts = $dataQualityResult->fetch_all(MYSQLI_ASSOC);
+}
+
+$auditLogFeed = [];
+if (audit_log_table_exists($conn)) {
+    $recentActivityResult = $conn->query(
+        "SELECT
+            l.created_at AS activity_time,
+            l.action,
+            l.entity_type,
+            l.entity_id,
+            actor.full_name AS actor_name,
+            l.old_values,
+            l.new_values
+         FROM audit_logs l
+         LEFT JOIN users actor ON actor.id = l.user_id
+         WHERE DATE(l.created_at) >= DATE_SUB(CURDATE(), INTERVAL " . ($rangeDays - 1) . " DAY)
+         ORDER BY l.created_at DESC
+         LIMIT 12"
+    );
+
+    if ($recentActivityResult) {
+        $auditLogFeed = $recentActivityResult->fetch_all(MYSQLI_ASSOC);
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -303,13 +750,197 @@ $csrfToken = getCsrfToken();
         <?php if ($error): ?><div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
 
         <div id="dashboard" class="tab-content <?php echo $activeTab === 'dashboard' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'dashboard' ? 'display: block;' : 'display: none;'; ?>">
-            <h2 class="dashboard-section-title" style="margin-bottom: 20px;">System Overview</h2>
-            <div class="stats">
-                <div class="stat-card"><h3>Engineers</h3><div class="number counter" data-target="<?php echo count($engineers); ?>">0</div></div>
-                <div class="stat-card"><h3>Foreman</h3><div class="number counter" data-target="<?php echo count($foremen); ?>">0</div></div>
-                <div class="stat-card"><h3>Clients</h3><div class="number counter" data-target="<?php echo count($clients); ?>">0</div></div>
-                <div class="stat-card"><h3>Total Users</h3><div class="number counter" data-target="<?php echo $totalUsers; ?>">0</div></div>
-            </div>
+            <section class="header page-header-card dashboard-hero">
+                <div class="header-copy">
+                    <h1>Operations Command Center</h1>
+                    <p>Track projects, users, inventory, and asset movement from one command center.</p>
+                </div>
+                <div class="dashboard-actions">
+                    <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="action-chip">Projects</a>
+                    <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=create" class="action-chip">Create User</a>
+                    <a href="/codesamplecaps/SUPERADMIN/sidebar/assets.php" class="action-chip">Add Asset</a>
+                    <a href="/codesamplecaps/SUPERADMIN/sidebar/inventory.php" class="action-chip">Update Inventory</a>
+                    <a href="/codesamplecaps/SUPERADMIN/sidebar/scan_history.php" class="action-chip">Scan History</a>
+                </div>
+            </section>
+
+            <section class="dashboard-panel problems-panel">
+                    <div class="panel-heading">
+                        <div>
+                            <h2 class="dashboard-section-title">Problems</h2>
+                            <p class="panel-copy">Check these first.</p>
+                        </div>
+                    </div>
+
+                    <div class="alert-group">
+                        <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?status=ongoing" class="alert-card alert-card-danger alert-card-link">
+                            <div class="alert-card-head">
+                                <h3>Project Problems</h3>
+                                <span><?php echo count($projectRiskAlerts); ?></span>
+                            </div>
+                            <?php if (empty($projectRiskAlerts)): ?>
+                                <p class="alert-empty">No project problems right now.</p>
+                            <?php else: ?>
+                                <ul class="alert-list">
+                                    <?php foreach ($projectRiskAlerts as $projectAlert): ?>
+                                        <li>
+                                            <strong><?php echo htmlspecialchars($projectAlert['project_name']); ?></strong>
+                                            <span>
+                                                <?php
+                                                $parts = [];
+                                                if ((int)$projectAlert['delayed_tasks'] > 0) {
+                                                    $parts[] = (int)$projectAlert['delayed_tasks'] . ' delayed task(s)';
+                                                }
+                                                if (!empty($projectAlert['end_date']) && $projectAlert['end_date'] < date('Y-m-d')) {
+                                                    $parts[] = 'late end date';
+                                                }
+                                                echo htmlspecialchars(implode(' | ', $parts) ?: 'Needs checking');
+                                                ?>
+                                            </span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php endif; ?>
+                        </a>
+
+                        <a href="/codesamplecaps/SUPERADMIN/sidebar/inventory.php?status=attention" class="alert-card alert-card-warning alert-card-link">
+                            <div class="alert-card-head">
+                                <h3>Stock Problems</h3>
+                                <span><?php echo count($lowStockAlerts); ?></span>
+                            </div>
+                            <?php if (empty($lowStockAlerts)): ?>
+                                <p class="alert-empty">No stock problems.</p>
+                            <?php else: ?>
+                                <ul class="alert-list">
+                                    <?php foreach ($lowStockAlerts as $stockAlert): ?>
+                                        <li>
+                                            <strong><?php echo htmlspecialchars($stockAlert['asset_name']); ?></strong>
+                                            <span><?php echo htmlspecialchars(ucwords(str_replace('-', ' ', $stockAlert['status']))); ?> | Qty <?php echo (int)$stockAlert['quantity']; ?><?php echo $stockAlert['min_stock'] !== null ? ' | Min ' . (int)$stockAlert['min_stock'] : ''; ?></span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php endif; ?>
+                        </a>
+
+                        <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=users&amp;status=inactive" class="alert-card alert-card-link">
+                            <div class="alert-card-head">
+                                <h3>User Problems</h3>
+                                <span><?php echo count($inactiveAssignmentAlerts); ?></span>
+                            </div>
+                            <?php if (empty($inactiveAssignmentAlerts)): ?>
+                                <p class="alert-empty">No user problems found.</p>
+                            <?php else: ?>
+                                <ul class="alert-list">
+                                    <?php foreach ($inactiveAssignmentAlerts as $userAlert): ?>
+                                        <li>
+                                            <strong><?php echo htmlspecialchars($userAlert['full_name']); ?></strong>
+                                            <span><?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$userAlert['role']))); ?> | <?php echo (int)$userAlert['active_projects']; ?> active project(s)</span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php endif; ?>
+                        </a>
+
+                        <a href="/codesamplecaps/SUPERADMIN/sidebar/assets.php?filter=quality" class="alert-card alert-card-link">
+                            <div class="alert-card-head">
+                                <h3>Asset Problems</h3>
+                                <span><?php echo count($dataQualityAlerts); ?></span>
+                            </div>
+                            <?php if (empty($dataQualityAlerts)): ?>
+                                <p class="alert-empty">No asset problems found.</p>
+                            <?php else: ?>
+                                <ul class="alert-list">
+                                    <?php foreach ($dataQualityAlerts as $dataAlert): ?>
+                                        <li>
+                                            <strong><?php echo htmlspecialchars($dataAlert['asset_name']); ?></strong>
+                                            <span>
+                                                <?php
+                                                $qualityParts = [];
+                                                if (empty($dataAlert['serial_number'])) {
+                                                    $qualityParts[] = 'missing serial';
+                                                }
+                                                if (empty($dataAlert['qr_id'])) {
+                                                    $qualityParts[] = 'missing QR';
+                                                }
+                                                echo htmlspecialchars(implode(' | ', $qualityParts) ?: 'Needs checking');
+                                                ?>
+                                            </span>
+                                        </li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php endif; ?>
+                        </a>
+                    </div>
+            </section>
+
+            <section class="dashboard-grid">
+                <section class="dashboard-panel summary-panel">
+                    <div class="panel-heading">
+                        <div>
+                            <h2 class="dashboard-section-title">Summary</h2>
+                            <p class="panel-copy">Quick system check.</p>
+                        </div>
+                    </div>
+                    <div class="metric-strip metric-strip-compact">
+                        <article class="metric-tile">
+                            <span>People</span>
+                            <strong><?php echo $totalUsers; ?></strong>
+                            <small>All users in the system</small>
+                        </article>
+                        <article class="metric-tile">
+                            <span>Projects</span>
+                            <strong><?php echo $totalProjects; ?></strong>
+                            <small><?php echo $ongoingProjects; ?> ongoing now</small>
+                        </article>
+                        <article class="metric-tile">
+                            <span>Tasks</span>
+                            <strong><?php echo $openTasks; ?></strong>
+                            <small>Open work items</small>
+                        </article>
+                        <article class="metric-tile">
+                            <span>Scans Today</span>
+                            <strong><?php echo $scansToday; ?></strong>
+                            <small>QR scans today</small>
+                        </article>
+                    </div>
+                </section>
+
+                <aside class="dashboard-panel activity-panel">
+                    <div class="panel-heading">
+                        <div>
+                            <h2 class="dashboard-section-title">Recent Activity</h2>
+                            <p class="panel-copy">Latest admin actions.</p>
+                        </div>
+                        <div class="dashboard-actions">
+                            <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard&amp;range=7" class="action-chip<?php echo $rangeDays === 7 ? ' active-chip' : ''; ?>">7 Days</a>
+                            <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard&amp;range=14" class="action-chip<?php echo $rangeDays === 14 ? ' active-chip' : ''; ?>">14 Days</a>
+                            <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard&amp;range=30" class="action-chip<?php echo $rangeDays === 30 ? ' active-chip' : ''; ?>">30 Days</a>
+                            <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard&amp;range=90" class="action-chip<?php echo $rangeDays === 90 ? ' active-chip' : ''; ?>">90 Days</a>
+                        </div>
+                    </div>
+
+                    <?php if (empty($auditLogFeed)): ?>
+                        <div class="empty-state-solid">No audit logs yet. New admin actions will appear here.</div>
+                    <?php else: ?>
+                        <div class="activity-feed">
+                            <?php foreach ($auditLogFeed as $activity): ?>
+                                <?php $auditSummary = buildAuditSummaryClean($activity); ?>
+                                <div class="activity-item">
+                                    <div class="activity-badge activity-<?php echo htmlspecialchars($auditSummary['badge']); ?>">
+                                        <?php echo strtoupper(substr((string)$auditSummary['badge'], 0, 1)); ?>
+                                    </div>
+                                    <div class="activity-copy">
+                                        <strong><?php echo htmlspecialchars($auditSummary['title']); ?></strong>
+                                        <span><?php echo htmlspecialchars($auditSummary['details']); ?></span>
+                                    </div>
+                                    <time><?php echo htmlspecialchars(formatRelativeDate($activity['activity_time'] ?? null)); ?></time>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+
+                </aside>
+            </section>
         </div>
 
         <div id="create" class="tab-content <?php echo $activeTab === 'create' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'create' ? 'display: block;' : 'display: none;'; ?>">
@@ -350,6 +981,11 @@ $csrfToken = getCsrfToken();
         </div>
 
         <div id="users" class="tab-content <?php echo $activeTab === 'users' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'users' ? 'display: block;' : 'display: none;'; ?>">
+            <div class="dashboard-actions">
+                <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=users" class="action-chip<?php echo $userStatusFilter === '' ? ' active-chip' : ''; ?>">All Users</a>
+                <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=users&amp;status=active" class="action-chip<?php echo $userStatusFilter === 'active' ? ' active-chip' : ''; ?>">Active</a>
+                <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=users&amp;status=inactive" class="action-chip<?php echo $userStatusFilter === 'inactive' ? ' active-chip' : ''; ?>">Inactive</a>
+            </div>
             <?php $sections = ['Engineers' => $engineers, 'Foreman' => $foremen, 'Clients' => $clients]; foreach ($sections as $title => $users): ?>
                 <h2 class="dashboard-section-title" style="margin-top: 20px; margin-bottom: 15px;"><?php echo $title; ?></h2>
                 <div class="users-table">
