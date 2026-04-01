@@ -37,7 +37,9 @@ if (canvas) {
         }
     }
 
-    for (let i = 0; i < particleCount; i++) particles.push(new Particle());
+    for (let i = 0; i < particleCount; i++) {
+        particles.push(new Particle());
+    }
 
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -57,12 +59,12 @@ if (canvas) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    // Password toggle
     document.querySelectorAll('.togglePassword').forEach(function (btn) {
         btn.addEventListener('click', function () {
             const targetId = btn.getAttribute('data-target');
             const input = document.getElementById(targetId);
             if (!input) return;
+
             const type = input.getAttribute('type') === 'password' ? 'text' : 'password';
             input.setAttribute('type', type);
             btn.textContent = type === 'text' ? 'Hide' : 'Show';
@@ -70,7 +72,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Forgot password redirect
     document.querySelectorAll('.links a').forEach(function (link) {
         if (link.textContent.includes('Forgot Password')) {
             link.addEventListener('click', function (e) {
@@ -80,62 +81,118 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Sidebar behavior (safe-guard if elements are missing)
+    // Shared sidebar behavior for dashboard and sidebar pages.
     const sidebar = document.getElementById('sidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
+    const mobileToggleBtn = document.getElementById('sidebarMobileToggle');
     const overlay = document.getElementById('sidebarOverlay');
+    const toggleIcon = document.getElementById('toggleIcon');
 
-    if (sidebar && toggleBtn && overlay) {
-
-
+    if (sidebar && overlay) {
         const mainContent = document.querySelector('.main-content');
-        if (window.innerWidth > 768 && localStorage.getItem('sidebarShrink') === 'true') {
-    sidebar.classList.add('shrink');
+        const storageKey = 'edgeSidebarCollapsed';
+        const isMobile = () => window.innerWidth <= 768;
 
-    if (mainContent) {
-        mainContent.classList.add('sidebar-shrink');
-    }
-
-    const icon = document.getElementById('toggleIcon');
-    if (icon) {
-        icon.textContent = '❯';
-    }
-}
-
-toggleBtn.addEventListener('click', function () {
-    if (window.innerWidth <= 768) {
-        sidebar.classList.toggle('mobile-open');
-        overlay.classList.toggle('active');
-    } else {
-        sidebar.classList.toggle('shrink');
-
-        if (mainContent) {
-          mainContent.classList.toggle('sidebar-shrink');
-        }
-
-        // 🔥 ADD THIS
-        const icon = document.getElementById('toggleIcon');
-        if (icon) {
-            if (sidebar.classList.contains('shrink')) {
-                icon.textContent = '❯';
-            } else {
-                icon.textContent = '❮';
+        const syncMainContent = () => {
+            const shouldShrink = sidebar.classList.contains('shrink') && !isMobile();
+            if (mainContent) {
+                mainContent.classList.toggle('sidebar-shrink', shouldShrink);
             }
-        }
+        };
 
-        localStorage.setItem('sidebarShrink', sidebar.classList.contains('shrink'));
-    }
-});
-        overlay.addEventListener('click', function () {
+        const closeMobileSidebar = () => {
             sidebar.classList.remove('mobile-open');
             overlay.classList.remove('active');
+        };
+
+        const updateToggleUi = () => {
+            if (isMobile()) {
+                const isOpen = sidebar.classList.contains('mobile-open');
+                if (mobileToggleBtn) {
+                    mobileToggleBtn.classList.toggle('active', isOpen);
+                    mobileToggleBtn.setAttribute('aria-label', isOpen ? 'Close navigation' : 'Open navigation');
+                    mobileToggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                }
+                return;
+            }
+
+            if (mobileToggleBtn) {
+                mobileToggleBtn.classList.remove('active');
+                mobileToggleBtn.setAttribute('aria-label', 'Open navigation');
+                mobileToggleBtn.setAttribute('aria-expanded', 'false');
+            }
+
+            if (toggleBtn && toggleIcon) {
+                const isCollapsed = sidebar.classList.contains('shrink');
+                toggleIcon.textContent = isCollapsed ? '>' : '<';
+                toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
+                toggleBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+            }
+        };
+
+        const applySidebarState = () => {
+            if (isMobile()) {
+                sidebar.classList.remove('shrink');
+                closeMobileSidebar();
+                syncMainContent();
+                updateToggleUi();
+                return;
+            }
+
+            const shouldShrink = window.localStorage.getItem(storageKey) === '1';
+            sidebar.classList.toggle('shrink', shouldShrink);
+            closeMobileSidebar();
+            syncMainContent();
+            updateToggleUi();
+        };
+
+        if (mobileToggleBtn) {
+            mobileToggleBtn.addEventListener('click', function () {
+                if (!isMobile()) {
+                    return;
+                }
+
+                const isOpen = sidebar.classList.toggle('mobile-open');
+                overlay.classList.toggle('active', isOpen);
+                updateToggleUi();
+            });
+        }
+
+        if (toggleBtn && toggleIcon) {
+            toggleBtn.addEventListener('click', function () {
+                if (isMobile()) {
+                    return;
+                }
+
+                const isCollapsed = sidebar.classList.toggle('shrink');
+                window.localStorage.setItem(storageKey, isCollapsed ? '1' : '0');
+                syncMainContent();
+                updateToggleUi();
+            });
+        }
+
+        overlay.addEventListener('click', function () {
+            closeMobileSidebar();
+            updateToggleUi();
         });
+
+        document.querySelectorAll('.menu-link').forEach(function (link) {
+            link.addEventListener('click', function () {
+                if (!isMobile()) {
+                    return;
+                }
+
+                closeMobileSidebar();
+                updateToggleUi();
+            });
+        });
+
+        window.addEventListener('resize', applySidebarState);
+        applySidebarState();
     }
 
-    // Smooth load
     document.body.classList.add('page-loaded');
 
-    // Counter animation
     const counters = document.querySelectorAll('.counter');
     counters.forEach((counter) => {
         const updateCount = () => {
@@ -155,31 +212,31 @@ toggleBtn.addEventListener('click', function () {
     });
 });
 
-const form = document.querySelector("form");
+const form = document.querySelector('form');
 
-if(form){
-    form.addEventListener("submit", function () {
-        const btn = document.getElementById("resetBtn");
-        if(btn){
+if (form) {
+    form.addEventListener('submit', function () {
+        const btn = document.getElementById('resetBtn');
+        if (btn) {
             btn.disabled = true;
-            btn.innerText = "Sending...";
+            btn.innerText = 'Sending...';
         }
     });
 }
 
-function showQR(src){
+function showQR(src) {
     document.getElementById('qrModal').style.display = 'flex';
     document.getElementById('qrModalImg').src = src;
 }
 
 const modal = document.getElementById('qrModal');
-if(modal){
-    modal.onclick = function(){
+if (modal) {
+    modal.onclick = function () {
         this.style.display = 'none';
-    }
+    };
 }
-document.addEventListener('DOMContentLoaded', function () {
 
+document.addEventListener('DOMContentLoaded', function () {
     function scorePassword(value) {
         let score = 0;
         if (value.length >= 12) score++;
@@ -194,9 +251,17 @@ document.addEventListener('DOMContentLoaded', function () {
         const score = scorePassword(input.value);
         let text = 'Weak';
         let cls = 'weak';
-        if (score >= 5) { text = 'Super Strong'; cls = 'super-strong'; }
-        else if (score === 4) { text = 'Strong'; cls = 'strong'; }
-        else if (score === 3) { text = 'Medium'; cls = 'medium'; }
+
+        if (score >= 5) {
+            text = 'Super Strong';
+            cls = 'super-strong';
+        } else if (score === 4) {
+            text = 'Strong';
+            cls = 'strong';
+        } else if (score === 3) {
+            text = 'Medium';
+            cls = 'medium';
+        }
 
         indicator.textContent = 'Strength: ' + text;
         indicator.className = 'pass-indicator ' + cls;
@@ -209,12 +274,12 @@ document.addEventListener('DOMContentLoaded', function () {
     const tempPass = document.getElementById('password');
     const tempIndicator = document.getElementById('tempPassStrength');
     if (tempPass && tempIndicator) {
-        tempPass.addEventListener('input', function(){
+        tempPass.addEventListener('input', function () {
             applyStrengthUI(tempPass, tempIndicator);
         });
     }
 
-    document.querySelectorAll('.user-row').forEach(function(row){
+    document.querySelectorAll('.user-row').forEach(function (row) {
         const editBtn = row.querySelector('[data-edit-btn]');
         const saveBtn = row.querySelector('[data-save-btn]');
         const cancelBtn = row.querySelector('[data-cancel-btn]');
@@ -223,14 +288,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const saveForm = document.getElementById('save-form-' + rowId);
         const originals = Array.from(inputs).map((input) => input.value);
 
-        editBtn.addEventListener('click', function(){
+        editBtn.addEventListener('click', function () {
             inputs.forEach((input) => input.removeAttribute('readonly'));
             editBtn.hidden = true;
             saveBtn.hidden = false;
             cancelBtn.hidden = false;
         });
 
-        cancelBtn.addEventListener('click', function(){
+        cancelBtn.addEventListener('click', function () {
             inputs.forEach((input, index) => {
                 input.value = originals[index];
                 input.setAttribute('readonly', 'readonly');
@@ -240,16 +305,17 @@ document.addEventListener('DOMContentLoaded', function () {
             cancelBtn.hidden = true;
         });
 
-        saveBtn.addEventListener('click', function(){
+        saveBtn.addEventListener('click', function () {
             const byField = {};
-            inputs.forEach((input) => { byField[input.getAttribute('data-field')] = input.value; });
+            inputs.forEach((input) => {
+                byField[input.getAttribute('data-field')] = input.value;
+            });
             saveForm.querySelector('[data-save-field="full_name"]').value = byField.full_name || '';
             saveForm.querySelector('[data-save-field="email"]').value = byField.email || '';
             saveForm.querySelector('[data-save-field="phone"]').value = byField.phone || '';
             saveForm.submit();
         });
     });
-
 });
 
 document.addEventListener('DOMContentLoaded', function () {

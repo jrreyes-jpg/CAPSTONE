@@ -25,20 +25,22 @@ if ($result) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scan History - Edge Automation</title>
-    <link rel="stylesheet" href="../css/admin_dashboard.css">
+    <link rel="stylesheet" href="../css/admin-dashboard.css">
 </head>
 <body>
 <div class="container">
-    <?php include __DIR__ . '/../components/sidebar_super_admin.php'; ?>
+    <?php include __DIR__ . '/../sidebar_super_admin.php'; ?>
 
-    <main class="main-content">
-        <div class="header">
-            <h1>Scan History</h1>
-            <p>Last 200 QR scans (auditing)</p>
+    <main class="main-content scan-history-content">
+        <div class="header page-header-card">
+            <div class="header-copy">
+                <h1>Scan History</h1>
+                <p>Review the latest 200 QR scans with asset, foreman, and device details.</p>
+            </div>
         </div>
 
         <div class="table-wrapper">
-            <table class="responsive-table">
+            <table class="responsive-table mobile-card-table">
                 <thead>
                     <tr>
                         <th>Time</th>
@@ -49,18 +51,18 @@ if ($result) {
                 </thead>
                 <tbody>
                     <?php if (count($history) === 0): ?>
-                        <tr><td colspan="4" style="text-align:center; padding: 20px;">No scan history yet.</td></tr>
+                        <tr><td colspan="4" class="table-empty-cell">No scan history yet.</td></tr>
                     <?php else: ?>
                         <?php foreach ($history as $row): ?>
                             <tr>
-                                <td><?php echo htmlspecialchars($row['scan_time']); ?></td>
-                                <td>
+                                <td data-label="Time"><?php echo htmlspecialchars($row['scan_time']); ?></td>
+                                <td data-label="Asset">
                                     <strong><?php echo htmlspecialchars($row['asset_name'] ?? 'Unknown'); ?></strong><br>
                                     <small><?php echo htmlspecialchars($row['asset_type'] ?? ''); ?></small><br>
                                     <small>SN: <?php echo htmlspecialchars($row['serial_number'] ?? ''); ?></small>
                                 </td>
-                                <td><?php echo htmlspecialchars($row['foreman_name'] ?? 'Unknown'); ?></td>
-                                <td><?php echo htmlspecialchars($row['scan_device'] ?? 'Unknown'); ?></td>
+                                <td data-label="Foreman"><?php echo htmlspecialchars($row['foreman_name'] ?? 'Unknown'); ?></td>
+                                <td data-label="Device"><?php echo htmlspecialchars($row['scan_device'] ?? 'Unknown'); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
@@ -69,5 +71,6 @@ if ($result) {
         </div>
     </main>
 </div>
+<script src="../js/admin-script.js"></script>
 </body>
 </html>

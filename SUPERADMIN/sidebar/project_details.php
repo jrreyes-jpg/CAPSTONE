@@ -84,7 +84,7 @@ $statusOptions = $supportsDraftStatus
     : ['pending', 'ongoing', 'completed', 'on-hold'];
 $todayDate = pm_today_date();
 $projectId = max(0, (int)($_GET['id'] ?? 0));
-$detailsPath = '/CAPSTONE/SUPERADMIN/sidebar/project_details.php?id=' . $projectId;
+$detailsPath = '/codesamplecaps/SUPERADMIN/sidebar/project_details.php?id=' . $projectId;
 
 pm_ensure_project_inventory_deployments_table($conn);
 pm_ensure_project_inventory_return_logs_table($conn);
@@ -286,7 +286,7 @@ if ($projectId > 0) {
     <main class="main-content">
         <div class="page-stack">
             <div class="form-actions">
-                <a href="/CAPSTONE/SUPERADMIN/sidebar/projects.php" class="btn-secondary">Back to Projects</a>
+                <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="btn-secondary">Back to Projects</a>
             </div>
 
             <?php if ($flash): ?>
@@ -334,7 +334,7 @@ if ($projectId > 0) {
 
                 <section class="form-panel">
                     <h2 class="section-title-inline">Edit Project Details</h2>
-                    <form method="POST" action="/CAPSTONE/SUPERADMIN/sidebar/projects.php">
+                    <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php">
                         <input type="hidden" name="action" value="update_project_details">
                         <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                         <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -400,7 +400,7 @@ if ($projectId > 0) {
                     <h2 class="section-title-inline">Update Status</h2>
                     <?php if ($isCompleted): ?>
                         <div class="lock-note">This project is locked because it is already completed.</div>
-                        <form method="POST" action="/CAPSTONE/SUPERADMIN/sidebar/projects.php" class="mini-form">
+                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form">
                             <input type="hidden" name="action" value="reopen_project">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -409,7 +409,7 @@ if ($projectId > 0) {
                             </div>
                         </form>
                     <?php else: ?>
-                        <form method="POST" action="/CAPSTONE/SUPERADMIN/sidebar/projects.php" class="mini-form">
+                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form">
                             <input type="hidden" name="action" value="update_project_status">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -457,7 +457,7 @@ if ($projectId > 0) {
                     <?php elseif ($isDraft): ?>
                         <div class="empty-state">Task creation is disabled while this project is still in draft.</div>
                     <?php else: ?>
-                        <form method="POST" action="/CAPSTONE/SUPERADMIN/sidebar/projects.php" class="mini-form">
+                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form">
                             <input type="hidden" name="action" value="add_task">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -517,7 +517,7 @@ if ($projectId > 0) {
                                     <span>Deployed By: <?php echo htmlspecialchars($deployment['deployed_by_name'] ?? 'N/A'); ?></span>
                                     <span>Deployed At: <?php echo htmlspecialchars($deployment['deployed_at']); ?></span>
                                     <span>Notes: <?php echo htmlspecialchars($deployment['notes'] ?: 'None'); ?></span>
-                                    <form method="POST" action="/CAPSTONE/SUPERADMIN/sidebar/projects.php" class="mini-form">
+                                    <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form">
                                         <input type="hidden" name="action" value="return_project_inventory">
                                         <input type="hidden" name="deployment_id" value="<?php echo (int)$deployment['id']; ?>">
                                         <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -547,7 +547,7 @@ if ($projectId > 0) {
                     <?php elseif (empty($availableInventory)): ?>
                         <div class="empty-state">No available inventory to deploy right now.</div>
                     <?php else: ?>
-                        <form method="POST" action="/CAPSTONE/SUPERADMIN/sidebar/projects.php" class="mini-form">
+                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form">
                             <input type="hidden" name="action" value="deploy_inventory_to_project">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">

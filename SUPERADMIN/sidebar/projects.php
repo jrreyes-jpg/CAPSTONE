@@ -127,11 +127,11 @@ function get_projects_redirect_target(): string {
     $redirectTo = $_POST['redirect_to'] ?? $_GET['redirect_to'] ?? '';
     $redirectTo = is_string($redirectTo) ? trim($redirectTo) : '';
 
-    if ($redirectTo !== '' && str_starts_with($redirectTo, '/CAPSTONE/SUPERADMIN/sidebar/')) {
+    if ($redirectTo !== '' && str_starts_with($redirectTo, '/codesamplecaps/SUPERADMIN/sidebar/')) {
         return $redirectTo;
     }
 
-    return '/CAPSTONE/SUPERADMIN/sidebar/projects.php';
+    return '/codesamplecaps/SUPERADMIN/sidebar/projects.php';
 }
 
 function redirect_projects_page(): void {
@@ -1009,7 +1009,14 @@ if ($projectsResult) {
 <div class="container">
     <?php include __DIR__ . '/../sidebar_super_admin.php'; ?>
 
-    <main class="main-content">
+    <main class="main-content projects-content">
+        <div class="header page-header-card">
+            <div class="header-copy">
+                <h1>Project Management</h1>
+                <p>Create projects, assign engineers, update status, and manage tasks from one place.</p>
+            </div>
+        </div>
+
         <div class="page-stack">
             <section class="metrics-grid">
                 <div class="metric-card">
@@ -1173,7 +1180,7 @@ if ($projectsResult) {
                                 $project['project_address'] ?? '',
                                 $project['status'] ?? '',
                             ])));
-                            $detailsPath = '/CAPSTONE/SUPERADMIN/sidebar/project_details.php?id=' . (int)$project['id'];
+                            $detailsPath = '/codesamplecaps/SUPERADMIN/sidebar/project_details.php?id=' . (int)$project['id'];
                             ?>
                             <article class="project-card<?php echo $isCompleted ? ' is-locked' : ''; ?><?php echo $isDraft ? ' is-draft' : ''; ?>" data-project-card data-status="<?php echo htmlspecialchars($project['status']); ?>" data-search="<?php echo htmlspecialchars($searchText); ?>">
                                 <div class="card-split">
@@ -1221,7 +1228,7 @@ if ($projectsResult) {
                                     $pageParams['status'] = $statusFilter;
                                 }
                                 $pageParams['page'] = $page;
-                                $pageLink = '/CAPSTONE/SUPERADMIN/sidebar/projects.php?' . http_build_query($pageParams);
+                                $pageLink = '/codesamplecaps/SUPERADMIN/sidebar/projects.php?' . http_build_query($pageParams);
                                 ?>
                                 <a href="<?php echo htmlspecialchars($pageLink); ?>" class="pagination-link<?php echo $page === $currentPage ? ' is-active' : ''; ?>">
                                     <?php echo $page; ?>

@@ -203,12 +203,21 @@ function smoothScroll(target, duration = 800) {
     requestAnimationFrame(animation);
 }
 
-document.querySelectorAll('.nav-link').forEach(link => {
-    link.addEventListener('click', function(e) {
-        e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
-        if (!target) return;
+document.querySelectorAll('.nav-link').forEach((link) => {
+    link.addEventListener('click', function (e) {
+        const href = this.getAttribute('href') ?? '';
 
+        // Only intercept in-page anchors; allow real page navigation like login.php.
+        if (!href.startsWith('#')) {
+            return;
+        }
+
+        const target = document.querySelector(href);
+        if (!target) {
+            return;
+        }
+
+        e.preventDefault();
         smoothScroll(target);
 
         // Close mobile menu kung bukas
