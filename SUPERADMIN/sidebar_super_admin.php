@@ -11,8 +11,13 @@ $isInventory = str_contains($currentPath, '/SUPERADMIN/sidebar/inventory.php');
 $isAssets = str_contains($currentPath, '/SUPERADMIN/sidebar/assets.php');
 $isScanHistory = str_contains($currentPath, '/SUPERADMIN/sidebar/scan_history.php');
 ?>
+<button id="sidebarMobileToggle" class="sidebar-mobile-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">
+    <span></span>
+    <span></span>
+    <span></span>
+</button>
 <nav class="sidebar" id="sidebar">
-    <button id="sidebarToggle" class="sidebar-toggle" type="button">
+    <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Collapse sidebar" aria-controls="sidebar" aria-expanded="true">
         <span id="toggleIcon">&#10094;</span>
     </button>
 

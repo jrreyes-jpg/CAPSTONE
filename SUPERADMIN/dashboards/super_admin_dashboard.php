@@ -303,7 +303,7 @@ $csrfToken = getCsrfToken();
         <?php if ($error): ?><div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
 
         <div id="dashboard" class="tab-content <?php echo $activeTab === 'dashboard' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'dashboard' ? 'display: block;' : 'display: none;'; ?>">
-            <h2 style="margin-bottom: 20px;">System Overview</h2>
+            <h2 class="dashboard-section-title" style="margin-bottom: 20px;">System Overview</h2>
             <div class="stats">
                 <div class="stat-card"><h3>Engineers</h3><div class="number counter" data-target="<?php echo count($engineers); ?>">0</div></div>
                 <div class="stat-card"><h3>Foreman</h3><div class="number counter" data-target="<?php echo count($foremen); ?>">0</div></div>
@@ -314,7 +314,7 @@ $csrfToken = getCsrfToken();
 
         <div id="create" class="tab-content <?php echo $activeTab === 'create' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'create' ? 'display: block;' : 'display: none;'; ?>">
             <div class="form-section">
-                <h2>Create Account</h2>
+                <h2 class="dashboard-section-title">Create Account</h2>
                                 <form method="POST">
                     <input type="hidden" name="action" value="create_account">
                     <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
@@ -351,7 +351,7 @@ $csrfToken = getCsrfToken();
 
         <div id="users" class="tab-content <?php echo $activeTab === 'users' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'users' ? 'display: block;' : 'display: none;'; ?>">
             <?php $sections = ['Engineers' => $engineers, 'Foreman' => $foremen, 'Clients' => $clients]; foreach ($sections as $title => $users): ?>
-                <h2 style="margin-top: 20px; margin-bottom: 15px;"><?php echo $title; ?></h2>
+                <h2 class="dashboard-section-title" style="margin-top: 20px; margin-bottom: 15px;"><?php echo $title; ?></h2>
                 <div class="users-table">
                     <table class="responsive-table">
                         <colgroup>
@@ -370,11 +370,11 @@ $csrfToken = getCsrfToken();
                             <?php else: ?>
                                 <?php foreach ($users as $user): $status = $user['status'] ?? 'active'; $rowId = (int)$user['id']; ?>
                                     <tr class="user-row" data-row-id="<?php echo $rowId; ?>">
-                                        <td><input class="table-input" type="text" data-field="full_name" value="<?php echo htmlspecialchars($user['full_name']); ?>" readonly required></td>
-                                        <td><input class="table-input" type="email" data-field="email" value="<?php echo htmlspecialchars($user['email']); ?>" readonly required></td>
-                                        <td><input class="table-input" type="text" data-field="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" pattern="^09[0-9]{9}$" maxlength="11" placeholder="09XXXXXXXXX" oninput="this.value=this.value.replace(/[^0-9]/g,''); if(!this.value.startsWith('09')){this.value='09';}" readonly></td>
-                                        <td><span class="status-badge <?php echo $status === 'active' ? 'status-active' : 'status-inactive'; ?>"><?php echo htmlspecialchars(ucfirst($status)); ?></span></td>
-                                        <td>
+                                        <td data-label="Name"><input class="table-input" type="text" data-field="full_name" value="<?php echo htmlspecialchars($user['full_name']); ?>" readonly required></td>
+                                        <td data-label="Email"><input class="table-input" type="email" data-field="email" value="<?php echo htmlspecialchars($user['email']); ?>" readonly required></td>
+                                        <td data-label="Phone"><input class="table-input" type="text" data-field="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>" pattern="^09[0-9]{9}$" maxlength="11" placeholder="09XXXXXXXXX" oninput="this.value=this.value.replace(/[^0-9]/g,''); if(!this.value.startsWith('09')){this.value='09';}" readonly></td>
+                                        <td data-label="Status"><span class="status-badge <?php echo $status === 'active' ? 'status-active' : 'status-inactive'; ?>"><?php echo htmlspecialchars(ucfirst($status)); ?></span></td>
+                                        <td data-label="Actions">
                                             <div class="action-group compact">
                                                 <button type="button" class="action-btn edit" data-edit-btn>Edit</button>
                                                 <button type="button" class="action-btn save" data-save-btn hidden>Save</button>

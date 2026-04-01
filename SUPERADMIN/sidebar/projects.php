@@ -482,7 +482,14 @@ foreach ($projects as $project) {
 <div class="container">
     <?php include __DIR__ . '/../sidebar_super_admin.php'; ?>
 
-    <main class="main-content">
+    <main class="main-content projects-content">
+        <div class="header page-header-card">
+            <div class="header-copy">
+                <h1>Project Management</h1>
+                <p>Create projects, assign engineers, update status, and manage tasks from one place.</p>
+            </div>
+        </div>
+
         <div class="page-stack">
             <section class="metrics-grid">
                 <div class="metric-card">
