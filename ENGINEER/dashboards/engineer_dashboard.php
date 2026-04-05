@@ -238,6 +238,20 @@ $tasks = [];
 $recentUpdates = [];
 $taskCounts = array_fill_keys($taskStatusOptions, 0);
 $openTaskCount = 0;
+$todayDate = (new DateTimeImmutable('today'))->format('Y-m-d');
+$priorityCounts = [
+    'overdue' => 0,
+    'due_today' => 0,
+    'needs_update' => 0,
+    'blocked' => 0,
+];
+$engineerProfile = [
+    'full_name' => (string)($_SESSION['name'] ?? 'Engineer'),
+    'email' => '',
+    'phone' => '',
+    'status' => 'active',
+    'role' => 'engineer',
+];
 
 $totalAssigned = $conn->prepare(
     "SELECT COUNT(DISTINCT pa.project_id)
@@ -379,7 +393,7 @@ if ($tasksStmt) {
 }
 
 $recentUpdatesStmt = $conn->prepare(
-    "SELECT etu.progress_note, etu.status_snapshot, etu.created_at, t.task_name, p.project_name
+    "SELECT etu.progress_note, etu.status_snapshot, etu.created_at, t.id AS task_id, t.task_name, p.project_name
      FROM engineer_task_updates etu
      INNER JOIN tasks t ON t.id = etu.task_id
      INNER JOIN projects p ON p.id = t.project_id
@@ -397,15 +411,88 @@ if ($recentUpdatesStmt) {
     $recentUpdatesStmt->close();
 }
 
+$profileStmt = $conn->prepare(
+    'SELECT full_name, email, phone, status, role
+     FROM users
+     WHERE id = ?
+     LIMIT 1'
+);
+if ($profileStmt) {
+    $profileStmt->bind_param('i', $userId);
+    $profileStmt->execute();
+    $profileResult = $profileStmt->get_result();
+
+    if ($profileResult && $profileResult->num_rows === 1) {
+        $engineerProfile = array_merge($engineerProfile, $profileResult->fetch_assoc());
+    }
+
+    $profileStmt->close();
+}
+
 foreach ($tasks as $task) {
     $statusKey = (string)($task['status'] ?? '');
 
     if (isset($taskCounts[$statusKey])) {
         $taskCounts[$statusKey]++;
     }
+
+    $taskDeadline = (string)($task['deadline'] ?? '');
+    $projectStatus = (string)($task['project_status'] ?? '');
+    $hasLatestProgress = trim((string)($task['latest_progress_note'] ?? '')) !== '';
+    $isOpenTask = $statusKey !== 'completed' && $projectStatus !== 'completed';
+
+    if (!$isOpenTask) {
+        continue;
+    }
+
+    if ($taskDeadline !== '' && $taskDeadline < $todayDate) {
+        $priorityCounts['overdue']++;
+    }
+
+    if ($taskDeadline === $todayDate) {
+        $priorityCounts['due_today']++;
+    }
+
+    if (!$hasLatestProgress) {
+        $priorityCounts['needs_update']++;
+    }
+
+    if ($statusKey === 'delayed') {
+        $priorityCounts['blocked']++;
+    }
 }
 
 $openTaskCount = $taskCounts['pending'] + $taskCounts['ongoing'] + $taskCounts['delayed'];
+$priorityCards = [
+    [
+        'title' => 'Overdue',
+        'count' => $priorityCounts['overdue'],
+        'filter' => 'overdue',
+        'action' => 'Review overdue tasks',
+        'tone' => 'danger',
+    ],
+    [
+        'title' => 'Due Today',
+        'count' => $priorityCounts['due_today'],
+        'filter' => 'due-today',
+        'action' => 'See today\'s tasks',
+        'tone' => 'warning',
+    ],
+    [
+        'title' => 'Needs Update',
+        'count' => $priorityCounts['needs_update'],
+        'filter' => 'no-update',
+        'action' => 'Report progress',
+        'tone' => 'neutral',
+    ],
+    [
+        'title' => 'Blocked',
+        'count' => $priorityCounts['blocked'],
+        'filter' => 'blocked',
+        'action' => 'Check blockers',
+        'tone' => 'info',
+    ],
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -430,51 +517,54 @@ $openTaskCount = $taskCounts['pending'] + $taskCounts['ongoing'] + $taskCounts['
 <?php include '../sidebar/sidebar_engineer.php'; ?>
 
 <div class="main-content">
-    <section class="engineer-hero">
-        <div>
-            <p class="engineer-eyebrow">Engineer Workspace</p>
-            <h1>Welcome, <?php echo htmlspecialchars((string)($_SESSION['name'] ?? 'Engineer')); ?></h1>
-            <p class="engineer-intro">Check your assigned projects, update task status, and keep project progress moving.</p>
-        </div>
-        <div class="engineer-hero-panel">
-            <span class="hero-chip">Assigned: <?php echo (int)$assignedCount; ?></span>
-            <span class="hero-chip">Open Tasks: <?php echo (int)$openTaskCount; ?></span>
-            <span class="hero-chip">Completed Projects: <?php echo (int)$completedCount; ?></span>
-        </div>
-    </section>
-
     <?php if ($flash): ?>
         <div class="flash <?php echo htmlspecialchars((string)($flash['type'] ?? 'success')); ?>">
             <?php echo htmlspecialchars((string)($flash['message'] ?? '')); ?>
         </div>
     <?php endif; ?>
 
-    <div class="stats-grid">
-        <div class="stat-card">
-            <h4>Assigned Projects</h4>
-            <p><?php echo (int)$assignedCount; ?></p>
+    <div id="dashboard-tab" class="tab-content active">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h4>Assigned Projects</h4>
+                <p><?php echo (int)$assignedCount; ?></p>
+            </div>
+            <div class="stat-card">
+                <h4>Active Projects</h4>
+                <p><?php echo (int)$inProgressCount; ?></p>
+            </div>
+            <div class="stat-card">
+                <h4>Completed Projects</h4>
+                <p><?php echo (int)$completedCount; ?></p>
+            </div>
+            <div class="stat-card">
+                <h4>Open Tasks</h4>
+                <p><?php echo (int)$openTaskCount; ?></p>
+            </div>
         </div>
-        <div class="stat-card">
-            <h4>Active Projects</h4>
-            <p><?php echo (int)$inProgressCount; ?></p>
-        </div>
-        <div class="stat-card">
-            <h4>Completed Projects</h4>
-            <p><?php echo (int)$completedCount; ?></p>
-        </div>
-        <div class="stat-card">
-            <h4>Open Tasks</h4>
-            <p><?php echo (int)$openTaskCount; ?></p>
-        </div>
+
+        <section class="priorities-panel">
+            <div class="section-heading">
+                <div>
+                    <p class="section-kicker">Today's Priorities</p>
+                    <h2>Focus on the work that needs you first.</h2>
+                </div>
+            </div>
+            <div class="priority-grid">
+                <?php foreach ($priorityCards as $priorityCard): ?>
+                    <article class="priority-card priority-card--<?php echo htmlspecialchars((string)$priorityCard['tone']); ?>">
+                        <span class="priority-card__label"><?php echo htmlspecialchars((string)$priorityCard['title']); ?></span>
+                        <strong><?php echo (int)$priorityCard['count']; ?></strong>
+                        <button type="button" class="priority-card__action" data-task-quick-filter="<?php echo htmlspecialchars((string)$priorityCard['filter']); ?>">
+                            <?php echo htmlspecialchars((string)$priorityCard['action']); ?>
+                        </button>
+                    </article>
+                <?php endforeach; ?>
+            </div>
+        </section>
     </div>
 
-    <div class="tabs">
-        <button class="tab active" type="button" data-tab-target="projects-tab">My Projects</button>
-        <button class="tab" type="button" data-tab-target="tasks-tab">Tasks</button>
-        <button class="tab" type="button" data-tab-target="profile-tab">Profile</button>
-    </div>
-
-    <div id="projects-tab" class="tab-content active">
+    <div id="projects-tab" class="tab-content">
         <h2>Assigned Projects</h2>
         <div class="projects-grid">
             <?php if (!empty($assignedProjects)): ?>
@@ -529,6 +619,14 @@ $openTaskCount = $taskCounts['pending'] + $taskCounts['ongoing'] + $taskCounts['
             <span class="task-pill delayed">Delayed: <?php echo (int)$taskCounts['delayed']; ?></span>
             <span class="task-pill completed">Completed: <?php echo (int)$taskCounts['completed']; ?></span>
         </div>
+        <div class="quick-actions">
+            <button type="button" class="quick-action-btn" data-task-quick-filter="all-open">All Open</button>
+            <button type="button" class="quick-action-btn" data-task-quick-filter="overdue">Overdue</button>
+            <button type="button" class="quick-action-btn" data-task-quick-filter="due-today">Due Today</button>
+            <button type="button" class="quick-action-btn" data-task-quick-filter="no-update">No Report Yet</button>
+            <button type="button" class="quick-action-btn" data-task-quick-filter="blocked">Blocked</button>
+            <button type="button" class="quick-action-btn quick-action-btn--muted" data-task-quick-filter="" data-reset-task-filters>Clear Filters</button>
+        </div>
         <div class="task-toolbar">
             <input
                 type="search"
@@ -551,7 +649,7 @@ $openTaskCount = $taskCounts['pending'] + $taskCounts['ongoing'] + $taskCounts['
             </select>
         </div>
         <p class="task-toolbar__hint">
-            Engineers review and update assigned tasks here. Task assignment stays with the project owner or super admin.
+            Engineers review and update assigned tasks here. Use quick actions for urgent work, then narrow further with search or dropdown filters.
         </p>
         <?php if (!empty($recentUpdates)): ?>
             <div class="updates-panel">
@@ -570,6 +668,19 @@ $openTaskCount = $taskCounts['pending'] + $taskCounts['ongoing'] + $taskCounts['
                                     · Status: <?php echo htmlspecialchars(ucfirst((string)$update['status_snapshot'])); ?>
                                 <?php endif; ?>
                             </small>
+                            <div class="update-card__meta">
+                                <span><?php echo htmlspecialchars((string)$update['project_name']); ?></span>
+                                <?php if (!empty($update['status_snapshot'])): ?>
+                                    <span>Status: <?php echo htmlspecialchars(ucfirst((string)$update['status_snapshot'])); ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <?php if (!empty($update['task_id'])): ?>
+                                <div class="update-card__actions">
+                                    <button type="button" class="btn btn-ghost btn-small" data-open-task-id="<?php echo (int)$update['task_id']; ?>">
+                                        Continue update
+                                    </button>
+                                </div>
+                            <?php endif; ?>
                         </article>
                     <?php endforeach; ?>
                 </div>
@@ -578,13 +689,30 @@ $openTaskCount = $taskCounts['pending'] + $taskCounts['ongoing'] + $taskCounts['
         <div class="tasks-list">
             <?php if (!empty($tasks)): ?>
                 <?php foreach ($tasks as $task): ?>
-                    <?php $deadlineMeta = build_deadline_meta($task['deadline'] ?? null, (string)$task['status']); ?>
+                    <?php
+                    $deadlineMeta = build_deadline_meta($task['deadline'] ?? null, (string)$task['status']);
+                    $taskId = (int)$task['id'];
+                    $taskStatus = (string)($task['status'] ?? '');
+                    $taskProjectStatus = (string)($task['project_status'] ?? '');
+                    $taskDeadline = (string)($task['deadline'] ?? '');
+                    $hasLatestProgress = trim((string)($task['latest_progress_note'] ?? '')) !== '';
+                    $isDueToday = $taskDeadline !== '' && $taskDeadline === $todayDate && $taskStatus !== 'completed' && $taskProjectStatus !== 'completed';
+                    $isOverdue = $taskDeadline !== '' && $taskDeadline < $todayDate && $taskStatus !== 'completed' && $taskProjectStatus !== 'completed';
+                    $isBlocked = $taskStatus === 'delayed';
+                    ?>
                     <div
+                        id="task-item-<?php echo $taskId; ?>"
                         class="task-item <?php echo htmlspecialchars((string)$task['status']); ?>"
                         data-task-item
+                        data-task-item-id="<?php echo $taskId; ?>"
                         data-task-name="<?php echo htmlspecialchars(mb_strtolower((string)$task['task_name'])); ?>"
                         data-project-name="<?php echo htmlspecialchars(mb_strtolower((string)$task['project_name'])); ?>"
                         data-task-status="<?php echo htmlspecialchars((string)$task['status']); ?>"
+                        data-task-has-update="<?php echo $hasLatestProgress ? 'yes' : 'no'; ?>"
+                        data-task-is-due-today="<?php echo $isDueToday ? 'yes' : 'no'; ?>"
+                        data-task-is-overdue="<?php echo $isOverdue ? 'yes' : 'no'; ?>"
+                        data-task-is-blocked="<?php echo $isBlocked ? 'yes' : 'no'; ?>"
+                        data-task-is-locked="<?php echo $taskProjectStatus === 'completed' ? 'yes' : 'no'; ?>"
                         data-deadline-group="<?php echo htmlspecialchars(
                             ($task['deadline'] ?? null) === null || ($task['deadline'] ?? '') === ''
                                 ? 'no-deadline'
@@ -658,24 +786,34 @@ $openTaskCount = $taskCounts['pending'] + $taskCounts['ongoing'] + $taskCounts['
     </div>
 
     <div id="profile-tab" class="tab-content">
-        <h2>Profile Settings</h2>
+        <h2>Profile Snapshot</h2>
+        <div class="profile-summary">
+            <span class="profile-chip">Open Tasks: <?php echo (int)$openTaskCount; ?></span>
+            <span class="profile-chip">Assigned Projects: <?php echo (int)$assignedCount; ?></span>
+            <span class="profile-chip">Completed Projects: <?php echo (int)$completedCount; ?></span>
+        </div>
         <div class="profile-form">
             <div class="form-group">
                 <label>Full Name</label>
-                <input type="text" value="<?php echo htmlspecialchars((string)($_SESSION['name'] ?? '')); ?>" disabled>
+                <input type="text" value="<?php echo htmlspecialchars((string)($engineerProfile['full_name'] ?? '')); ?>" disabled>
             </div>
             <div class="form-group">
                 <label>Email</label>
-                <input type="email" value="<?php echo htmlspecialchars((string)($_SESSION['email'] ?? '')); ?>" disabled>
+                <input type="email" value="<?php echo htmlspecialchars((string)($engineerProfile['email'] ?? '')); ?>" disabled>
             </div>
             <div class="form-group">
-                <label>Availability Status</label>
-                <select id="availability" disabled>
-                    <option>available</option>
-                    <option>assigned</option>
-                    <option>on-leave</option>
-                </select>
+                <label>Phone</label>
+                <input type="text" value="<?php echo htmlspecialchars((string)($engineerProfile['phone'] ?? '')); ?>" disabled>
             </div>
+            <div class="form-group">
+                <label>Account Status</label>
+                <input type="text" value="<?php echo htmlspecialchars(ucfirst((string)($engineerProfile['status'] ?? 'active'))); ?>" disabled>
+            </div>
+            <div class="form-group">
+                <label>Role</label>
+                <input type="text" value="<?php echo htmlspecialchars(ucfirst((string)($engineerProfile['role'] ?? 'engineer'))); ?>" disabled>
+            </div>
+            <p class="profile-note">Need profile details changed? Coordinate with the super admin so your account record stays consistent.</p>
             <a class="btn btn-link" href="/codesamplecaps/LOGIN/php/forgot.php">Reset Password</a>
         </div>
     </div>

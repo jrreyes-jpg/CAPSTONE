@@ -17,8 +17,18 @@ const activateTab = (tabId) => {
     document.querySelector(`[data-tab-target="${tabId}"]`)?.classList.add('active');
 
     document.querySelectorAll('[data-section-link]').forEach((link) => {
-        link.classList.toggle('active-link', link.dataset.sectionLink === tabId);
+        const isActive = link.dataset.sectionLink === tabId;
+        link.classList.toggle('active-link', isActive);
+        link.setAttribute('aria-current', isActive ? 'page' : 'false');
     });
+};
+
+const replaceHash = (tabId) => {
+    if (window.history && window.history.replaceState) {
+        window.history.replaceState(null, '', `#${tabId}`);
+    } else {
+        window.location.hash = tabId;
+    }
 };
 
 const setSidebarState = (isShrink) => {
@@ -34,7 +44,8 @@ const setSidebarState = (isShrink) => {
     mainContent.classList.toggle('sidebar-shrink', isShrink);
 
     if (toggleButton) {
-        toggleButton.innerHTML = isShrink ? '&rsaquo;' : '&lsaquo;';
+        toggleButton.setAttribute('aria-label', isShrink ? 'Expand menu' : 'Collapse menu');
+        toggleButton.setAttribute('aria-expanded', String(!isShrink));
     }
 };
 
@@ -48,15 +59,58 @@ const closeMobileSidebar = () => {
     mobileToggle?.classList.remove('active');
 };
 
+const spotlightTask = (taskId) => {
+    if (!taskId) {
+        return;
+    }
+
+    const taskItem = document.querySelector(`[data-task-item-id="${taskId}"]`);
+
+    if (!taskItem) {
+        return;
+    }
+
+    taskItem.classList.add('is-spotlight');
+    taskItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    window.setTimeout(() => {
+        taskItem.classList.remove('is-spotlight');
+    }, 2200);
+};
+
 const initTaskFilters = () => {
     const searchInput = document.querySelector('[data-task-search]');
     const statusFilter = document.querySelector('[data-task-status-filter]');
     const deadlineFilter = document.querySelector('[data-task-deadline-filter]');
     const taskItems = Array.from(document.querySelectorAll('[data-task-item]'));
+    const quickButtons = Array.from(document.querySelectorAll('[data-task-quick-filter]'));
+    const taskJumpButtons = Array.from(document.querySelectorAll('[data-open-task-id]'));
 
-    if (!searchInput || !statusFilter || !deadlineFilter || taskItems.length === 0) {
+    if (!searchInput || !statusFilter || !deadlineFilter) {
         return;
     }
+
+    let quickFilterValue = '';
+
+    const setQuickFilter = (value) => {
+        quickFilterValue = value;
+
+        quickButtons.forEach((button) => {
+            const buttonFilter = button.dataset.taskQuickFilter ?? '';
+            button.classList.toggle('active', value !== '' && buttonFilter === value);
+        });
+    };
+
+    const openTasksTab = () => {
+        activateTab('tasks-tab');
+        replaceHash('tasks-tab');
+    };
+
+    const resetStandardFilters = () => {
+        searchInput.value = '';
+        statusFilter.value = '';
+        deadlineFilter.value = '';
+    };
 
     const applyFilters = () => {
         const searchValue = searchInput.value.trim().toLowerCase();
@@ -68,6 +122,11 @@ const initTaskFilters = () => {
             const projectName = item.dataset.projectName ?? '';
             const taskStatus = item.dataset.taskStatus ?? '';
             const deadlineGroup = item.dataset.deadlineGroup ?? '';
+            const hasUpdate = item.dataset.taskHasUpdate ?? 'no';
+            const isDueToday = item.dataset.taskIsDueToday ?? 'no';
+            const isOverdue = item.dataset.taskIsOverdue ?? 'no';
+            const isBlocked = item.dataset.taskIsBlocked ?? 'no';
+            const isLocked = item.dataset.taskIsLocked ?? 'no';
 
             const matchesSearch =
                 searchValue === '' ||
@@ -75,14 +134,51 @@ const initTaskFilters = () => {
                 projectName.includes(searchValue);
             const matchesStatus = statusValue === '' || taskStatus === statusValue;
             const matchesDeadline = deadlineValue === '' || deadlineGroup === deadlineValue;
+            const matchesQuick =
+                quickFilterValue === '' ||
+                (quickFilterValue === 'all-open' && taskStatus !== 'completed' && isLocked !== 'yes') ||
+                (quickFilterValue === 'overdue' && isOverdue === 'yes') ||
+                (quickFilterValue === 'due-today' && isDueToday === 'yes') ||
+                (quickFilterValue === 'no-update' && hasUpdate === 'no' && taskStatus !== 'completed' && isLocked !== 'yes') ||
+                (quickFilterValue === 'blocked' && isBlocked === 'yes' && isLocked !== 'yes');
 
-            item.style.display = matchesSearch && matchesStatus && matchesDeadline ? '' : 'none';
+            item.hidden = !(matchesSearch && matchesStatus && matchesDeadline && matchesQuick);
         });
     };
+
+    quickButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const nextQuickFilter = button.dataset.taskQuickFilter ?? '';
+            const isResetButton = button.hasAttribute('data-reset-task-filters');
+
+            resetStandardFilters();
+            setQuickFilter(isResetButton ? '' : nextQuickFilter);
+            applyFilters();
+            openTasksTab();
+            document.getElementById('tasks-tab')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+
+    taskJumpButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const taskId = button.dataset.openTaskId ?? '';
+
+            resetStandardFilters();
+            setQuickFilter('');
+            applyFilters();
+            openTasksTab();
+
+            window.setTimeout(() => {
+                spotlightTask(taskId);
+            }, 120);
+        });
+    });
 
     searchInput.addEventListener('input', applyFilters);
     statusFilter.addEventListener('change', applyFilters);
     deadlineFilter.addEventListener('change', applyFilters);
+
+    applyFilters();
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -99,11 +195,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             activateTab(tabId);
+            replaceHash(tabId);
+        });
+    });
 
-            if (window.history && window.history.replaceState) {
-                window.history.replaceState(null, '', `#${tabId}`);
-            } else {
-                window.location.hash = tabId;
+    document.querySelectorAll('[data-section-link]').forEach((link) => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                closeMobileSidebar();
             }
         });
     });
@@ -138,12 +237,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const hashTabId = window.location.hash.replace('#', '');
+    const activeTabButton = document.querySelector('[data-tab-target].active');
+    const firstTabButton = document.querySelector('[data-tab-target]');
     const defaultTabId =
-        document.querySelector('[data-tab-target].active')?.dataset.tabTarget ??
-        document.querySelector('[data-tab-target]')?.dataset.tabTarget ??
-        'projects-tab';
+        hashTabId ||
+        activeTabButton?.dataset.tabTarget ||
+        firstTabButton?.dataset.tabTarget ||
+        'dashboard-tab';
 
-    activateTab(hashTabId || defaultTabId);
+    activateTab(defaultTabId);
     initTaskFilters();
     setSidebarState(false);
 });

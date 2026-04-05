@@ -233,13 +233,6 @@ if ($result) {
     <?php include __DIR__ . '/../sidebar_super_admin.php'; ?>
 
     <main class="main-content assets-content">
-        <div class="header page-header-card">
-            <div class="header-copy">
-                <h1>Assets & QR Codes</h1>
-                <p>Create assets, preview QR codes, and manage return actions cleanly on mobile or desktop.</p>
-            </div>
-        </div>
-
         <?php if ($message): ?><div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div><?php endif; ?>
         <?php if ($error): ?><div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
         <?php if (!$qrLibraryReady): ?><div class="alert alert-error">QR preview/print is temporarily unavailable because Composer packages are incomplete in `vendor/`.</div><?php endif; ?>
