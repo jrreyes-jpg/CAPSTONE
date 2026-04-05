@@ -112,10 +112,20 @@ function determine_inventory_status(int $quantity, ?int $minStock): string {
 }
 
 $supportsDraftStatus = enum_supports_value($conn, 'projects', 'status', 'draft');
+$supportsCancelledStatus = enum_supports_value($conn, 'projects', 'status', 'cancelled');
+$supportsArchivedStatus = enum_supports_value($conn, 'projects', 'status', 'archived');
 $hasProjectAddressColumn = table_has_column($conn, 'projects', 'project_address');
-$statusOptions = $supportsDraftStatus
-    ? ['draft', 'pending', 'ongoing', 'completed', 'on-hold']
-    : ['pending', 'ongoing', 'completed', 'on-hold'];
+$statusOptions = [];
+if ($supportsDraftStatus) {
+    $statusOptions[] = 'draft';
+}
+$statusOptions = array_merge($statusOptions, ['pending', 'ongoing', 'completed', 'on-hold']);
+if ($supportsCancelledStatus) {
+    $statusOptions[] = 'cancelled';
+}
+if ($supportsArchivedStatus) {
+    $statusOptions[] = 'archived';
+}
 $initialStatusOptions = $supportsDraftStatus
     ? ['draft', 'pending', 'ongoing']
     : ['pending', 'ongoing'];
@@ -167,6 +177,48 @@ function getProjectSnapshot(mysqli $conn, int $projectId): ?array {
     $result = $stmt->get_result();
 
     return $result ? $result->fetch_assoc() : null;
+}
+
+function projectNameExists(mysqli $conn, string $projectName, ?int $excludeProjectId = null): bool {
+    $normalizedName = trim(mb_strtolower($projectName));
+
+    if ($normalizedName === '') {
+        return false;
+    }
+
+    if ($excludeProjectId !== null && $excludeProjectId > 0) {
+        $stmt = $conn->prepare(
+            'SELECT id
+             FROM projects
+             WHERE LOWER(TRIM(project_name)) = ?
+             AND id <> ?
+             LIMIT 1'
+        );
+
+        if (!$stmt) {
+            return false;
+        }
+
+        $stmt->bind_param('si', $normalizedName, $excludeProjectId);
+    } else {
+        $stmt = $conn->prepare(
+            'SELECT id
+             FROM projects
+             WHERE LOWER(TRIM(project_name)) = ?
+             LIMIT 1'
+        );
+
+        if (!$stmt) {
+            return false;
+        }
+
+        $stmt->bind_param('s', $normalizedName);
+    }
+
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return (bool)($result && $result->fetch_assoc());
 }
 
 function countOpenProjectTasks(mysqli $conn, int $projectId): int {
@@ -266,6 +318,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($projectName === '' || $clientId <= 0 || $engineerId <= 0) {
             set_projects_flash('error', 'Project name, client, and engineer are required.');
+            redirect_projects_page();
+        }
+
+        if (projectNameExists($conn, $projectName)) {
+            set_projects_flash('error', 'Project name already exists. Use a more specific name like site, phase, or year.');
             redirect_projects_page();
         }
 
@@ -423,6 +480,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
+        if (!in_array(($project['status'] ?? ''), ['pending', 'draft'], true) && $status === 'draft') {
+            set_projects_flash('error', 'Only projects that have not started yet can stay in Draft.');
+            redirect_projects_page();
+        }
+
         if ($status === 'completed') {
             $openTasks = countOpenProjectTasks($conn, $projectId);
             $activeDeployments = countActiveProjectInventoryDeployments($conn, $projectId);
@@ -439,6 +501,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($activeDeployments > 0) {
                 set_projects_flash('error', 'Return all deployed inventory before marking this project as completed.');
+                redirect_projects_page();
+            }
+        }
+
+        if (in_array($status, ['cancelled', 'archived'], true)) {
+            $activeDeployments = countActiveProjectInventoryDeployments($conn, $projectId);
+
+            if ($activeDeployments > 0) {
+                set_projects_flash('error', 'Return all deployed inventory before cancelling or archiving this project.');
                 redirect_projects_page();
             }
         }
@@ -493,6 +564,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($projectName === '' || $clientId <= 0 || $engineerId <= 0) {
             set_projects_flash('error', 'Project name, client, and engineer are required.');
+            redirect_projects_page();
+        }
+
+        if (projectNameExists($conn, $projectName, $projectId)) {
+            set_projects_flash('error', 'Project name already exists. Use a more specific name like site, phase, or year.');
             redirect_projects_page();
         }
 
@@ -1028,6 +1104,21 @@ $completedProjects = (int)($projectMetrics['completed_projects'] ?? 0);
 $taskMetricsResult = $conn->query("SELECT COUNT(*) AS total_tasks FROM tasks");
 $taskMetrics = $taskMetricsResult ? $taskMetricsResult->fetch_assoc() : [];
 $totalTasks = (int)($taskMetrics['total_tasks'] ?? 0);
+$statusCounts = array_fill_keys($statusOptions, 0);
+
+$statusCountsResult = $conn->query("
+    SELECT p.status, COUNT(*) AS total
+    FROM projects p
+    GROUP BY p.status
+");
+if ($statusCountsResult) {
+    while ($statusRow = $statusCountsResult->fetch_assoc()) {
+        $statusKey = (string)($statusRow['status'] ?? '');
+        if (array_key_exists($statusKey, $statusCounts)) {
+            $statusCounts[$statusKey] = (int)($statusRow['total'] ?? 0);
+        }
+    }
+}
 
 $projectCountQuery = "
     SELECT COUNT(*) AS total
@@ -1119,33 +1210,7 @@ if ($projectsResult) {
     <?php include __DIR__ . '/../sidebar_super_admin.php'; ?>
 
     <main class="main-content projects-content">
-        <div class="header page-header-card">
-            <div class="header-copy">
-                <h1>Project Management</h1>
-                <p>Create projects, assign engineers, update status, and manage tasks from one place.</p>
-            </div>
-        </div>
-
         <div class="page-stack">
-            <section class="metrics-grid">
-                <div class="metric-card">
-                    <span>Total Projects</span>
-                    <strong><?php echo $totalProjects; ?></strong>
-                </div>
-                <div class="metric-card">
-                    <span>Ongoing</span>
-                    <strong><?php echo $ongoingProjects; ?></strong>
-                </div>
-                <div class="metric-card">
-                    <span>Completed</span>
-                    <strong><?php echo $completedProjects; ?></strong>
-                </div>
-                <div class="metric-card">
-                    <span>Total Tasks</span>
-                    <strong><?php echo $totalTasks; ?></strong>
-                </div>
-            </section>
-
             <?php if ($flash): ?>
                 <div class="alert <?php echo $flash['type'] === 'success' ? 'alert-success' : 'alert-error'; ?>">
                     <?php echo htmlspecialchars($flash['message']); ?>
@@ -1253,25 +1318,63 @@ if ($projectsResult) {
                 </form>
             </section>
 
-            <section class="page-stack">
+            <section
+                class="page-stack"
+                id="projects-list-section"
+                data-reset-url="/codesamplecaps/SUPERADMIN/sidebar/projects.php<?php echo $statusFilter !== '' ? '?' . http_build_query(['status' => $statusFilter]) : ''; ?>"
+            >
                 <h2 class="section-title-inline">Projects</h2>
+                <div class="project-controls">
+                    <div class="project-filter-chips">
+                        <?php
+                        $chipOptions = ['' => 'All'];
+                        foreach ($statusOptions as $statusOption) {
+                            $chipOptions[$statusOption] = ucfirst($statusOption);
+                        }
+                        foreach ($chipOptions as $chipValue => $chipLabel):
+                            $chipParams = [];
+                            if ($searchQuery !== '') {
+                                $chipParams['q'] = $searchQuery;
+                            }
+                            if ($chipValue !== '') {
+                                $chipParams['status'] = $chipValue;
+                            }
+                            $chipLink = '/codesamplecaps/SUPERADMIN/sidebar/projects.php' . ($chipParams ? '?' . http_build_query($chipParams) : '');
+                            $isActiveChip = $statusFilter === $chipValue;
+                        ?>
+                            <a href="<?php echo htmlspecialchars($chipLink); ?>" class="project-filter-chip<?php echo $isActiveChip ? ' is-active' : ''; ?>">
+                                <?php
+                                $chipCount = $chipValue === '' ? $totalProjects : (int)($statusCounts[$chipValue] ?? 0);
+                                echo htmlspecialchars($chipLabel . ' (' . $chipCount . ')');
+                                ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <form method="GET" class="project-toolbar" id="project-search-form">
+                        <div class="project-search-shell">
+                            <div class="project-search-input-row">
+                                <span class="project-search-icon" aria-hidden="true">&#128269;</span>
+                                <input type="search" id="project-search" name="q" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search project, client, engineer, or site" autocomplete="off">
+                                <a
+                                    href="/codesamplecaps/SUPERADMIN/sidebar/projects.php<?php echo $statusFilter !== '' ? '?' . http_build_query(['status' => $statusFilter]) : ''; ?>"
+                                    class="project-search-clear<?php echo $searchQuery !== '' ? ' is-visible' : ''; ?>"
+                                    id="project-search-clear"
+                                >
+                                    Clear
+                                </a>
+                            </div>
+                            <div class="project-search-dropdown" id="project-search-dropdown" hidden></div>
+                        </div>
+                        <button type="submit" class="btn-primary project-toolbar__submit">Search</button>
+                    </form>
+                </div>
 
                 <?php if (empty($projects)): ?>
-                    <div class="empty-state">No projects yet. Create your first project above.</div>
+                    <div class="empty-state">
+                        <?php echo $searchQuery !== '' || $statusFilter !== '' ? 'No matching projects found.' : 'No projects yet. Create your first project above.'; ?>
+                    </div>
                 <?php else: ?>
-                    <form method="GET" class="project-toolbar" id="project-search-form">
-                        <input type="search" id="project-search" name="q" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search project, client, engineer, or site">
-                        <select id="project-status-filter" name="status">
-                            <option value="">All statuses</option>
-                            <?php foreach ($statusOptions as $statusOption): ?>
-                                <option value="<?php echo htmlspecialchars($statusOption); ?>" <?php echo $statusFilter === $statusOption ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars(ucfirst($statusOption)); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                        <button type="submit" class="btn-primary">Search</button>
-                    </form>
-
                     <div class="project-results-meta">
                         <span>Showing <?php echo count($projects); ?> of <?php echo $filteredProjects; ?> matching projects</span>
                         <span>Page <?php echo $currentPage; ?> of <?php echo $totalPages; ?></span>
@@ -1291,7 +1394,7 @@ if ($projectsResult) {
                             ])));
                             $detailsPath = '/codesamplecaps/SUPERADMIN/sidebar/project_details.php?id=' . (int)$project['id'];
                             ?>
-                            <article class="project-card<?php echo $isCompleted ? ' is-locked' : ''; ?><?php echo $isDraft ? ' is-draft' : ''; ?>" data-project-card data-status="<?php echo htmlspecialchars($project['status']); ?>" data-search="<?php echo htmlspecialchars($searchText); ?>">
+                            <article class="project-card<?php echo $isCompleted ? ' is-locked' : ''; ?><?php echo $isDraft ? ' is-draft' : ''; ?>" data-project-card data-status="<?php echo htmlspecialchars($project['status']); ?>" data-search="<?php echo htmlspecialchars($searchText); ?>" data-title="<?php echo htmlspecialchars($project['project_name']); ?>" data-link="<?php echo htmlspecialchars($detailsPath); ?>" data-client="<?php echo htmlspecialchars($project['client_name'] ?? 'N/A'); ?>" data-engineer="<?php echo htmlspecialchars($project['engineer_name'] ?? 'Not assigned'); ?>">
                                 <div class="card-split">
                                     <div>
                                         <h3><?php echo htmlspecialchars($project['project_name']); ?></h3>
@@ -1352,33 +1455,216 @@ if ($projectsResult) {
 </div>
 <script src="../js/admin-script.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+function initProjectSearchUI() {
+    const section = document.getElementById('projects-list-section');
     const searchInput = document.getElementById('project-search');
-    const statusFilter = document.getElementById('project-status-filter');
-    const cards = Array.from(document.querySelectorAll('[data-project-card]'));
+    const searchClear = document.getElementById('project-search-clear');
+    const searchDropdown = document.getElementById('project-search-dropdown');
+    const projectCards = Array.from(document.querySelectorAll('[data-project-card]'));
+    let activeSuggestionIndex = -1;
 
-    function applyProjectFilters() {
-        const query = (searchInput?.value || '').trim().toLowerCase();
-        const status = (statusFilter?.value || '').trim().toLowerCase();
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
 
-        cards.forEach((card) => {
-            const cardSearch = (card.getAttribute('data-search') || '').toLowerCase();
-            const cardStatus = (card.getAttribute('data-status') || '').toLowerCase();
-            const matchesQuery = query === '' || cardSearch.includes(query);
-            const matchesStatus = status === '' || cardStatus === status;
+    function highlightMatch(text, query) {
+        const lowerText = text.toLowerCase();
+        const matchIndex = lowerText.indexOf(query);
 
-            card.hidden = !(matchesQuery && matchesStatus);
+        if (matchIndex === -1 || query === '') {
+            return escapeHtml(text);
+        }
+
+        const before = escapeHtml(text.slice(0, matchIndex));
+        const matched = escapeHtml(text.slice(matchIndex, matchIndex + query.length));
+        const after = escapeHtml(text.slice(matchIndex + query.length));
+
+        return before + '<mark>' + matched + '</mark>' + after;
+    }
+
+    function getSuggestionLinks() {
+        return Array.from(searchDropdown?.querySelectorAll('.project-search-result') || []);
+    }
+
+    function syncSuggestionFocus() {
+        const links = getSuggestionLinks();
+
+        links.forEach(function (link, index) {
+            link.classList.toggle('is-active', index === activeSuggestionIndex);
         });
     }
 
-    if (searchInput) {
-        searchInput.addEventListener('input', applyProjectFilters);
+    function updateSearchDropdown() {
+        if (!searchInput || !searchDropdown) {
+            return;
+        }
+
+        const query = searchInput.value.trim().toLowerCase();
+
+        if (query.length < 2) {
+            searchDropdown.hidden = true;
+            searchDropdown.innerHTML = '';
+            activeSuggestionIndex = -1;
+            return;
+        }
+
+        const matches = projectCards
+            .filter(function (card) {
+                return (card.getAttribute('data-search') || '').toLowerCase().includes(query);
+            })
+            .slice(0, 5);
+
+        if (matches.length === 0) {
+            searchDropdown.innerHTML = '<div class="project-search-empty">No matching projects yet.</div>';
+            searchDropdown.hidden = false;
+            activeSuggestionIndex = -1;
+            return;
+        }
+
+        searchDropdown.innerHTML = matches.map(function (card) {
+            const title = card.getAttribute('data-title') || 'Project';
+            const status = card.getAttribute('data-status') || '';
+            const link = card.getAttribute('data-link') || '#';
+            const client = card.getAttribute('data-client') || 'N/A';
+            const engineer = card.getAttribute('data-engineer') || 'Not assigned';
+
+            return '<a class="project-search-result" href="' + link + '">' +
+                '<strong>' + highlightMatch(title, query) + '</strong>' +
+                '<span>Client: ' + escapeHtml(client) + ' · Engineer: ' + escapeHtml(engineer) + ' · ' + escapeHtml(status.charAt(0).toUpperCase() + status.slice(1)) + '</span>' +
+                '</a>';
+        }).join('');
+        searchDropdown.hidden = false;
+        activeSuggestionIndex = -1;
+        syncSuggestionFocus();
     }
 
-    if (statusFilter) {
-        statusFilter.addEventListener('change', applyProjectFilters);
+    function updateClearVisibility() {
+        if (!searchInput || !searchClear) {
+            return;
+        }
+
+        searchClear.classList.toggle('is-visible', searchInput.value.trim() !== '');
     }
-});
+
+    function refreshProjectsSection(url) {
+        if (!section) {
+            window.location.href = url;
+            return;
+        }
+
+        fetch(url, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        })
+            .then(function (response) {
+                return response.text();
+            })
+            .then(function (html) {
+                const parser = new DOMParser();
+                const documentFromResponse = parser.parseFromString(html, 'text/html');
+                const nextSection = documentFromResponse.getElementById('projects-list-section');
+
+                if (!nextSection) {
+                    window.location.href = url;
+                    return;
+                }
+
+                section.replaceWith(nextSection);
+                if (window.history && window.history.replaceState) {
+                    window.history.replaceState(null, '', url);
+                }
+                initProjectSearchUI();
+            })
+            .catch(function () {
+                window.location.href = url;
+            });
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            updateClearVisibility();
+            updateSearchDropdown();
+        });
+
+        searchInput.addEventListener('focus', updateSearchDropdown);
+        searchInput.addEventListener('keydown', function (event) {
+            const links = getSuggestionLinks();
+
+            if (searchDropdown.hidden || links.length === 0) {
+                return;
+            }
+
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                activeSuggestionIndex = (activeSuggestionIndex + 1) % links.length;
+                syncSuggestionFocus();
+                return;
+            }
+
+            if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                activeSuggestionIndex = activeSuggestionIndex <= 0 ? links.length - 1 : activeSuggestionIndex - 1;
+                syncSuggestionFocus();
+                return;
+            }
+
+            if (event.key === 'Enter' && activeSuggestionIndex >= 0 && links[activeSuggestionIndex]) {
+                event.preventDefault();
+                window.location.href = links[activeSuggestionIndex].href;
+                return;
+            }
+
+            if (event.key === 'Escape') {
+                searchDropdown.hidden = true;
+                activeSuggestionIndex = -1;
+            }
+        });
+    }
+
+    if (searchClear) {
+        searchClear.addEventListener('click', function (event) {
+            event.preventDefault();
+
+            if (!searchInput) {
+                return;
+            }
+
+            searchInput.value = '';
+            updateClearVisibility();
+            if (searchDropdown) {
+                searchDropdown.hidden = true;
+                searchDropdown.innerHTML = '';
+            }
+
+            const resetUrl = section?.getAttribute('data-reset-url') || searchClear.getAttribute('href') || '/codesamplecaps/SUPERADMIN/sidebar/projects.php';
+            refreshProjectsSection(resetUrl);
+        });
+    }
+
+    if (!window.__projectSearchOutsideBound) {
+        document.addEventListener('click', function (event) {
+            const currentDropdown = document.getElementById('project-search-dropdown');
+            const isInsideSearch = event.target.closest('.project-search-shell');
+
+            if (!isInsideSearch && currentDropdown) {
+                currentDropdown.hidden = true;
+            }
+        });
+
+        window.__projectSearchOutsideBound = true;
+    }
+
+    updateClearVisibility();
+    updateSearchDropdown();
+}
+
+document.addEventListener('DOMContentLoaded', initProjectSearchUI);
 </script>
 </body>
 </html>

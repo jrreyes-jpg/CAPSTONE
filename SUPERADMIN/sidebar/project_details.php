@@ -78,10 +78,20 @@ function pm_ensure_project_inventory_return_logs_table(mysqli $conn): void {
 }
 
 $supportsDraftStatus = pm_enum_supports_value($conn, 'projects', 'status', 'draft');
+$supportsCancelledStatus = pm_enum_supports_value($conn, 'projects', 'status', 'cancelled');
+$supportsArchivedStatus = pm_enum_supports_value($conn, 'projects', 'status', 'archived');
 $hasProjectAddressColumn = pm_table_has_column($conn, 'projects', 'project_address');
-$statusOptions = $supportsDraftStatus
-    ? ['draft', 'pending', 'ongoing', 'completed', 'on-hold']
-    : ['pending', 'ongoing', 'completed', 'on-hold'];
+$statusOptions = [];
+if ($supportsDraftStatus) {
+    $statusOptions[] = 'draft';
+}
+$statusOptions = array_merge($statusOptions, ['pending', 'ongoing', 'completed', 'on-hold']);
+if ($supportsCancelledStatus) {
+    $statusOptions[] = 'cancelled';
+}
+if ($supportsArchivedStatus) {
+    $statusOptions[] = 'archived';
+}
 $todayDate = pm_today_date();
 $projectId = max(0, (int)($_GET['id'] ?? 0));
 $detailsPath = '/codesamplecaps/SUPERADMIN/sidebar/project_details.php?id=' . $projectId;
@@ -430,6 +440,30 @@ if ($projectId > 0) {
                                 <button type="submit" class="btn-primary">Save Status</button>
                             </div>
                         </form>
+
+                        <?php if ($supportsCancelledStatus || $supportsArchivedStatus): ?>
+                            <div class="status-quick-actions">
+                                <?php if ($supportsCancelledStatus && ($project['status'] ?? '') !== 'cancelled'): ?>
+                                    <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="inline-form" data-confirm-action="Cancel this project? This is for projects that will not continue.">
+                                        <input type="hidden" name="action" value="update_project_status">
+                                        <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
+                                        <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
+                                        <input type="hidden" name="status" value="cancelled">
+                                        <button type="submit" class="btn-secondary btn-status-danger">Mark as Cancelled</button>
+                                    </form>
+                                <?php endif; ?>
+
+                                <?php if ($supportsArchivedStatus && ($project['status'] ?? '') !== 'archived'): ?>
+                                    <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="inline-form" data-confirm-action="Archive this project? It will stay in history but should no longer be active.">
+                                        <input type="hidden" name="action" value="update_project_status">
+                                        <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
+                                        <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
+                                        <input type="hidden" name="status" value="archived">
+                                        <button type="submit" class="btn-secondary btn-status-neutral">Archive Project</button>
+                                    </form>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </section>
 
@@ -622,5 +656,18 @@ if ($projectId > 0) {
     </main>
 </div>
 <script src="../js/admin-script.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-confirm-action]').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            const message = form.getAttribute('data-confirm-action') || 'Are you sure?';
+
+            if (!window.confirm(message)) {
+                event.preventDefault();
+            }
+        });
+    });
+});
+</script>
 </body>
 </html>
