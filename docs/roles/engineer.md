@@ -1,30 +1,31 @@
 # Engineer
 
-## Primary Responsibility
+## Main Purpose
 
-The Engineer is responsible for project execution monitoring and progress updates.
+The Engineer role is focused on project execution, task updates, and progress monitoring.
 
-## Main Duties
+## Responsibilities
 
 - Monitor assigned projects
-- Review and update project tasks
-- Track deadlines and completion status
-- Report project progress based on assigned work
+- Review task progress
+- Update task status when work changes
+- Track deadlines and completion
+- Coordinate with operations and project owners
 
-## Allowed Actions
+## Allowed In The System
 
 - View assigned projects
 - View assigned tasks
-- Update work progress where applicable
-- Coordinate with field operations and project owners
+- Update task status
+- Report work progress based on assigned responsibilities
 
-## Not the Main Owner Of
+## Not Handled By This Role
 
 - User management
-- Master inventory control
-- Actual on-site asset scanning and usage logging
-- Client-facing account administration
+- Full inventory control
+- On-site asset scanning and usage logging
+- Client account administration
 
-## System Intent
+## System Goal
 
-This role focuses on delivery progress, task execution, and engineering-side updates.
+This role helps keep project delivery organized, updated, and on track.
