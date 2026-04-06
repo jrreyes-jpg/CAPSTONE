@@ -700,7 +700,7 @@ if (audit_log_table_exists($conn)) {
          LEFT JOIN users actor ON actor.id = l.user_id
          WHERE DATE(l.created_at) >= DATE_SUB(CURDATE(), INTERVAL " . ($rangeDays - 1) . " DAY)
          ORDER BY l.created_at DESC
-         LIMIT 12"
+        "
     );
 
     if ($recentActivityResult) {
@@ -789,7 +789,7 @@ if (audit_log_table_exists($conn)) {
                             <?php endif; ?>
                         </a>
 
-                        <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=users&amp;status=inactive" class="alert-card alert-card-link">
+                        <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=users&amp;status=inactive" class="alert-card alert-card-info alert-card-link">
                             <div class="alert-card-head">
                                 <h3>Users</h3>
                                 <span><?php echo count($inactiveAssignmentAlerts); ?></span>
@@ -820,26 +820,26 @@ if (audit_log_table_exists($conn)) {
                         </div>
                     </div>
                     <div class="metric-strip metric-strip-compact">
-                        <article class="metric-tile">
+                        <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=users" class="metric-tile metric-tile-link metric-tile-people">
                             <span>People</span>
                             <strong><?php echo $totalUsers; ?></strong>
-                            <small>All users in the system</small>
-                        </article>
-                        <article class="metric-tile">
+                            <small>Open manage users</small>
+                        </a>
+                        <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?status=active" class="metric-tile metric-tile-link metric-tile-projects">
                             <span>Projects</span>
                             <strong><?php echo $totalProjects; ?></strong>
-                            <small><?php echo $ongoingProjects; ?> ongoing now</small>
-                        </article>
-                        <article class="metric-tile">
+                            <small><?php echo $ongoingProjects; ?> active now</small>
+                        </a>
+                        <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?status=active" class="metric-tile metric-tile-link metric-tile-tasks">
                             <span>Tasks</span>
                             <strong><?php echo $openTasks; ?></strong>
-                            <small>Open work items</small>
-                        </article>
-                        <article class="metric-tile">
+                            <small>Review active project work</small>
+                        </a>
+                        <a href="/codesamplecaps/SUPERADMIN/sidebar/scan_history.php" class="metric-tile metric-tile-link metric-tile-scans">
                             <span>Scans Today</span>
                             <strong><?php echo $scansToday; ?></strong>
-                            <small>QR scans today</small>
-                        </article>
+                            <small>Open scan history</small>
+                        </a>
                     </div>
                 </section>
 
@@ -847,9 +847,12 @@ if (audit_log_table_exists($conn)) {
                     <div class="panel-heading">
                         <div>
                             <h2 class="dashboard-section-title">Recent Activity</h2>
-                            <p class="panel-copy">Latest admin actions.</p>
+                            <p class="panel-copy">Latest <?php echo count($auditLogFeed); ?> admin actions in the selected range.</p>
                         </div>
-                        <div class="dashboard-actions">
+                        <div class="dashboard-actions activity-actions">
+                            <button type="button" class="action-chip action-chip-button" id="toggleActivityHistory" aria-expanded="false" <?php echo count($auditLogFeed) <= 3 ? 'hidden' : ''; ?>>
+                                Show All History
+                            </button>
                             <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard&amp;range=7" class="action-chip<?php echo $rangeDays === 7 ? ' active-chip' : ''; ?>">7 Days</a>
                             <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard&amp;range=14" class="action-chip<?php echo $rangeDays === 14 ? ' active-chip' : ''; ?>">14 Days</a>
                             <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard&amp;range=30" class="action-chip<?php echo $rangeDays === 30 ? ' active-chip' : ''; ?>">30 Days</a>
@@ -857,13 +860,34 @@ if (audit_log_table_exists($conn)) {
                         </div>
                     </div>
 
+                    <?php if (!empty($auditLogFeed)): ?>
+                        <div class="activity-search">
+                            <input type="search" id="activitySearchInput" class="activity-search__input" placeholder="Search activity, actor, action, date..." autocomplete="off" aria-label="Search recent activity">
+                            <span class="activity-search__hint">Press ESC to clear</span>
+                        </div>
+                    <?php endif; ?>
+
                     <?php if (empty($auditLogFeed)): ?>
                         <div class="empty-state-solid">No audit logs yet. New admin actions will appear here.</div>
                     <?php else: ?>
-                        <div class="activity-feed">
-                            <?php foreach ($auditLogFeed as $activity): ?>
+                        <div class="activity-feed activity-feed-compact" id="activityFeed">
+                            <?php foreach ($auditLogFeed as $index => $activity): ?>
                                 <?php $auditSummary = buildAuditSummaryClean($activity); ?>
-                                <div class="activity-item">
+                                <?php
+                                try {
+                                    $activityDate = new DateTimeImmutable((string)($activity['activity_time'] ?? 'now'));
+                                    $activityFullDate = $activityDate->format('l, M d, Y g:i A');
+                                } catch (Throwable $exception) {
+                                    $activityFullDate = (string)($activity['activity_time'] ?? '');
+                                }
+                                $activitySearch = strtolower(trim(implode(' ', [
+                                    (string)($auditSummary['title'] ?? ''),
+                                    (string)($auditSummary['details'] ?? ''),
+                                    (string)($activity['actor_name'] ?? ''),
+                                    $activityFullDate,
+                                ])));
+                                ?>
+                                <div class="activity-item<?php echo $index >= 3 ? ' activity-item-extra' : ''; ?>" data-activity-item data-activity-search="<?php echo htmlspecialchars($activitySearch); ?>" data-activity-rank="<?php echo $index; ?>"<?php echo $index >= 3 ? ' hidden' : ''; ?>>
                                     <div class="activity-badge activity-<?php echo htmlspecialchars($auditSummary['badge']); ?>">
                                         <?php echo strtoupper(substr((string)$auditSummary['badge'], 0, 1)); ?>
                                     </div>
@@ -871,7 +895,12 @@ if (audit_log_table_exists($conn)) {
                                         <strong><?php echo htmlspecialchars($auditSummary['title']); ?></strong>
                                         <span><?php echo htmlspecialchars($auditSummary['details']); ?></span>
                                     </div>
-                                    <time><?php echo htmlspecialchars(formatRelativeDate($activity['activity_time'] ?? null)); ?></time>
+                                    <time>
+                                        <span class="activity-time-relative"><?php echo htmlspecialchars(formatRelativeDate($activity['activity_time'] ?? null)); ?></span>
+                                        <span class="activity-time-full">
+                                            <?php echo htmlspecialchars($activityFullDate); ?>
+                                        </span>
+                                    </time>
                                 </div>
                             <?php endforeach; ?>
                         </div>

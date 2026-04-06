@@ -38,3 +38,14 @@ $isScanHistory = str_contains($currentPath, '/SUPERADMIN/sidebar/scan_history.ph
     </ul>
 </nav>
 <div id="sidebarOverlay" class="sidebar-overlay"></div>
+<header class="global-topbar" aria-live="polite">
+    <div class="global-topbar__copy">
+        <strong>EDGE Automation</strong>
+        <span>Super Admin Panel</span>
+    </div>
+    <div class="global-topbar__clock">
+        <span class="global-topbar__clock-label">Philippines Time</span>
+        <strong class="global-topbar__time" data-ph-time>--:--:--</strong>
+        <span class="global-topbar__date" data-ph-date>Loading date...</span>
+    </div>
+</header>
