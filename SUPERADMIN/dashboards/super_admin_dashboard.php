@@ -592,17 +592,7 @@ $lowStockItems = (int)($inventoryMetricRow['low_stock_items'] ?? 0);
 $outOfStockItems = (int)($inventoryMetricRow['out_of_stock_items'] ?? 0);
 $totalAssets = (int)($assetMetricRow['total_assets'] ?? 0);
 $assetsThisMonth = (int)($assetMetricRow['assets_this_month'] ?? 0);
-$rangeDays = (int)($_GET['range'] ?? 7);
-if (!in_array($rangeDays, [7, 14, 30, 90], true)) {
-    $rangeDays = 7;
-}
 $scansToday = getScalarInt($conn, "SELECT COUNT(*) FROM asset_scan_history WHERE DATE(scan_time) = CURDATE()");
-$scanTrend = getDateRangeTrend($conn, 'asset_scan_history', 'scan_time', $rangeDays);
-$projectTrend = getDateRangeTrend($conn, 'projects', 'created_at', $rangeDays);
-$userTrend = getDateRangeTrend($conn, 'users', 'created_at', $rangeDays, "role IN ('engineer', 'foreman', 'foremen', 'client')");
-$scanTrendPeak = getTrendPeak($scanTrend);
-$projectTrendPeak = getTrendPeak($projectTrend);
-$userTrendPeak = getTrendPeak($userTrend);
 $activeDeployments = hasTable($conn, 'project_inventory_deployments')
     ? getScalarInt(
         $conn,
@@ -620,93 +610,6 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
     )
     : 0;
 
-$lowStockAlerts = [];
-$lowStockResult = $conn->query(
-    "SELECT a.asset_name, i.quantity, i.min_stock, i.status
-     FROM inventory i
-     INNER JOIN assets a ON a.id = i.asset_id
-     WHERE i.status IN ('low-stock', 'out-of-stock')
-     ORDER BY FIELD(i.status, 'out-of-stock', 'low-stock'), i.quantity ASC, a.asset_name ASC
-     LIMIT 5"
-);
-if ($lowStockResult) {
-    $lowStockAlerts = $lowStockResult->fetch_all(MYSQLI_ASSOC);
-}
-
-$projectRiskAlerts = [];
-$projectRiskResult = $conn->query(
-    "SELECT
-        p.project_name,
-        p.status,
-        p.end_date,
-        COALESCE(task_totals.open_tasks, 0) AS open_tasks,
-        COALESCE(task_totals.delayed_tasks, 0) AS delayed_tasks
-     FROM projects p
-     LEFT JOIN (
-         SELECT
-             project_id,
-             SUM(CASE WHEN status IN ('pending', 'ongoing', 'delayed') THEN 1 ELSE 0 END) AS open_tasks,
-             SUM(CASE WHEN status = 'delayed' THEN 1 ELSE 0 END) AS delayed_tasks
-         FROM tasks
-         GROUP BY project_id
-     ) task_totals ON task_totals.project_id = p.id
-     WHERE p.status IN ('pending', 'ongoing', 'on-hold')
-     AND (
-         COALESCE(task_totals.delayed_tasks, 0) > 0
-         OR (p.end_date IS NOT NULL AND p.end_date < CURDATE())
-     )
-     ORDER BY
-        COALESCE(task_totals.delayed_tasks, 0) DESC,
-        p.end_date ASC,
-        p.updated_at DESC
-     LIMIT 5"
-);
-if ($projectRiskResult) {
-    $projectRiskAlerts = $projectRiskResult->fetch_all(MYSQLI_ASSOC);
-}
-
-$inactiveAssignmentAlerts = [];
-$inactiveAssignmentResult = $conn->query(
-    "SELECT
-        u.full_name,
-        u.role,
-        COUNT(DISTINCT p.id) AS active_projects
-     FROM users u
-     LEFT JOIN project_assignments pa ON pa.engineer_id = u.id
-     LEFT JOIN projects p ON p.id = pa.project_id AND p.status IN ('pending', 'ongoing', 'on-hold')
-     WHERE u.status = 'inactive'
-     AND u.role IN ('engineer', 'foreman', 'client')
-     GROUP BY u.id, u.full_name, u.role
-     HAVING active_projects > 0
-     ORDER BY active_projects DESC, u.full_name ASC
-     LIMIT 5"
-);
-if ($inactiveAssignmentResult) {
-    $inactiveAssignmentAlerts = $inactiveAssignmentResult->fetch_all(MYSQLI_ASSOC);
-}
-
-$auditLogFeed = [];
-if (audit_log_table_exists($conn)) {
-    $recentActivityResult = $conn->query(
-        "SELECT
-            l.created_at AS activity_time,
-            l.action,
-            l.entity_type,
-            l.entity_id,
-            actor.full_name AS actor_name,
-            l.old_values,
-            l.new_values
-         FROM audit_logs l
-         LEFT JOIN users actor ON actor.id = l.user_id
-         WHERE DATE(l.created_at) >= DATE_SUB(CURDATE(), INTERVAL " . ($rangeDays - 1) . " DAY)
-         ORDER BY l.created_at DESC
-        "
-    );
-
-    if ($recentActivityResult) {
-        $auditLogFeed = $recentActivityResult->fetch_all(MYSQLI_ASSOC);
-    }
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -714,7 +617,7 @@ if (audit_log_table_exists($conn)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Super Admin Dashboard - Edge Automation</title>
-    <link rel="stylesheet" href="../css/admin-dashboard.css">
+    <link rel="stylesheet" href="../css/super_admin_dashboard.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -731,86 +634,6 @@ if (audit_log_table_exists($conn)) {
         <?php if ($error): ?><div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
 
         <div id="dashboard" class="tab-content <?php echo $activeTab === 'dashboard' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'dashboard' ? 'display: block;' : 'display: none;'; ?>">
-            <section class="dashboard-panel problems-panel">
-                    <div class="panel-heading">
-                        <div>
-                            <h2 class="dashboard-section-title">Needs Attention</h2>
-                            <p class="panel-copy">Check these first.</p>
-                        </div>
-                    </div>
-
-                    <div class="alert-group">
-                        <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?status=ongoing" class="alert-card alert-card-danger alert-card-link">
-                            <div class="alert-card-head">
-                                <h3>Projects</h3>
-                                <span><?php echo count($projectRiskAlerts); ?></span>
-                            </div>
-                            <?php if (empty($projectRiskAlerts)): ?>
-                                <p class="alert-empty">No project problems right now.</p>
-                            <?php else: ?>
-                                <ul class="alert-list">
-                                    <?php foreach ($projectRiskAlerts as $projectAlert): ?>
-                                        <li>
-                                            <strong><?php echo htmlspecialchars($projectAlert['project_name']); ?></strong>
-                                            <span>
-                                                <?php
-                                                $parts = [];
-                                                if ((int)$projectAlert['delayed_tasks'] > 0) {
-                                                    $parts[] = (int)$projectAlert['delayed_tasks'] . ' delayed task(s)';
-                                                }
-                                                if (!empty($projectAlert['end_date']) && $projectAlert['end_date'] < date('Y-m-d')) {
-                                                    $parts[] = 'late end date';
-                                                }
-                                                echo htmlspecialchars(implode(' | ', $parts) ?: 'Needs checking');
-                                                ?>
-                                            </span>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            <?php endif; ?>
-                        </a>
-
-                        <a href="/codesamplecaps/SUPERADMIN/sidebar/inventory.php?status=attention" class="alert-card alert-card-warning alert-card-link">
-                            <div class="alert-card-head">
-                                <h3>Stock</h3>
-                                <span><?php echo count($lowStockAlerts); ?></span>
-                            </div>
-                            <?php if (empty($lowStockAlerts)): ?>
-                                <p class="alert-empty">No stock problems.</p>
-                            <?php else: ?>
-                                <ul class="alert-list">
-                                    <?php foreach ($lowStockAlerts as $stockAlert): ?>
-                                        <li>
-                                            <strong><?php echo htmlspecialchars($stockAlert['asset_name']); ?></strong>
-                                            <span><?php echo htmlspecialchars(ucwords(str_replace('-', ' ', $stockAlert['status']))); ?> | Qty <?php echo (int)$stockAlert['quantity']; ?><?php echo $stockAlert['min_stock'] !== null ? ' | Min ' . (int)$stockAlert['min_stock'] : ''; ?></span>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            <?php endif; ?>
-                        </a>
-
-                        <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=users&amp;status=inactive" class="alert-card alert-card-info alert-card-link">
-                            <div class="alert-card-head">
-                                <h3>Users</h3>
-                                <span><?php echo count($inactiveAssignmentAlerts); ?></span>
-                            </div>
-                            <?php if (empty($inactiveAssignmentAlerts)): ?>
-                                <p class="alert-empty">No user problems found.</p>
-                            <?php else: ?>
-                                <ul class="alert-list">
-                                    <?php foreach ($inactiveAssignmentAlerts as $userAlert): ?>
-                                        <li>
-                                            <strong><?php echo htmlspecialchars($userAlert['full_name']); ?></strong>
-                                            <span><?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$userAlert['role']))); ?> | <?php echo (int)$userAlert['active_projects']; ?> active project(s)</span>
-                                        </li>
-                                    <?php endforeach; ?>
-                                </ul>
-                            <?php endif; ?>
-                        </a>
-
-                    </div>
-            </section>
-
             <section class="dashboard-grid">
                 <section class="dashboard-panel summary-panel">
                     <div class="panel-heading">
@@ -843,70 +666,6 @@ if (audit_log_table_exists($conn)) {
                     </div>
                 </section>
 
-                <aside class="dashboard-panel activity-panel">
-                    <div class="panel-heading">
-                        <div>
-                            <h2 class="dashboard-section-title">Recent Activity</h2>
-                            <p class="panel-copy">Latest <?php echo count($auditLogFeed); ?> admin actions in the selected range.</p>
-                        </div>
-                        <div class="dashboard-actions activity-actions">
-                            <button type="button" class="action-chip action-chip-button" id="toggleActivityHistory" aria-expanded="false" <?php echo count($auditLogFeed) <= 3 ? 'hidden' : ''; ?>>
-                                Show All History
-                            </button>
-                            <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard&amp;range=7" class="action-chip<?php echo $rangeDays === 7 ? ' active-chip' : ''; ?>">7 Days</a>
-                            <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard&amp;range=14" class="action-chip<?php echo $rangeDays === 14 ? ' active-chip' : ''; ?>">14 Days</a>
-                            <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard&amp;range=30" class="action-chip<?php echo $rangeDays === 30 ? ' active-chip' : ''; ?>">30 Days</a>
-                            <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard&amp;range=90" class="action-chip<?php echo $rangeDays === 90 ? ' active-chip' : ''; ?>">90 Days</a>
-                        </div>
-                    </div>
-
-                    <?php if (!empty($auditLogFeed)): ?>
-                        <div class="activity-search">
-                            <input type="search" id="activitySearchInput" class="activity-search__input" placeholder="Search activity, actor, action, date..." autocomplete="off" aria-label="Search recent activity">
-                            <span class="activity-search__hint">Press ESC to clear</span>
-                        </div>
-                    <?php endif; ?>
-
-                    <?php if (empty($auditLogFeed)): ?>
-                        <div class="empty-state-solid">No audit logs yet. New admin actions will appear here.</div>
-                    <?php else: ?>
-                        <div class="activity-feed activity-feed-compact" id="activityFeed">
-                            <?php foreach ($auditLogFeed as $index => $activity): ?>
-                                <?php $auditSummary = buildAuditSummaryClean($activity); ?>
-                                <?php
-                                try {
-                                    $activityDate = new DateTimeImmutable((string)($activity['activity_time'] ?? 'now'));
-                                    $activityFullDate = $activityDate->format('l, M d, Y g:i A');
-                                } catch (Throwable $exception) {
-                                    $activityFullDate = (string)($activity['activity_time'] ?? '');
-                                }
-                                $activitySearch = strtolower(trim(implode(' ', [
-                                    (string)($auditSummary['title'] ?? ''),
-                                    (string)($auditSummary['details'] ?? ''),
-                                    (string)($activity['actor_name'] ?? ''),
-                                    $activityFullDate,
-                                ])));
-                                ?>
-                                <div class="activity-item<?php echo $index >= 3 ? ' activity-item-extra' : ''; ?>" data-activity-item data-activity-search="<?php echo htmlspecialchars($activitySearch); ?>" data-activity-rank="<?php echo $index; ?>"<?php echo $index >= 3 ? ' hidden' : ''; ?>>
-                                    <div class="activity-badge activity-<?php echo htmlspecialchars($auditSummary['badge']); ?>">
-                                        <?php echo strtoupper(substr((string)$auditSummary['badge'], 0, 1)); ?>
-                                    </div>
-                                    <div class="activity-copy">
-                                        <strong><?php echo htmlspecialchars($auditSummary['title']); ?></strong>
-                                        <span><?php echo htmlspecialchars($auditSummary['details']); ?></span>
-                                    </div>
-                                    <time>
-                                        <span class="activity-time-relative"><?php echo htmlspecialchars(formatRelativeDate($activity['activity_time'] ?? null)); ?></span>
-                                        <span class="activity-time-full">
-                                            <?php echo htmlspecialchars($activityFullDate); ?>
-                                        </span>
-                                    </time>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    <?php endif; ?>
-
-                </aside>
             </section>
         </div>
 
@@ -1013,6 +772,6 @@ if (audit_log_table_exists($conn)) {
     </main>
 </div>
 
-<script src="../js/admin-script.js"></script>
+<script src="../js/super_admin_dashboard.js"></script>
 </body>
 </html>

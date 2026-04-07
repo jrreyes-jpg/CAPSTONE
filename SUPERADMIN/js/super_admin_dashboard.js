@@ -61,6 +61,9 @@ if (canvas) {
 document.addEventListener('DOMContentLoaded', function () {
     const phTime = document.querySelector('[data-ph-time]');
     const phDate = document.querySelector('[data-ph-date]');
+    const notificationRoot = document.querySelector('[data-notification-root]');
+    const notificationToggle = document.getElementById('topbarNotificationToggle');
+    const notificationDropdown = document.getElementById('topbarNotificationDropdown');
 
     if (phTime && phDate) {
         const timeFormatter = new Intl.DateTimeFormat('en-PH', {
@@ -87,6 +90,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
         syncPhilippineClock();
         window.setInterval(syncPhilippineClock, 1000);
+    }
+
+    if (notificationRoot && notificationToggle && notificationDropdown) {
+        const setNotificationState = function (isOpen) {
+            notificationToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            notificationDropdown.hidden = !isOpen;
+        };
+
+        notificationToggle.addEventListener('click', function (event) {
+            event.preventDefault();
+            const isOpen = notificationToggle.getAttribute('aria-expanded') === 'true';
+            setNotificationState(!isOpen);
+        });
+
+        document.addEventListener('click', function (event) {
+            if (!notificationRoot.contains(event.target)) {
+                setNotificationState(false);
+            }
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                setNotificationState(false);
+            }
+        });
     }
 
     document.querySelectorAll('.togglePassword').forEach(function (btn) {
@@ -241,101 +269,6 @@ document.addEventListener('DOMContentLoaded', function () {
         updateCount();
     });
 
-    const toggleActivityHistoryBtn = document.getElementById('toggleActivityHistory');
-    const activitySearchInput = document.getElementById('activitySearchInput');
-    const activityFeed = document.getElementById('activityFeed');
-    const activityItems = Array.from(document.querySelectorAll('[data-activity-item]'));
-    const ITEMS_PER_PAGE = 3;
-
-    if (activityItems.length > 0 && activityFeed) {
-        let debounceTimeout = null;
-        let currentQuery = '';
-
-        const updateActivityFeed = function () {
-            currentQuery = (activitySearchInput?.value || '').trim().toLowerCase();
-            const isExpanded = toggleActivityHistoryBtn
-                ? toggleActivityHistoryBtn.getAttribute('aria-expanded') === 'true'
-                : false;
-
-            let matchCount = 0;
-            let visibleCount = 0;
-
-            activityItems.forEach(function (item) {
-                const searchText = item.getAttribute('data-activity-search') || '';
-                const isMatch = currentQuery === '' || searchText.includes(currentQuery);
-
-                if (!isMatch) {
-                    item.hidden = true;
-                    return;
-                }
-
-                matchCount += 1;
-                const shouldShow = isExpanded || matchCount <= ITEMS_PER_PAGE;
-                item.hidden = !shouldShow;
-                if (shouldShow) visibleCount += 1;
-            });
-
-            // Update button visibility and state
-            if (toggleActivityHistoryBtn) {
-                const totalMatches = activityItems.filter(item => !item.hidden || item.getAttribute('data-activity-search').includes(currentQuery)).length;
-                const shouldShowButton = totalMatches > ITEMS_PER_PAGE;
-                
-                if (shouldShowButton) {
-                    toggleActivityHistoryBtn.hidden = false;
-                    const hasMoreItems = matchCount > ITEMS_PER_PAGE;
-                    if (!isExpanded && hasMoreItems) {
-                        toggleActivityHistoryBtn.textContent = `Show All History (${matchCount})`;
-                    } else if (isExpanded) {
-                        toggleActivityHistoryBtn.textContent = `Show Less History`;
-                    }
-                } else {
-                    toggleActivityHistoryBtn.hidden = true;
-                }
-            }
-
-            // Show/hide empty state
-            const emptyState = activityFeed?.querySelector('.empty-state-solid');
-            if (emptyState) {
-                const hasVisibleItems = activityItems.some(item => !item.hidden);
-                if (!hasVisibleItems) {
-                    emptyState.hidden = false;
-                    emptyState.textContent = currentQuery 
-                        ? 'No activities match your search.' 
-                        : 'No audit logs yet. New admin actions will appear here.';
-                } else {
-                    emptyState.hidden = true;
-                }
-            }
-        };
-
-        const debouncedUpdate = function () {
-            clearTimeout(debounceTimeout);
-            debounceTimeout = setTimeout(updateActivityFeed, 200);
-        };
-
-        if (toggleActivityHistoryBtn) {
-            toggleActivityHistoryBtn.addEventListener('click', function (e) {
-                e.preventDefault();
-                const isExpanded = toggleActivityHistoryBtn.getAttribute('aria-expanded') === 'true';
-                const nextExpanded = !isExpanded;
-                toggleActivityHistoryBtn.setAttribute('aria-expanded', nextExpanded ? 'true' : 'false');
-                updateActivityFeed();
-            });
-        }
-
-        if (activitySearchInput) {
-            activitySearchInput.addEventListener('input', debouncedUpdate);
-            activitySearchInput.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape') {
-                    activitySearchInput.value = '';
-                    currentQuery = '';
-                    updateActivityFeed();
-                }
-            });
-        }
-
-        updateActivityFeed();
-    }
 });
 
 const form = document.querySelector('form');

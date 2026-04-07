@@ -224,7 +224,7 @@ if ($result) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Assets & QR Codes - Super Admin</title>
-    <link rel="stylesheet" href="../css/admin-dashboard.css">
+    <link rel="stylesheet" href="../css/super_admin_dashboard.css">
     <link rel="stylesheet" href="../css/assets.css">
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
@@ -372,6 +372,6 @@ if ($result) {
     <img id="qrModalImg" class="modal-image" style="max-width:300px; background:#fff; padding:10px;">
 </div>
 
-<script src="../js/admin-script.js"></script>
+<script src="../js/super_admin_dashboard.js"></script>
 </body>
 </html>

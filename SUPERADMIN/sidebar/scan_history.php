@@ -25,7 +25,7 @@ if ($result) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scan History - Edge Automation</title>
-    <link rel="stylesheet" href="../css/admin-dashboard.css">
+    <link rel="stylesheet" href="../css/super_admin_dashboard.css">
 </head>
 <body>
 <div class="container">
@@ -71,6 +71,6 @@ if ($result) {
         </div>
     </main>
 </div>
-<script src="../js/admin-script.js"></script>
+<script src="../js/super_admin_dashboard.js"></script>
 </body>
 </html>
