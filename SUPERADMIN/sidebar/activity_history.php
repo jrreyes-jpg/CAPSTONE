@@ -192,24 +192,31 @@ if (function_exists('audit_log_table_exists') ? audit_log_table_exists($conn) : 
         <div class="header page-header-card">
             <div class="header-copy">
                 <h1>Activity History</h1>
-                <p>Review recent admin activity, audit actions, and system changes in one place.</p>
             </div>
         </div>
 
         <section class="dashboard-panel activity-history-panel">
             <form method="GET" class="activity-history-toolbar">
                 <div class="activity-history-toolbar__search">
-                    <input type="search" name="q" value="<?php echo htmlspecialchars($search); ?>" placeholder="Search actor, action, type, or ID">
+                    <label class="activity-history-smart-field">
+                        <span class="activity-history-smart-field__icon" aria-hidden="true">&#128269;</span>
+                        <span class="sr-only">Search activity history</span>
+                        <input type="search" name="q" value="<?php echo htmlspecialchars($search); ?>" placeholder="Smart search actor, action, type, details, or ID" autocomplete="off">
+                    </label>
                 </div>
                 <div class="activity-history-toolbar__filters">
-                    <select name="entity">
-                        <option value="">All types</option>
-                        <option value="user" <?php echo $entityFilter === 'user' ? 'selected' : ''; ?>>Users</option>
-                        <option value="project" <?php echo $entityFilter === 'project' ? 'selected' : ''; ?>>Projects</option>
-                        <option value="inventory" <?php echo $entityFilter === 'inventory' ? 'selected' : ''; ?>>Inventory</option>
-                        <option value="asset" <?php echo $entityFilter === 'asset' ? 'selected' : ''; ?>>Assets</option>
-                        <option value="scan" <?php echo $entityFilter === 'scan' ? 'selected' : ''; ?>>Scans</option>
-                    </select>
+                    <label class="activity-history-smart-field activity-history-smart-field--select">
+                        <span class="activity-history-smart-field__icon" aria-hidden="true">&#9881;</span>
+                        <span class="sr-only">Filter activity type</span>
+                        <select name="entity">
+                            <option value="">All types</option>
+                            <option value="user" <?php echo $entityFilter === 'user' ? 'selected' : ''; ?>>Users</option>
+                            <option value="project" <?php echo $entityFilter === 'project' ? 'selected' : ''; ?>>Projects</option>
+                            <option value="inventory" <?php echo $entityFilter === 'inventory' ? 'selected' : ''; ?>>Inventory</option>
+                            <option value="asset" <?php echo $entityFilter === 'asset' ? 'selected' : ''; ?>>Assets</option>
+                            <option value="scan" <?php echo $entityFilter === 'scan' ? 'selected' : ''; ?>>Scans</option>
+                        </select>
+                    </label>
                     <button type="submit" class="btn-primary">Filter</button>
                     <a href="/codesamplecaps/SUPERADMIN/sidebar/activity_history.php" class="btn-secondary">Reset</a>
                 </div>
