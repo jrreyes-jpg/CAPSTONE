@@ -107,6 +107,7 @@ if (!function_exists('super_admin_fetch_notification_data')) {
 
         $projectRiskResult = $conn->query(
             "SELECT
+                p.id,
                 p.project_name,
                 p.status,
                 p.end_date,
@@ -214,7 +215,7 @@ if (!function_exists('super_admin_fetch_notification_data')) {
             'project_risk_count' => $projectRiskCount,
             'stock_alert_count' => $stockAlertCount,
             'inactive_assignment_count' => $inactiveAssignmentCount,
-            'urgent_count' => $projectRiskCount + $stockAlertCount + $inactiveAssignmentCount,
+            'urgent_count' => $projectRiskCount,
             'project_risk_alerts' => $projectRiskAlerts,
             'stock_alerts' => $stockAlerts,
             'inactive_assignment_alerts' => $inactiveAssignmentAlerts,
@@ -243,24 +244,163 @@ $superAdminNotificationData = isset($conn) && $conn instanceof mysqli
 </button>
 <nav class="sidebar" id="sidebar">
     <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Collapse sidebar" aria-controls="sidebar" aria-expanded="true">
-        <span id="toggleIcon">&#10094;</span>
+        <span id="toggleIcon" class="sidebar-toggle-icon" aria-hidden="true">
+            <svg class="sidebar-toggle-svg" viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+                <path d="M11.75 4.75L6.5 10l5.25 5.25"></path>
+            </svg>
+        </span>
     </button>
 
-    <div class="sidebar-header">
-        <h3>&#127970; <span class="menu-text">EDGE AUTOMATION</span></h3>
-        <p class="sidebar-subtitle menu-text">Super Admin</p>
+    <div class="sidebar-header brand-block">
+        <span class="brand-mark" aria-hidden="true">EA</span>
+        <div class="brand-copy">
+            <h3 class="brand-title">Edge Automation</h3>
+            <p class="sidebar-subtitle">Super Admin Panel</p>
+        </div>
     </div>
+    <div class="nav-divider"></div>
 
     <ul class="nav-menu">
-        <li><a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard" class="menu-link<?php echo $isDashboard ? ' active' : ''; ?>">&#128202; <span class="menu-text">Dashboard</span></a></li>
-        <li><a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=create" class="menu-link<?php echo $isCreate ? ' active' : ''; ?>">&#10133; <span class="menu-text">Create Accounts</span></a></li>
-        <li><a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=users" class="menu-link<?php echo $isUsers ? ' active' : ''; ?>">&#128101; <span class="menu-text">Manage Users</span></a></li>
-        <li><a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="menu-link<?php echo $isProjects ? ' active' : ''; ?>">&#128193; <span class="menu-text">Projects</span></a></li>
-        <li><a href="/codesamplecaps/SUPERADMIN/sidebar/inventory.php" class="menu-link<?php echo $isInventory ? ' active' : ''; ?>">&#128230; <span class="menu-text">Inventory</span></a></li>
-        <li><a href="/codesamplecaps/SUPERADMIN/sidebar/assets.php" class="menu-link<?php echo $isAssets ? ' active' : ''; ?>">&#127959;&#65039; <span class="menu-text">Assets</span></a></li>
-        <li><a href="/codesamplecaps/SUPERADMIN/sidebar/scan_history.php" class="menu-link<?php echo $isScanHistory ? ' active' : ''; ?>">&#128337; <span class="menu-text">Scan History</span></a></li>
-        <li><a href="/codesamplecaps/SUPERADMIN/sidebar/activity_history.php" class="menu-link<?php echo $isActivityHistory ? ' active' : ''; ?>">&#128276; <span class="menu-text">Activity History</span></a></li>
-        <li><a href="/codesamplecaps/LOGIN/php/logout.php" class="menu-link logout">&#128682; <span class="menu-text">Logout</span></a></li>
+        <li>
+            <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard" class="menu-link<?php echo $isDashboard ? ' active' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <rect x="3" y="3" width="7" height="7" rx="2"></rect>
+                            <rect x="14" y="3" width="7" height="5" rx="2"></rect>
+                            <rect x="14" y="10" width="7" height="11" rx="2"></rect>
+                            <rect x="3" y="12" width="7" height="9" rx="2"></rect>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Home</span>
+                </span>
+                <span class="menu-text">Dashboard</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=create" class="menu-link<?php echo $isCreate ? ' active' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M12 5v14"></path>
+                            <path d="M5 12h14"></path>
+                            <path d="M7 19h10"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Create</span>
+                </span>
+                <span class="menu-text">Create Accounts</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=users" class="menu-link<?php echo $isUsers ? ' active' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M16 20a4 4 0 0 0-8 0"></path>
+                            <circle cx="12" cy="9" r="3.5"></circle>
+                            <path d="M19 20a3 3 0 0 0-3-3"></path>
+                            <path d="M5 20a3 3 0 0 1 3-3"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Users</span>
+                </span>
+                <span class="menu-text">Manage Users</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="menu-link<?php echo $isProjects ? ' active' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M3.5 7.5a2 2 0 0 1 2-2h4l1.6 1.8H18.5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"></path>
+                            <path d="M3.5 10.5h17"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Proj</span>
+                </span>
+                <span class="menu-text">Projects</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/SUPERADMIN/sidebar/inventory.php" class="menu-link<?php echo $isInventory ? ' active' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M4 8.5 12 4l8 4.5"></path>
+                            <path d="M4 8.5V16l8 4 8-4V8.5"></path>
+                            <path d="M12 12l8-3.5"></path>
+                            <path d="M12 12 4 8.5"></path>
+                            <path d="M12 12v8"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Stock</span>
+                </span>
+                <span class="menu-text">Inventory</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/SUPERADMIN/sidebar/assets.php" class="menu-link<?php echo $isAssets ? ' active' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M4 19h16"></path>
+                            <path d="M6 19V9l6-4 6 4v10"></path>
+                            <path d="M9 19v-4h6v4"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Asset</span>
+                </span>
+                <span class="menu-text">Assets</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/SUPERADMIN/sidebar/scan_history.php" class="menu-link<?php echo $isScanHistory ? ' active' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M7 4H5a1 1 0 0 0-1 1v2"></path>
+                            <path d="M17 4h2a1 1 0 0 1 1 1v2"></path>
+                            <path d="M20 17v2a1 1 0 0 1-1 1h-2"></path>
+                            <path d="M4 17v2a1 1 0 0 0 1 1h2"></path>
+                            <path d="M7 12h10"></path>
+                            <path d="M12 7v10"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Scan</span>
+                </span>
+                <span class="menu-text">Scan History</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/SUPERADMIN/sidebar/activity_history.php" class="menu-link<?php echo $isActivityHistory ? ' active' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M12 8v5l3 2"></path>
+                            <circle cx="12" cy="12" r="8"></circle>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Audit</span>
+                </span>
+                <span class="menu-text">Activity History</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/LOGIN/php/logout.php" class="menu-link logout">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M10 5H6.5A1.5 1.5 0 0 0 5 6.5v11A1.5 1.5 0 0 0 6.5 19H10"></path>
+                            <path d="M13 8l4 4-4 4"></path>
+                            <path d="M9 12h8"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Exit</span>
+                </span>
+                <span class="menu-text">Logout</span>
+            </a>
+        </li>
     </ul>
 </nav>
 <div id="sidebarOverlay" class="sidebar-overlay"></div>
@@ -291,7 +431,7 @@ $superAdminNotificationData = isset($conn) && $conn instanceof mysqli
                 <?php endif; ?>
             </button>
 
-            <div id="topbarNotificationDropdown" class="topbar-notifications__dropdown" hidden>
+                <div id="topbarNotificationDropdown" class="topbar-notifications__dropdown" hidden>
                 <div class="topbar-notifications__panel-head">
                     <div>
                         <strong>Notifications</strong>
@@ -299,33 +439,26 @@ $superAdminNotificationData = isset($conn) && $conn instanceof mysqli
                             <?php echo (int)($superAdminNotificationData['urgent_count'] ?? 0); ?> need attention
                         </span>
                     </div>
-                    <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard" class="topbar-notifications__view-all">Open dashboard</a>
                 </div>
 
-                <div class="topbar-notifications__summary">
-                    <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?status=ongoing" class="notification-summary-chip notification-summary-chip--danger">
-                        <strong><?php echo (int)($superAdminNotificationData['project_risk_count'] ?? 0); ?></strong>
-                        <span>Project risks</span>
-                    </a>
-                    <a href="/codesamplecaps/SUPERADMIN/sidebar/inventory.php?status=attention" class="notification-summary-chip notification-summary-chip--warning">
-                        <strong><?php echo (int)($superAdminNotificationData['stock_alert_count'] ?? 0); ?></strong>
-                        <span>Stock alerts</span>
-                    </a>
-                    <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=users&amp;status=inactive" class="notification-summary-chip notification-summary-chip--info">
-                        <strong><?php echo (int)($superAdminNotificationData['inactive_assignment_count'] ?? 0); ?></strong>
-                        <span>User blockers</span>
-                    </a>
-                </div>
+                <?php if (($superAdminNotificationData['project_risk_count'] ?? 0) > 0): ?>
+                    <div class="topbar-notifications__summary">
+                        <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?status=ongoing" class="notification-summary-chip notification-summary-chip--danger">
+                            <strong><?php echo (int)($superAdminNotificationData['project_risk_count'] ?? 0); ?></strong>
+                            <span>Project risks</span>
+                        </a>
+                    </div>
+                <?php endif; ?>
 
                 <div class="topbar-notifications__section">
                     <div class="topbar-notifications__section-title">Needs attention</div>
                     <?php if (($superAdminNotificationData['urgent_count'] ?? 0) === 0): ?>
                         <div class="topbar-notifications__empty">
-                            No urgent issues right now. Everything looks steady.
+                            No project alerts right now.
                         </div>
                     <?php else: ?>
                         <?php foreach ($superAdminNotificationData['project_risk_alerts'] as $projectAlert): ?>
-                            <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?status=ongoing" class="notification-item notification-item--danger">
+                            <a href="/codesamplecaps/SUPERADMIN/sidebar/project_details.php?id=<?php echo (int)($projectAlert['id'] ?? 0); ?>" class="notification-item notification-item--danger">
                                 <span class="notification-item__dot"></span>
                                 <div class="notification-item__copy">
                                     <strong><?php echo htmlspecialchars((string)$projectAlert['project_name']); ?></strong>
@@ -344,68 +477,9 @@ $superAdminNotificationData = isset($conn) && $conn instanceof mysqli
                                 </div>
                             </a>
                         <?php endforeach; ?>
-
-                        <?php foreach ($superAdminNotificationData['stock_alerts'] as $stockAlert): ?>
-                            <a href="/codesamplecaps/SUPERADMIN/sidebar/inventory.php?status=attention" class="notification-item notification-item--warning">
-                                <span class="notification-item__dot"></span>
-                                <div class="notification-item__copy">
-                                    <strong><?php echo htmlspecialchars((string)$stockAlert['asset_name']); ?></strong>
-                                    <span>
-                                        <?php echo htmlspecialchars(ucwords(str_replace('-', ' ', (string)$stockAlert['status']))); ?>
-                                        | Qty <?php echo (int)$stockAlert['quantity']; ?>
-                                        <?php echo $stockAlert['min_stock'] !== null ? ' | Min ' . (int)$stockAlert['min_stock'] : ''; ?>
-                                    </span>
-                                </div>
-                            </a>
-                        <?php endforeach; ?>
-
-                        <?php foreach ($superAdminNotificationData['inactive_assignment_alerts'] as $userAlert): ?>
-                            <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=users&amp;status=inactive" class="notification-item notification-item--info">
-                                <span class="notification-item__dot"></span>
-                                <div class="notification-item__copy">
-                                    <strong><?php echo htmlspecialchars((string)$userAlert['full_name']); ?></strong>
-                                    <span>
-                                        <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$userAlert['role']))); ?>
-                                        | <?php echo (int)$userAlert['active_projects']; ?> active project(s)
-                                    </span>
-                                </div>
-                            </a>
-                        <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
 
-                <div class="topbar-notifications__section">
-                    <div class="topbar-notifications__section-title">Recent actions</div>
-                    <?php if (empty($superAdminNotificationData['recent_activity'])): ?>
-                        <div class="topbar-notifications__empty">
-                            No recent admin actions yet.
-                        </div>
-                    <?php else: ?>
-                        <?php foreach ($superAdminNotificationData['recent_activity'] as $activity): ?>
-                            <div class="notification-item notification-item--neutral">
-                                <span class="notification-item__dot"></span>
-                                <div class="notification-item__copy">
-                                    <strong><?php echo htmlspecialchars(super_admin_notification_action_label((string)($activity['action'] ?? 'Activity'))); ?></strong>
-                                    <span>
-                                        <?php echo htmlspecialchars((string)($activity['actor_name'] ?: 'System')); ?>
-                                        <?php if (!empty($activity['entity_type'])): ?>
-                                            | <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$activity['entity_type']))); ?>
-                                        <?php endif; ?>
-                                    </span>
-                                </div>
-                                <time class="notification-item__time">
-                                    <?php echo htmlspecialchars(super_admin_notification_relative_time((string)($activity['created_at'] ?? ''))); ?>
-                                </time>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                </div>
-
-                <div class="topbar-notifications__footer">
-                    <a href="/codesamplecaps/SUPERADMIN/sidebar/activity_history.php" class="topbar-notifications__history-link">
-                        View All History
-                    </a>
-                </div>
             </div>
         </div>
 

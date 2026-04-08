@@ -1418,11 +1418,11 @@ if ($projectsResult) {
                                 </div>
 
                                 <?php if (!empty($project['description'])): ?>
-                                    <div class="empty-state empty-state-solid"><?php echo nl2br(htmlspecialchars($project['description'])); ?></div>
+                                    <div class="empty-state empty-state-solid project-card__description"><?php echo nl2br(htmlspecialchars($project['description'])); ?></div>
                                 <?php endif; ?>
 
-                                <div class="form-actions">
-                                    <a href="<?php echo htmlspecialchars($detailsPath); ?>" class="btn-primary">View Details</a>
+                                <div class="form-actions project-card__actions">
+                                    <a href="<?php echo htmlspecialchars($detailsPath); ?>" class="btn-primary project-card__details-btn">View Details</a>
                                 </div>
                             </article>
                         <?php endforeach; ?>

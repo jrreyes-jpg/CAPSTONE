@@ -150,6 +150,42 @@ document.addEventListener('DOMContentLoaded', function () {
         const mainContent = document.querySelector('.main-content');
         const storageKey = 'edgeSidebarCollapsed';
         const isMobile = () => window.innerWidth <= 768;
+        let audioContext = null;
+
+        const playSidebarSound = (variant) => {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) {
+                return;
+            }
+
+            if (!audioContext) {
+                audioContext = new AudioCtx();
+            }
+
+            if (audioContext.state === 'suspended') {
+                audioContext.resume().catch(function () {
+                    return null;
+                });
+            }
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            const now = audioContext.currentTime;
+            const profile = variant === 'toggle'
+                ? { start: 540, end: 320, volume: 0.045, duration: 0.14 }
+                : { start: 620, end: 460, volume: 0.03, duration: 0.09 };
+
+            oscillator.type = variant === 'toggle' ? 'triangle' : 'sine';
+            oscillator.frequency.setValueAtTime(profile.start, now);
+            oscillator.frequency.exponentialRampToValueAtTime(profile.end, now + profile.duration);
+            gainNode.gain.setValueAtTime(0.0001, now);
+            gainNode.gain.exponentialRampToValueAtTime(profile.volume, now + 0.012);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + profile.duration);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.start(now);
+            oscillator.stop(now + profile.duration);
+        };
 
         const syncMainContent = () => {
             const shouldShrink = sidebar.classList.contains('shrink') && !isMobile();
@@ -182,7 +218,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             if (toggleBtn && toggleIcon) {
                 const isCollapsed = sidebar.classList.contains('shrink');
-                toggleIcon.textContent = isCollapsed ? '>' : '<';
+                toggleIcon.classList.toggle('is-collapsed', isCollapsed);
                 toggleBtn.setAttribute('aria-label', isCollapsed ? 'Expand sidebar' : 'Collapse sidebar');
                 toggleBtn.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
             }
@@ -212,6 +248,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const isOpen = sidebar.classList.toggle('mobile-open');
                 overlay.classList.toggle('active', isOpen);
+                playSidebarSound('toggle');
                 updateToggleUi();
             });
         }
@@ -225,6 +262,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const isCollapsed = sidebar.classList.toggle('shrink');
                 window.localStorage.setItem(storageKey, isCollapsed ? '1' : '0');
                 syncMainContent();
+                playSidebarSound('toggle');
                 updateToggleUi();
             });
         }
@@ -236,6 +274,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.querySelectorAll('.menu-link').forEach(function (link) {
             link.addEventListener('click', function () {
+                playSidebarSound('link');
+
                 if (!isMobile()) {
                     return;
                 }

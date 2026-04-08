@@ -1,3 +1,6 @@
+<?php
+session_start();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,7 +9,7 @@
     <meta name="description" content="Edge Automation Technology Services, Co. - Professional engineering automation and technology solutions">
     <title>Edge Automation Technology Services, Co.</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/landing-page.css">
+<link rel="stylesheet" href="../css/index.css">
 </head>
 <body>
     <!-- Navigation -->
@@ -22,7 +25,14 @@
                 <li><a href="#services" class="nav-link">Services</a></li>
                 <li><a href="#projects" class="nav-link">Projects</a></li>
                 <li><a href="#contact" class="nav-link">Contact</a></li>
+                <?php if (empty($_SESSION['user_id'])): ?>
+                    <li class="mobile-only"><a href="login.php" class="nav-link btn btn-primary">Login</a></li>
+                <?php endif; ?>
             </ul>
+
+           <div class="nav-actions">
+        <a href="login.php" class="btn btn-primary">Login</a>
+</div>
             <div class="hamburger">
                 <span></span>
                 <span></span>
@@ -37,8 +47,7 @@
             <h1 class="hero-title">Engineering Innovation at Scale</h1>
             <p class="hero-subtitle">Specialists in automation, electrical systems, and industrial solutions</p>
             <div class="cta-buttons">
-                <a href="#contact" class="btn btn-primary">Request Consultation</a>
-                <a href="#services" class="btn btn-secondary">View Services</a>
+<button class="btn btn-primary" id="consultBtn">Request Consultation</button>                <a href="#services" class="btn btn-secondary">View Services</a>
             </div>
         </div>
         <div class="hero-overlay"></div>
@@ -177,41 +186,53 @@
         </div>
     </section>
 
-    <!-- Contact Section -->
+    <!-- Contact Section (Login-gated) -->
     <section id="contact" class="contact">
         <div class="container">
-            <h2 class="section-title">Get In Touch</h2>
-            <div class="contact-content">
-                <form class="contact-form" id="contactForm">
-                    <div class="form-group">
-                        <label for="name">Name</label>
-                        <input type="text" id="name" name="name" required placeholder="Your name">
-                    </div>
-                    <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" required placeholder="your@email.com">
-                    </div>
-                    <div class="form-group">
-                        <label for="message">Message</label>
-                        <textarea id="message" name="message" required placeholder="Tell us about your project..." rows="6"></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Send Message</button>
-                </form>
-                <div class="contact-info">
-                    <h3>Contact Information</h3>
-                    <p><strong>Company:</strong> Edge Automation Technology Services, Co.</p>
-                    <p><strong>Specialization:</strong> Industrial Automation & Engineering</p>
-                    <div class="social-links">
-                        <a href="https://www.facebook.com/edgeautomationtsc" target="_blank" rel="noopener noreferrer" class="social-icon" aria-label="Facebook">
-                            <!-- Facebook "f" logo SVG -->
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-                                <path fill="currentColor" d="M22.675 0h-21.35C.597 0 0 .597 0 1.326v21.348C0 23.403.597 24 1.326 24H12.82v-9.294H9.692V11.01h3.128V8.412c0-3.1 1.894-4.788 4.659-4.788 1.325 0 2.463.099 2.795.143v3.24l-1.918.001c-1.504 0-1.796.716-1.796 1.763v2.312h3.587l-.467 3.696h-3.12V24h6.116c.73 0 1.326-.597 1.326-1.326V1.326C24 .597 23.403 0 22.675 0z"/>
-                            </svg>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
+            <h2 class="section-title">Client & Project Inquiries</h2>
+
+
+           <div class="contact-content">
+              
+
+           <div class="contact-card">
+    <h3>Contact Information</h3>
+    <p>
+        <strong>Company:</strong> Edge Automation Technology Services, Co.<br>
+        <strong>Company Location:</strong> Blk 4 Lot 16 Camella Dos Rios, Brgy. Pittland, Cabuyao, Laguna<br>
+        <strong>Specialization:</strong> Industrial Automation & Engineering
+    </p>
+
+  <div class="social-links" id="socialLinks">
+
+    <!-- Social Icons -->
+    <a href="https://www.facebook.com/edgeautomationtsc" target="_blank"
+       class="social-icon">
+        <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" width="24">
+    </a>
+
+    <a href="https://invite.viber.com/?number=09178789571" target="_blank"
+       class="social-icon">
+        <img src="https://cdn-icons-png.flaticon.com/512/3670/3670059.png" width="24">
+    </a>
+
+    <a href="https://mail.google.com/mail/?view=cm&fs=1&to=ejimenez.edge@gmail.com"
+       target="_blank" class="social-icon">
+        <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" width="24">
+    </a>
+
+    <!-- ✅ POPUP MESSAGE (NOW CORRECT POSITION) -->
+    <div class="social-tooltip" id="newClientTip">
+        <div class="tooltip-arrow"></div>
+        <p>
+            <strong>New client?</strong><br>
+            To request a project consultation, please contact us using one of the platforms below.
+        </p>
+        <button id="dismissTip" type="button">Got it</button>
+    </div>
+
+</div>
+            
     </section>
 
     <!-- Footer -->
@@ -221,6 +242,30 @@
         </div>
     </footer>
 
-    <script src="../js/landing.js"></script>
+<div id="consultModal" class="consult-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="consultModalTitle">
+    <div class="consult-modal-content">
+        <h3 id="consultModalTitle">Request Consultation</h3>
+        <p>Choose your preferred platform:</p>
+
+        <div class="consult-buttons">
+<a href="https://www.facebook.com/edgeautomationtsc" target="_blank" rel="noopener noreferrer" class="consult-option" aria-label="Facebook">                <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" alt="Facebook Messenger">
+                <span>Facebook Page</span>
+            </a>
+
+<a href="https://invite.viber.com/?number=639178789571" target="_blank" rel="noopener noreferrer" class="consult-option" aria-label="Viber">                <img src="https://cdn-icons-png.flaticon.com/512/3670/3670059.png" alt="Viber">
+                <span>Viber Chat</span>
+            </a>
+
+<a href="https://mail.google.com/mail/?view=cm&fs=1&to=ejimenez.edge@gmail.com&su=Request%20Consultation&body=Hello%20Edge%20Automation,%20I%20would%20like%20to%20request%20a%20consultation." target="_blank" class="consult-option">
+    <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" alt="Email">
+    <span>Email</span>
+</a>      </div>
+
+        <button id="closeConsult" class="consult-close" type="button">Close</button>
+    </div>
+</div>
+    <script src="../js/index.js"></script>
+
 </body>
+
 </html>

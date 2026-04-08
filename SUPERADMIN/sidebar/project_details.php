@@ -312,37 +312,69 @@ if ($projectId > 0) {
                 $isDraft = ($project['status'] ?? '') === 'draft';
                 $isCompleted = ($project['status'] ?? '') === 'completed';
                 $currentEngineerId = (int)($project['engineer_id'] ?? 0);
+                $completionRate = (int)round(((int)($project['completed_tasks'] ?? 0) / max(1, (int)($project['total_tasks'] ?? 0))) * 100);
                 ?>
 
-                <section class="form-panel">
-                    <div class="card-split">
-                        <div>
-                            <h2 class="section-title-inline"><?php echo htmlspecialchars($project['project_name']); ?></h2>
-                            <div class="status-pill-wrap">
-                                <span class="status-pill status-<?php echo htmlspecialchars($project['status']); ?>">
-                                    <?php echo htmlspecialchars(ucfirst($project['status'])); ?>
-                                </span>
+                <section class="form-panel project-details-shell">
+                    <div class="project-details-hero">
+                        <div class="project-details-hero__main">
+                            <div>
+                                <h2 class="section-title-inline"><?php echo htmlspecialchars($project['project_name']); ?></h2>
+                                <div class="status-pill-wrap">
+                                    <span class="status-pill status-<?php echo htmlspecialchars($project['status']); ?>">
+                                        <?php echo htmlspecialchars(ucfirst($project['status'])); ?>
+                                    </span>
+                                </div>
                             </div>
+
+                            <?php if (!empty($project['description'])): ?>
+                                <div class="empty-state empty-state-solid project-details-hero__description"><?php echo nl2br(htmlspecialchars($project['description'])); ?></div>
+                            <?php endif; ?>
                         </div>
 
-                        <div class="project-meta">
-                            <div><strong>Client:</strong> <?php echo htmlspecialchars($project['client_name'] ?? 'N/A'); ?></div>
-                            <div><strong>Engineer:</strong> <?php echo htmlspecialchars($project['engineer_name'] ?? 'Not assigned'); ?></div>
-                            <?php if ($hasProjectAddressColumn): ?>
-                                <div><strong>Project Site:</strong> <?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></div>
-                            <?php endif; ?>
-                            <div><strong>Start:</strong> <?php echo htmlspecialchars($project['start_date'] ?? 'N/A'); ?></div>
-                            <div><strong>End:</strong> <?php echo htmlspecialchars($project['end_date'] ?? 'N/A'); ?></div>
-                            <div><strong>Tasks:</strong> <?php echo (int)$project['completed_tasks']; ?> / <?php echo (int)$project['total_tasks']; ?> completed</div>
+                        <div class="project-details-stats">
+                            <div class="project-details-stat">
+                                <span>Progress</span>
+                                <strong><?php echo $completionRate; ?>%</strong>
+                                <small><?php echo (int)$project['completed_tasks']; ?> / <?php echo (int)$project['total_tasks']; ?> tasks done</small>
+                            </div>
+                            <div class="project-details-stat">
+                                <span>Client</span>
+                                <strong><?php echo htmlspecialchars($project['client_name'] ?? 'N/A'); ?></strong>
+                                <small>Assigned client</small>
+                            </div>
+                            <div class="project-details-stat">
+                                <span>Engineer</span>
+                                <strong><?php echo htmlspecialchars($project['engineer_name'] ?? 'Not assigned'); ?></strong>
+                                <small>Current lead</small>
+                            </div>
+                            <div class="project-details-stat">
+                                <span>Target End</span>
+                                <strong><?php echo htmlspecialchars($project['end_date'] ?? 'N/A'); ?></strong>
+                                <small>Planned completion</small>
+                            </div>
                         </div>
                     </div>
 
-                    <?php if (!empty($project['description'])): ?>
-                        <div class="empty-state empty-state-solid"><?php echo nl2br(htmlspecialchars($project['description'])); ?></div>
-                    <?php endif; ?>
+                    <div class="project-details-glance">
+                        <div><strong>Start:</strong> <?php echo htmlspecialchars($project['start_date'] ?? 'N/A'); ?></div>
+                        <div><strong>Created:</strong> <?php echo htmlspecialchars($project['created_at'] ?? 'N/A'); ?></div>
+                        <?php if ($hasProjectAddressColumn): ?>
+                            <div><strong>Project Site:</strong> <?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></div>
+                        <?php endif; ?>
+                    </div>
                 </section>
 
-                <section class="form-panel">
+                <nav class="project-details-tabs" aria-label="Project detail sections">
+                    <button type="button" class="project-details-tab is-active" data-project-tab="overview">Overview</button>
+                    <button type="button" class="project-details-tab" data-project-tab="status">Status</button>
+                    <button type="button" class="project-details-tab" data-project-tab="tasks">Tasks</button>
+                    <button type="button" class="project-details-tab" data-project-tab="inventory">Inventory</button>
+                    <button type="button" class="project-details-tab" data-project-tab="history">History</button>
+                </nav>
+
+                <div class="project-details-panels">
+                <section class="form-panel project-details-panel is-active" data-project-panel="overview">
                     <h2 class="section-title-inline">Edit Project Details</h2>
                     <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php">
                         <input type="hidden" name="action" value="update_project_details">
@@ -406,7 +438,7 @@ if ($projectId > 0) {
                     </form>
                 </section>
 
-                <section class="form-panel">
+                <section class="form-panel project-details-panel" data-project-panel="status">
                     <h2 class="section-title-inline">Update Status</h2>
                     <?php if ($isCompleted): ?>
                         <div class="lock-note">This project is locked because it is already completed.</div>
@@ -467,7 +499,7 @@ if ($projectId > 0) {
                     <?php endif; ?>
                 </section>
 
-                <section class="form-panel">
+                <section class="form-panel project-details-panel" data-project-panel="tasks">
                     <h2 class="section-title-inline">Tasks</h2>
 
                     <?php if (empty($tasks)): ?>
@@ -533,7 +565,7 @@ if ($projectId > 0) {
                     <?php endif; ?>
                 </section>
 
-                <section class="form-panel">
+                <section class="form-panel project-details-panel" data-project-panel="inventory">
                     <h2 class="section-title-inline">Deployed Inventory</h2>
 
                     <?php if (empty($activeDeployments)): ?>
@@ -626,7 +658,7 @@ if ($projectId > 0) {
                     <?php endif; ?>
                 </section>
 
-                <section class="form-panel">
+                <section class="form-panel project-details-panel" data-project-panel="history">
                     <h2 class="section-title-inline">Deployment History</h2>
 
                     <?php if (empty($deploymentHistory)): ?>
@@ -651,6 +683,7 @@ if ($projectId > 0) {
                         </div>
                     <?php endif; ?>
                 </section>
+                </div>
             <?php endif; ?>
         </div>
     </main>
@@ -665,6 +698,28 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!window.confirm(message)) {
                 event.preventDefault();
             }
+        });
+    });
+
+    const tabs = Array.from(document.querySelectorAll('[data-project-tab]'));
+    const panels = Array.from(document.querySelectorAll('[data-project-panel]'));
+
+    function setActiveProjectTab(tabName) {
+        tabs.forEach(function (tab) {
+            const isActive = tab.getAttribute('data-project-tab') === tabName;
+            tab.classList.toggle('is-active', isActive);
+        });
+
+        panels.forEach(function (panel) {
+            const isActive = panel.getAttribute('data-project-panel') === tabName;
+            panel.classList.toggle('is-active', isActive);
+        });
+    }
+
+    tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+            const tabName = tab.getAttribute('data-project-tab') || 'overview';
+            setActiveProjectTab(tabName);
         });
     });
 });
