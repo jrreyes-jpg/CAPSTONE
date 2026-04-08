@@ -5,6 +5,12 @@
     $error = "";
     $failed_attempts_display = "";
 
+    if (isset($_GET['timeout'])) {
+        $error = "Your session expired after 15 minutes of inactivity. Please log in again.";
+    } elseif (isset($_GET['logout'])) {
+        $error = "You have been logged out successfully.";
+    }
+
     $max_attempts = 10;
 $lockout_time = 15 * 60;
 $ip_address = $_SERVER['REMOTE_ADDR'];
@@ -53,9 +59,11 @@ Account will be temporarily locked after $max_attempts failed attempts.";
                 $deleteAttempts->bind_param("ss", $email, $ip_address);
                 $deleteAttempts->execute();
 
+                session_regenerate_id(true);
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['name'] = $user['full_name'];
                 $_SESSION['role'] = $user['role'];
+                $_SESSION['last_activity_at'] = time();
 
                 if ($user['role'] == 'super_admin') {
                     header("Location: ../../SUPERADMIN/dashboards/super_admin_dashboard.php");

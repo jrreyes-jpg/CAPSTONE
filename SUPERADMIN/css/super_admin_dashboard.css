@@ -151,6 +151,37 @@ body.page-loaded {
     gap: 2px;
 }
 
+.global-topbar__copy {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: 12px;
+}
+
+.global-topbar__copy strong,
+.global-topbar__copy span {
+    grid-column: 2;
+}
+
+.global-topbar__brand-mark {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 44px;
+    height: 44px;
+    border-radius: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background:
+        radial-gradient(circle at 30% 30%, rgba(134, 239, 172, 0.9), rgba(34, 197, 94, 0.28) 44%, transparent 45%),
+        linear-gradient(135deg, #052e22, #0f766e);
+    color: #f0fdf4;
+    font-size: 0.9rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    box-shadow: 0 16px 30px rgba(15, 23, 42, 0.14);
+    border: 1px solid rgba(15, 118, 110, 0.18);
+}
+
 .global-topbar__copy strong,
 .global-topbar__time {
     color: #0f172a;
@@ -158,6 +189,8 @@ body.page-loaded {
 
 .global-topbar__copy strong {
     font-size: 0.98rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .global-topbar__copy span,
@@ -165,6 +198,11 @@ body.page-loaded {
 .global-topbar__date {
     color: #475569;
     font-size: 0.82rem;
+}
+
+.global-topbar__copy span {
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .global-topbar__clock {
@@ -1853,6 +1891,13 @@ tbody tr:hover {
         flex: 1 1 auto;
     }
 
+    .global-topbar__brand-mark {
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+        font-size: 0.8rem;
+    }
+
     .global-topbar__copy span {
         display: none;
     }
@@ -2225,6 +2270,12 @@ tbody tr:hover {
 
     .global-topbar__copy strong {
         font-size: 0.88rem;
+    }
+
+    .global-topbar__brand-mark {
+        width: 36px;
+        height: 36px;
+        border-radius: 13px;
     }
 
     .global-topbar__actions {

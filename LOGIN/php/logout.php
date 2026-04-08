@@ -1,6 +1,7 @@
 <?php
-session_start();
-session_destroy();
-header("Location: login.php");
+require_once __DIR__ . '/../../config/auth_middleware.php';
+
+auth_apply_no_cache_headers();
+auth_destroy_session();
+header('Location: login.php?logout=1');
 exit();
-?>

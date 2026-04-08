@@ -64,6 +64,23 @@ document.addEventListener('DOMContentLoaded', function () {
     const notificationRoot = document.querySelector('[data-notification-root]');
     const notificationToggle = document.getElementById('topbarNotificationToggle');
     const notificationDropdown = document.getElementById('topbarNotificationDropdown');
+    const idleTimeoutMs = 15 * 60 * 1000;
+    let idleTimerId = null;
+
+    const scheduleIdleLogout = function () {
+        if (idleTimerId) {
+            window.clearTimeout(idleTimerId);
+        }
+
+        idleTimerId = window.setTimeout(function () {
+            window.location.href = '/codesamplecaps/LOGIN/php/logout.php?timeout=1';
+        }, idleTimeoutMs);
+    };
+
+    ['click', 'keydown', 'mousemove', 'scroll', 'touchstart'].forEach(function (eventName) {
+        document.addEventListener(eventName, scheduleIdleLogout, { passive: true });
+    });
+    scheduleIdleLogout();
 
     if (phTime && phDate) {
         const timeFormatter = new Intl.DateTimeFormat('en-PH', {

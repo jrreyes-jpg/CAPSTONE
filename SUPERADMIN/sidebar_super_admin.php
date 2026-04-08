@@ -406,6 +406,7 @@ $superAdminNotificationData = isset($conn) && $conn instanceof mysqli
 <div id="sidebarOverlay" class="sidebar-overlay"></div>
 <header class="global-topbar" aria-live="polite">
     <div class="global-topbar__copy">
+        <span class="global-topbar__brand-mark" aria-hidden="true">EA</span>
         <strong>EDGE Automation</strong>
         <span>Super Admin Panel</span>
     </div>
