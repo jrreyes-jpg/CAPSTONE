@@ -54,6 +54,19 @@ function isValidCsrfToken(?string $token): bool {
     return hash_equals($_SESSION['csrf_token'], $token);
 }
 
+function getUserById(mysqli $conn, int $userId): ?array {
+    $stmt = $conn->prepare('SELECT id, full_name, email, phone, role, status, created_at FROM users WHERE id = ? LIMIT 1');
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('i', $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result ? $result->fetch_assoc() : null;
+}
+
 function getUserForStatusChange(mysqli $conn, int $userId): ?array {
     $stmt = $conn->prepare('SELECT id, full_name, email, phone, role, status FROM users WHERE id = ? LIMIT 1');
     $stmt->bind_param('i', $userId);
@@ -324,7 +337,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     if (!isValidCsrfToken($_POST['csrf_token'] ?? null)) {
         $error = 'Invalid request. Please try again.';
-        $activeTab = $action === 'create_account' ? 'create' : 'users';
+        $activeTab = $action === 'create_account'
+            ? 'create'
+            : (($action === 'update_my_profile' || $action === 'change_my_password') ? 'profile' : 'users');
     } elseif ($action === 'create_account') {
         $fullName = trim($_POST['full_name'] ?? '');
         $email = trim($_POST['email'] ?? '');
@@ -506,6 +521,113 @@ $old['role'] = $role;
         $activeTab = 'users';
     }
 
+    if ($action === 'update_my_profile' && $error === '') {
+        $userId = (int)($_SESSION['user_id'] ?? 0);
+        $fullName = trim($_POST['full_name'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $phone = trim($_POST['phone'] ?? '');
+        $currentUser = $userId > 0 ? getUserById($conn, $userId) : null;
+
+        if ($userId <= 0 || !$currentUser) {
+            $error = 'Unable to load your admin account.';
+        } elseif ($fullName === '' || $email === '') {
+            $error = 'Full name and email are required.';
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error = 'Please use a valid email address.';
+        } elseif (!ctype_digit($phone) && $phone !== '') {
+            $error = 'Phone number must contain numbers only.';
+        } elseif (!isValidPhMobile($phone)) {
+            $error = 'Phone number must be a valid PH mobile number (09xxxxxxxxx).';
+        } else {
+            $dupStmt = $conn->prepare('SELECT id FROM users WHERE (full_name = ? OR email = ? OR phone = ?) AND id != ? LIMIT 1');
+            $dupStmt->bind_param('sssi', $fullName, $email, $phone, $userId);
+            $dupStmt->execute();
+            $dup = $dupStmt->get_result();
+
+            if ($dup && $dup->num_rows > 0) {
+                $error = 'Full name, email, and phone must stay unique.';
+            } else {
+                $stmt = $conn->prepare('UPDATE users SET full_name = ?, email = ?, phone = ? WHERE id = ?');
+                $stmt->bind_param('sssi', $fullName, $email, $phone, $userId);
+
+                if ($stmt->execute()) {
+                    $_SESSION['name'] = $fullName;
+                    audit_log_event(
+                        $conn,
+                        $userId,
+                        'update_user_profile',
+                        'user',
+                        $userId,
+                        [
+                            'full_name' => $currentUser['full_name'] ?? null,
+                            'email' => $currentUser['email'] ?? null,
+                            'phone' => $currentUser['phone'] ?? null,
+                        ],
+                        [
+                            'full_name' => $fullName,
+                            'email' => $email,
+                            'phone' => $phone,
+                        ]
+                    );
+                    $message = 'Your admin profile was updated.';
+                } else {
+                    $error = 'Failed to update your profile.';
+                }
+            }
+        }
+
+        $activeTab = 'profile';
+    }
+
+    if ($action === 'change_my_password' && $error === '') {
+        $userId = (int)($_SESSION['user_id'] ?? 0);
+        $currentPassword = (string)($_POST['current_password'] ?? '');
+        $newPassword = (string)($_POST['new_password'] ?? '');
+        $confirmPassword = (string)($_POST['confirm_password'] ?? '');
+        $currentUser = $userId > 0 ? getUserById($conn, $userId) : null;
+
+        if ($userId <= 0 || !$currentUser) {
+            $error = 'Unable to load your admin account.';
+        } elseif ($currentPassword === '' || $newPassword === '' || $confirmPassword === '') {
+            $error = 'Complete all password fields first.';
+        } elseif ($newPassword !== $confirmPassword) {
+            $error = 'New password and confirmation do not match.';
+        } elseif (!isStrongPassword($newPassword)) {
+            $error = 'Use a strong password with 12+ chars, uppercase, lowercase, number, and special symbol.';
+        } else {
+            $passwordStmt = $conn->prepare('SELECT password FROM users WHERE id = ? LIMIT 1');
+            $passwordStmt->bind_param('i', $userId);
+            $passwordStmt->execute();
+            $passwordResult = $passwordStmt->get_result();
+            $passwordRow = $passwordResult ? $passwordResult->fetch_assoc() : null;
+
+            if (!$passwordRow || !password_verify($currentPassword, (string)($passwordRow['password'] ?? ''))) {
+                $error = 'Current password is incorrect.';
+            } else {
+                $newPasswordHash = password_hash($newPassword, PASSWORD_DEFAULT);
+                $updatePasswordStmt = $conn->prepare('UPDATE users SET password = ? WHERE id = ?');
+                $updatePasswordStmt->bind_param('si', $newPasswordHash, $userId);
+
+                if ($updatePasswordStmt->execute()) {
+                    audit_log_event(
+                        $conn,
+                        $userId,
+                        'change_password',
+                        'user',
+                        $userId,
+                        null,
+                        ['full_name' => $currentUser['full_name'] ?? null]
+                    );
+                    $message = 'Your password was changed successfully.';
+                } else {
+                    $error = 'Failed to change your password.';
+                }
+            }
+        }
+
+        $activeTab = 'profile';
+    }
+
 }
 
 
@@ -538,6 +660,13 @@ $foremen = fetchUsersByRoles($conn, ['foreman', 'foremen'], $activeTab === 'user
 $clients = fetchUsersByRoles($conn, ['client'], $activeTab === 'users' ? $userStatusFilter : '');
 $totalUsers = count($engineers) + count($foremen) + count($clients);
 $csrfToken = getCsrfToken();
+$currentAdmin = getUserById($conn, (int)($_SESSION['user_id'] ?? 0));
+$currentAdminName = (string)($currentAdmin['full_name'] ?? ($_SESSION['name'] ?? 'Super Admin'));
+$currentAdminEmail = (string)($currentAdmin['email'] ?? '');
+$currentAdminPhone = (string)($currentAdmin['phone'] ?? '');
+$currentAdminRole = ucwords(str_replace('_', ' ', (string)($currentAdmin['role'] ?? 'super_admin')));
+$currentAdminStatus = ucfirst((string)($currentAdmin['status'] ?? 'active'));
+$currentAdminCreatedAt = formatRelativeDate($currentAdmin['created_at'] ?? null);
 
 $projectMetrics = $conn->query(
     "SELECT
@@ -626,8 +755,18 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
 
     <main class="main-content">
         <div class="header">
-            <h1>Super Admin Dashboard</h1>
-            <div class="user-info"><span>Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></span></div>
+            <div class="header-copy">
+                <h1><?php echo $activeTab === 'profile' ? 'Admin Profile' : 'Super Admin Dashboard'; ?></h1>
+                <p>
+                    <?php echo $activeTab === 'profile'
+                        ? 'Keep your admin account details current and your access secure.'
+                        : 'Monitor the system, manage people, and keep operations moving.'; ?>
+                </p>
+            </div>
+            <div class="user-info">
+                <span><?php echo htmlspecialchars($currentAdminName); ?></span>
+                <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=profile">Open profile</a>
+            </div>
         </div>
 
         <?php if ($message): ?><div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div><?php endif; ?>
@@ -767,6 +906,111 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
                     </table>
                 </div>
             <?php endforeach; ?>
+        </div>
+
+        <div id="profile" class="tab-content <?php echo $activeTab === 'profile' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'profile' ? 'display: block;' : 'display: none;'; ?>">
+            <section class="profile-shell">
+                <article class="profile-overview-card">
+                    <div class="profile-overview-card__avatar" aria-hidden="true">
+                        <?php echo htmlspecialchars(strtoupper(substr(trim($currentAdminName), 0, 1))); ?>
+                    </div>
+                    <div class="profile-overview-card__content">
+                        <span class="profile-eyebrow">Account Overview</span>
+                        <h2><?php echo htmlspecialchars($currentAdminName); ?></h2>
+                        <p>Primary super admin account for EDGE Automation system control and approvals.</p>
+                    </div>
+                    <div class="profile-overview-card__stats">
+                        <div class="profile-stat">
+                            <span>Role</span>
+                            <strong><?php echo htmlspecialchars($currentAdminRole); ?></strong>
+                        </div>
+                        <div class="profile-stat">
+                            <span>Status</span>
+                            <strong><?php echo htmlspecialchars($currentAdminStatus); ?></strong>
+                        </div>
+                        <div class="profile-stat">
+                            <span>Account Age</span>
+                            <strong><?php echo htmlspecialchars($currentAdminCreatedAt); ?></strong>
+                        </div>
+                    </div>
+                </article>
+
+                <div class="profile-grid">
+                    <section class="form-section profile-form-card">
+                        <div class="panel-heading">
+                            <div>
+                                <h2 class="dashboard-section-title">Profile Details</h2>
+                                <p class="panel-copy">Update the core details shown across the admin workspace.</p>
+                            </div>
+                        </div>
+                        <form method="POST">
+                            <input type="hidden" name="action" value="update_my_profile">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="admin_full_name">Full Name *</label>
+                                    <input type="text" id="admin_full_name" name="full_name" value="<?php echo htmlspecialchars($currentAdminName); ?>" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="admin_email">Email *</label>
+                                    <input type="email" id="admin_email" name="email" value="<?php echo htmlspecialchars($currentAdminEmail); ?>" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="admin_phone">Phone Number</label>
+                                    <input type="tel" id="admin_phone" name="phone" value="<?php echo htmlspecialchars($currentAdminPhone); ?>" pattern="^09[0-9]{9}$" maxlength="11" placeholder="09XXXXXXXXX" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,''); if(this.value && !this.value.startsWith('09')){this.value='09';}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="admin_role">Role</label>
+                                    <input type="text" id="admin_role" value="<?php echo htmlspecialchars($currentAdminRole); ?>" readonly>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary">Save Profile</button>
+                        </form>
+                    </section>
+
+                    <section class="form-section profile-form-card profile-form-card--security">
+                        <div class="panel-heading">
+                            <div>
+                                <h2 class="dashboard-section-title">Security</h2>
+                                <p class="panel-copy">Change your password regularly, especially on shared or office machines.</p>
+                            </div>
+                        </div>
+                        <form method="POST">
+                            <input type="hidden" name="action" value="change_my_password">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                            <div class="form-row">
+                                <div class="form-group password-field">
+                                    <label for="current_password">Current Password *</label>
+                                    <div class="password-input-wrap">
+                                        <input type="password" id="current_password" name="current_password" required>
+                                        <button type="button" class="togglePassword" data-target="current_password">Show</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group password-field">
+                                    <label for="new_password">New Password *</label>
+                                    <div class="password-input-wrap">
+                                        <input type="password" id="new_password" name="new_password" minlength="12" required>
+                                        <button type="button" class="togglePassword" data-target="new_password">Show</button>
+                                    </div>
+                                    <small class="password-tip">Use 12+ characters with uppercase, lowercase, number, and symbol.</small>
+                                </div>
+                                <div class="form-group password-field">
+                                    <label for="confirm_password">Confirm Password *</label>
+                                    <div class="password-input-wrap">
+                                        <input type="password" id="confirm_password" name="confirm_password" minlength="12" required>
+                                        <button type="button" class="togglePassword" data-target="confirm_password">Show</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary btn-primary--dark">Update Password</button>
+                        </form>
+                    </section>
+                </div>
+            </section>
         </div>
 </div>
     </main>

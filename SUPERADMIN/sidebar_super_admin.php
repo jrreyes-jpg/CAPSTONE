@@ -251,13 +251,6 @@ $superAdminNotificationData = isset($conn) && $conn instanceof mysqli
         </span>
     </button>
 
-    <div class="sidebar-header brand-block">
-        <span class="brand-mark" aria-hidden="true">EA</span>
-        <div class="brand-copy">
-            <h3 class="brand-title">Edge Automation</h3>
-            <p class="sidebar-subtitle">Super Admin Panel</p>
-        </div>
-    </div>
     <div class="nav-divider"></div>
 
     <ul class="nav-menu">
@@ -406,11 +399,45 @@ $superAdminNotificationData = isset($conn) && $conn instanceof mysqli
 <div id="sidebarOverlay" class="sidebar-overlay"></div>
 <header class="global-topbar" aria-live="polite">
     <div class="global-topbar__copy">
-        <span class="global-topbar__brand-mark" aria-hidden="true">EA</span>
+        <img src="/codesamplecaps/IMAGES/edge.jpg" alt="Edge Automation logo" class="global-topbar__brand-logo">
         <strong>EDGE Automation</strong>
-        <span>Super Admin Panel</span>
     </div>
     <div class="global-topbar__actions">
+        <div class="topbar-profile" data-profile-root>
+            <button
+                id="topbarProfileToggle"
+                class="topbar-profile__toggle"
+                type="button"
+                aria-label="Open profile menu"
+                aria-controls="topbarProfileDropdown"
+                aria-expanded="false"
+            >
+                <span class="topbar-profile__avatar" aria-hidden="true">
+                    <?php echo htmlspecialchars(strtoupper(substr(trim((string)($_SESSION['name'] ?? 'A')), 0, 1))); ?>
+                </span>
+                <span class="topbar-profile__identity">
+                    <strong><?php echo htmlspecialchars((string)($_SESSION['name'] ?? 'Admin')); ?></strong>
+                    <span>Super Admin</span>
+                </span>
+            </button>
+
+            <div id="topbarProfileDropdown" class="topbar-profile__dropdown" hidden>
+                <div class="topbar-profile__panel-head">
+                    <span class="topbar-profile__avatar topbar-profile__avatar--panel" aria-hidden="true">
+                        <?php echo htmlspecialchars(strtoupper(substr(trim((string)($_SESSION['name'] ?? 'A')), 0, 1))); ?>
+                    </span>
+                    <div>
+                        <strong><?php echo htmlspecialchars((string)($_SESSION['name'] ?? 'Admin')); ?></strong>
+                        <span><?php echo htmlspecialchars((string)($_SESSION['role'] ?? 'super_admin')); ?></span>
+                    </div>
+                </div>
+                <div class="topbar-profile__links">
+                    <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=profile">My Profile</a>
+                    <a href="/codesamplecaps/LOGIN/php/logout.php">Logout</a>
+                </div>
+            </div>
+        </div>
+
         <div class="topbar-notifications" data-notification-root>
             <button
                 id="topbarNotificationToggle"

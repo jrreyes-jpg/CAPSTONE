@@ -64,6 +64,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const notificationRoot = document.querySelector('[data-notification-root]');
     const notificationToggle = document.getElementById('topbarNotificationToggle');
     const notificationDropdown = document.getElementById('topbarNotificationDropdown');
+    const profileRoot = document.querySelector('[data-profile-root]');
+    const profileToggle = document.getElementById('topbarProfileToggle');
+    const profileDropdown = document.getElementById('topbarProfileDropdown');
     const idleTimeoutMs = 15 * 60 * 1000;
     let idleTimerId = null;
 
@@ -119,6 +122,11 @@ document.addEventListener('DOMContentLoaded', function () {
             event.preventDefault();
             const isOpen = notificationToggle.getAttribute('aria-expanded') === 'true';
             setNotificationState(!isOpen);
+
+            if (profileToggle && profileDropdown) {
+                profileToggle.setAttribute('aria-expanded', 'false');
+                profileDropdown.hidden = true;
+            }
         });
 
         document.addEventListener('click', function (event) {
@@ -130,6 +138,36 @@ document.addEventListener('DOMContentLoaded', function () {
         document.addEventListener('keydown', function (event) {
             if (event.key === 'Escape') {
                 setNotificationState(false);
+            }
+        });
+    }
+
+    if (profileRoot && profileToggle && profileDropdown) {
+        const setProfileState = function (isOpen) {
+            profileToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            profileDropdown.hidden = !isOpen;
+        };
+
+        profileToggle.addEventListener('click', function (event) {
+            event.preventDefault();
+            const isOpen = profileToggle.getAttribute('aria-expanded') === 'true';
+            setProfileState(!isOpen);
+
+            if (notificationToggle && notificationDropdown) {
+                notificationToggle.setAttribute('aria-expanded', 'false');
+                notificationDropdown.hidden = true;
+            }
+        });
+
+        document.addEventListener('click', function (event) {
+            if (!profileRoot.contains(event.target)) {
+                setProfileState(false);
+            }
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape') {
+                setProfileState(false);
             }
         });
     }
