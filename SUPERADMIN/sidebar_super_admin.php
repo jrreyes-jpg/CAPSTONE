@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/../config/profile_photo_storage.php';
+
 $currentPath = str_replace('\\', '/', parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '');
 $currentQuery = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_QUERY) ?? '';
 
@@ -14,6 +16,33 @@ $isActivityHistory = str_contains($currentPath, '/SUPERADMIN/sidebar/activity_hi
 $superAdminProfileName = (string)($_SESSION['name'] ?? 'Super Admin');
 $superAdminProfileRole = ucfirst(str_replace('_', ' ', (string)($_SESSION['role'] ?? 'super_admin')));
 $superAdminProfilePhotoUrl = '';
+
+if (!function_exists('build_default_profile_avatar_data_uri')) {
+    function build_default_profile_avatar_data_uri(): string {
+        $relativePath = '/codesamplecaps/IMAGES/nodp.jpg';
+        $absoluteFile = __DIR__ . '/../IMAGES/nodp.jpg';
+
+        if (is_file($absoluteFile) && is_readable($absoluteFile)) {
+            return $relativePath;
+        }
+
+        $svg = <<<'SVG'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="avatarBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f0f2f5;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="200" height="200" fill="url(#avatarBg)"/>
+  <circle cx="100" cy="70" r="35" fill="#ccc"/>
+  <path d="M 30 180 Q 30 140 100 140 Q 170 140 170 180 L 170 200 L 30 200 Z" fill="#ccc"/>
+</svg>
+SVG;
+
+        return 'data:image/svg+xml;utf8,' . rawurlencode($svg);
+    }
+}
 
 if (!function_exists('super_admin_sidebar_table_exists')) {
     function super_admin_sidebar_table_exists(mysqli $conn, string $tableName): bool {
@@ -275,11 +304,20 @@ if (
         $profileStmt->execute();
         $profileResult = $profileStmt->get_result();
         $profileRow = $profileResult ? $profileResult->fetch_assoc() : null;
-        $profilePhotoPath = trim((string)($profileRow['profile_photo_path'] ?? ''));
+        $profilePhotoPath = profile_photo_migrate_legacy_reference(
+            $conn,
+            (int)$_SESSION['user_id'],
+            $profileRow['profile_photo_path'] ?? null
+        );
+        $profilePhotoPath = trim((string)$profilePhotoPath);
         if ($profilePhotoPath !== '') {
-            $superAdminProfilePhotoUrl = '/codesamplecaps/' . ltrim(str_replace('\\', '/', $profilePhotoPath), '/');
+            $superAdminProfilePhotoUrl = profile_photo_public_url($profilePhotoPath);
         }
     }
+}
+
+if ($superAdminProfilePhotoUrl === '') {
+    $superAdminProfilePhotoUrl = build_default_profile_avatar_data_uri();
 }
 ?>
 <button id="sidebarMobileToggle" class="sidebar-mobile-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">
@@ -462,13 +500,7 @@ if (
                 aria-controls="topbarProfileDropdown"
                 aria-expanded="false"
             >
-                <?php if ($superAdminProfilePhotoUrl !== ''): ?>
-                    <img src="<?php echo htmlspecialchars($superAdminProfilePhotoUrl); ?>" alt="Super admin profile picture" class="topbar-profile__avatar-image">
-                <?php else: ?>
-                    <span class="topbar-profile__avatar" aria-hidden="true">
-                        <?php echo htmlspecialchars(strtoupper(substr(trim($superAdminProfileName), 0, 1))); ?>
-                    </span>
-                <?php endif; ?>
+                <img src="<?php echo htmlspecialchars($superAdminProfilePhotoUrl); ?>" alt="Super admin profile picture" class="topbar-profile__avatar-image">
                 <span class="topbar-profile__identity">
                     <strong>Super Admin</strong>
                     <span>Profile Menu</span>
@@ -477,13 +509,7 @@ if (
 
             <div id="topbarProfileDropdown" class="topbar-profile__dropdown" hidden>
                 <div class="topbar-profile__panel-head">
-                    <?php if ($superAdminProfilePhotoUrl !== ''): ?>
-                        <img src="<?php echo htmlspecialchars($superAdminProfilePhotoUrl); ?>" alt="Super admin profile picture" class="topbar-profile__avatar-image topbar-profile__avatar-image--panel">
-                    <?php else: ?>
-                        <span class="topbar-profile__avatar topbar-profile__avatar--panel" aria-hidden="true">
-                            <?php echo htmlspecialchars(strtoupper(substr(trim($superAdminProfileName), 0, 1))); ?>
-                        </span>
-                    <?php endif; ?>
+                    <img src="<?php echo htmlspecialchars($superAdminProfilePhotoUrl); ?>" alt="Super admin profile picture" class="topbar-profile__avatar-image topbar-profile__avatar-image--panel">
                     <div>
                         <strong>Admin Menu</strong>
                         <span><?php echo htmlspecialchars($superAdminProfileRole); ?></span>

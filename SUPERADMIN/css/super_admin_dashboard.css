@@ -3350,6 +3350,73 @@ tbody tr:hover {
     border-radius: 4px;
 }
 
+.search-result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.search-result-header strong {
+    flex: 1;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.search-status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.search-status-badge.status-draft {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.search-status-badge.status-pending {
+    background: #fce7f3;
+    color: #9d174d;
+}
+
+.search-status-badge.status-ongoing {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.search-status-badge.status-completed {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.search-status-badge.status-on-hold {
+    background: #f3e8ff;
+    color: #6b21a8;
+}
+
+.search-status-badge.status-cancelled {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.search-status-badge.status-archived {
+    background: #ede9fe;
+    color: #5b21b6;
+}
+
+.search-result-meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
 .project-filter-chips {
     display: flex;
     flex-wrap: wrap;
@@ -3386,6 +3453,110 @@ tbody tr:hover {
     border-color: #22c55e;
     color: #166534;
     box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+}
+
+.project-filter-chip--all {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #334155;
+}
+
+.project-filter-chip--draft {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #475569;
+}
+
+.project-filter-chip--pending {
+    background: #fff7ed;
+    border-color: #fdba74;
+    color: #9a3412;
+}
+
+.project-filter-chip--ongoing {
+    background: #ecfeff;
+    border-color: #67e8f9;
+    color: #155e75;
+}
+
+.project-filter-chip--completed {
+    background: #ecfdf5;
+    border-color: #86efac;
+    color: #166534;
+}
+
+.project-filter-chip--on-hold {
+    background: #fef2f2;
+    border-color: #fca5a5;
+    color: #991b1b;
+}
+
+.project-filter-chip--cancelled {
+    background: #fff1f2;
+    border-color: #fda4af;
+    color: #9f1239;
+}
+
+.project-filter-chip--archived {
+    background: #f8fafc;
+    border-color: #d1d5db;
+    color: #4b5563;
+}
+
+.project-filter-chip.is-active.project-filter-chip--all {
+    background: #e2e8f0;
+    border-color: #94a3b8;
+    color: #0f172a;
+    box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.16);
+}
+
+.project-filter-chip.is-active.project-filter-chip--draft {
+    background: #e2e8f0;
+    border-color: #94a3b8;
+    color: #1e293b;
+    box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.16);
+}
+
+.project-filter-chip.is-active.project-filter-chip--pending {
+    background: #fed7aa;
+    border-color: #fb923c;
+    color: #7c2d12;
+    box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.16);
+}
+
+.project-filter-chip.is-active.project-filter-chip--ongoing {
+    background: #cffafe;
+    border-color: #22d3ee;
+    color: #164e63;
+    box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.16);
+}
+
+.project-filter-chip.is-active.project-filter-chip--completed {
+    background: #bbf7d0;
+    border-color: #22c55e;
+    color: #14532d;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14);
+}
+
+.project-filter-chip.is-active.project-filter-chip--on-hold {
+    background: #fecaca;
+    border-color: #ef4444;
+    color: #7f1d1d;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.14);
+}
+
+.project-filter-chip.is-active.project-filter-chip--cancelled {
+    background: #fecdd3;
+    border-color: #f43f5e;
+    color: #881337;
+    box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.14);
+}
+
+.project-filter-chip.is-active.project-filter-chip--archived {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+    color: #111827;
+    box-shadow: 0 0 0 3px rgba(156, 163, 175, 0.14);
 }
 
 .project-card {

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/audit_log.php';
+require_once __DIR__ . '/project_search_support.php';
 
 require_role('super_admin');
 
@@ -115,6 +116,7 @@ $supportsDraftStatus = enum_supports_value($conn, 'projects', 'status', 'draft')
 $supportsCancelledStatus = enum_supports_value($conn, 'projects', 'status', 'cancelled');
 $supportsArchivedStatus = enum_supports_value($conn, 'projects', 'status', 'archived');
 $hasProjectAddressColumn = table_has_column($conn, 'projects', 'project_address');
+ensure_project_search_indexes($conn, $hasProjectAddressColumn);
 $statusOptions = [];
 if ($supportsDraftStatus) {
     $statusOptions[] = 'draft';
@@ -1053,41 +1055,14 @@ if ($engineerResult) {
 }
 
 $projects = [];
-$projectAddressSelect = $hasProjectAddressColumn ? 'p.project_address,' : 'NULL AS project_address,';
 $searchQuery = trim((string)($_GET['q'] ?? ''));
 $statusFilter = trim((string)($_GET['status'] ?? ''));
+if (!in_array($statusFilter, $statusOptions, true)) {
+    $statusFilter = '';
+}
 $currentPage = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 8;
 $offset = ($currentPage - 1) * $perPage;
-$whereClauses = [];
-
-if ($searchQuery !== '') {
-    $escapedSearch = $conn->real_escape_string($searchQuery);
-    $searchLike = "'%" . $escapedSearch . "%'";
-    $searchColumns = [
-        'p.project_name',
-        'p.description',
-        'client.full_name',
-        'engineer.full_name',
-    ];
-
-    if ($hasProjectAddressColumn) {
-        $searchColumns[] = 'p.project_address';
-    }
-
-    $searchConditions = array_map(
-        static fn(string $column): string => "{$column} LIKE {$searchLike}",
-        $searchColumns
-    );
-    $whereClauses[] = '(' . implode(' OR ', $searchConditions) . ')';
-}
-
-if ($statusFilter !== '' && in_array($statusFilter, $statusOptions, true)) {
-    $escapedStatus = $conn->real_escape_string($statusFilter);
-    $whereClauses[] = "p.status = '{$escapedStatus}'";
-}
-
-$whereSql = empty($whereClauses) ? '' : 'WHERE ' . implode(' AND ', $whereClauses);
 
 $projectMetricsResult = $conn->query("
     SELECT
@@ -1120,29 +1095,7 @@ if ($statusCountsResult) {
     }
 }
 
-$projectCountQuery = "
-    SELECT COUNT(*) AS total
-    FROM projects p
-    LEFT JOIN users client ON client.id = p.client_id
-    LEFT JOIN (
-        SELECT pa.project_id, pa.engineer_id
-        FROM project_assignments pa
-        INNER JOIN (
-            SELECT project_id, MAX(id) AS latest_id
-            FROM project_assignments
-            GROUP BY project_id
-        ) latest ON latest.latest_id = pa.id
-    ) latest_assignment ON latest_assignment.project_id = p.id
-    LEFT JOIN users engineer ON engineer.id = latest_assignment.engineer_id
-    {$whereSql}
-";
-
-$projectCountResult = $conn->query($projectCountQuery);
-$filteredProjects = 0;
-if ($projectCountResult) {
-    $projectCountRow = $projectCountResult->fetch_assoc();
-    $filteredProjects = (int)($projectCountRow['total'] ?? 0);
-}
+$filteredProjects = project_search_fetch_count($conn, $hasProjectAddressColumn, $searchQuery, $statusFilter);
 
 $totalPages = max(1, (int)ceil($filteredProjects / $perPage));
 if ($currentPage > $totalPages) {
@@ -1150,51 +1103,7 @@ if ($currentPage > $totalPages) {
     $offset = ($currentPage - 1) * $perPage;
 }
 
-$projectsQuery = "
-    SELECT
-        p.id,
-        p.project_name,
-        p.description,
-        {$projectAddressSelect}
-        p.client_id,
-        p.start_date,
-        p.end_date,
-        p.status,
-        p.created_at,
-        client.full_name AS client_name,
-        latest_assignment.engineer_id,
-        engineer.full_name AS engineer_name,
-        COALESCE(task_totals.total_tasks, 0) AS total_tasks,
-        COALESCE(task_totals.completed_tasks, 0) AS completed_tasks
-    FROM projects p
-    LEFT JOIN users client ON client.id = p.client_id
-    LEFT JOIN (
-        SELECT pa.project_id, pa.engineer_id
-        FROM project_assignments pa
-        INNER JOIN (
-            SELECT project_id, MAX(id) AS latest_id
-            FROM project_assignments
-            GROUP BY project_id
-        ) latest ON latest.latest_id = pa.id
-    ) latest_assignment ON latest_assignment.project_id = p.id
-    LEFT JOIN users engineer ON engineer.id = latest_assignment.engineer_id
-    LEFT JOIN (
-        SELECT
-            project_id,
-            COUNT(*) AS total_tasks,
-            SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_tasks
-        FROM tasks
-        GROUP BY project_id
-    ) task_totals ON task_totals.project_id = p.id
-    {$whereSql}
-    ORDER BY p.created_at DESC, p.id DESC
-    LIMIT {$perPage} OFFSET {$offset}
-";
-
-$projectsResult = $conn->query($projectsQuery);
-if ($projectsResult) {
-    $projects = $projectsResult->fetch_all(MYSQLI_ASSOC);
-}
+$projects = project_search_fetch_page($conn, $hasProjectAddressColumn, $searchQuery, $statusFilter, $perPage, $offset);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -1322,6 +1231,7 @@ if ($projectsResult) {
                 class="page-stack"
                 id="projects-list-section"
                 data-reset-url="/codesamplecaps/SUPERADMIN/sidebar/projects.php<?php echo $statusFilter !== '' ? '?' . http_build_query(['status' => $statusFilter]) : ''; ?>"
+                data-search-endpoint="/codesamplecaps/SUPERADMIN/sidebar/project_search_api.php"
             >
                 <h2 class="section-title-inline">Projects</h2>
                 <div class="project-controls">
@@ -1341,8 +1251,9 @@ if ($projectsResult) {
                             }
                             $chipLink = '/codesamplecaps/SUPERADMIN/sidebar/projects.php' . ($chipParams ? '?' . http_build_query($chipParams) : '');
                             $isActiveChip = $statusFilter === $chipValue;
+                            $chipTone = $chipValue === '' ? 'all' : str_replace('_', '-', $chipValue);
                         ?>
-                            <a href="<?php echo htmlspecialchars($chipLink); ?>" class="project-filter-chip<?php echo $isActiveChip ? ' is-active' : ''; ?>">
+                            <a href="<?php echo htmlspecialchars($chipLink); ?>" class="project-filter-chip project-filter-chip--<?php echo htmlspecialchars($chipTone); ?><?php echo $isActiveChip ? ' is-active' : ''; ?>">
                                 <?php
                                 $chipCount = $chipValue === '' ? $totalProjects : (int)($statusCounts[$chipValue] ?? 0);
                                 echo htmlspecialchars($chipLabel . ' (' . $chipCount . ')');
@@ -1352,21 +1263,35 @@ if ($projectsResult) {
                     </div>
 
                     <form method="GET" class="project-toolbar" id="project-search-form">
+                        <?php if ($statusFilter !== ''): ?>
+                            <input type="hidden" name="status" value="<?php echo htmlspecialchars($statusFilter); ?>">
+                        <?php endif; ?>
                         <div class="project-search-shell">
                             <div class="project-search-input-row">
                                 <span class="project-search-icon" aria-hidden="true">&#128269;</span>
-                                <input type="search" id="project-search" name="q" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="Search project, client, engineer, or site" autocomplete="off">
-                                <a
-                                    href="/codesamplecaps/SUPERADMIN/sidebar/projects.php<?php echo $statusFilter !== '' ? '?' . http_build_query(['status' => $statusFilter]) : ''; ?>"
+                                <input
+                                    type="search"
+                                    id="project-search"
+                                    name="q"
+                                    value="<?php echo htmlspecialchars($searchQuery); ?>"
+                                    placeholder="Search project, client, engineer, or site"
+                                    autocomplete="off"
+                                    aria-autocomplete="list"
+                                    aria-haspopup="listbox"
+                                    aria-controls="project-search-dropdown"
+                                    aria-expanded="false"
+                                >
+                                <button
+                                    type="button"
                                     class="project-search-clear<?php echo $searchQuery !== '' ? ' is-visible' : ''; ?>"
                                     id="project-search-clear"
+                                    aria-label="Clear search"
                                 >
-                                    Clear
-                                </a>
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
                             </div>
-                            <div class="project-search-dropdown" id="project-search-dropdown" hidden></div>
+                            <div class="project-search-dropdown" id="project-search-dropdown" role="listbox" hidden></div>
                         </div>
-                        <button type="submit" class="btn-primary project-toolbar__submit">Search</button>
                     </form>
                 </div>
 
@@ -1457,11 +1382,14 @@ if ($projectsResult) {
 <script>
 function initProjectSearchUI() {
     const section = document.getElementById('projects-list-section');
+    const searchForm = document.getElementById('project-search-form');
     const searchInput = document.getElementById('project-search');
     const searchClear = document.getElementById('project-search-clear');
     const searchDropdown = document.getElementById('project-search-dropdown');
     const projectCards = Array.from(document.querySelectorAll('[data-project-card]'));
+    const statusInput = searchForm?.querySelector('input[name="status"]');
     let activeSuggestionIndex = -1;
+    let searchDebounceId = null;
 
     function escapeHtml(value) {
         return String(value)
@@ -1499,6 +1427,32 @@ function initProjectSearchUI() {
         });
     }
 
+    function calculateSearchScore(card, query) {
+        const title = (card.getAttribute('data-title') || '').toLowerCase();
+        const client = (card.getAttribute('data-client') || '').toLowerCase();
+        const engineer = (card.getAttribute('data-engineer') || '').toLowerCase();
+        const status = (card.getAttribute('data-status') || '').toLowerCase();
+        let score = 0;
+
+        // Title match gets highest priority
+        if (title.startsWith(query)) score += 100;
+        else if (title.includes(query)) score += 80;
+
+        // Status match
+        if (status.startsWith(query)) score += 50;
+        else if (status.includes(query)) score += 30;
+
+        // Client match
+        if (client.startsWith(query)) score += 40;
+        else if (client.includes(query)) score += 20;
+
+        // Engineer match
+        if (engineer.startsWith(query)) score += 40;
+        else if (engineer.includes(query)) score += 15;
+
+        return score;
+    }
+
     function updateSearchDropdown() {
         if (!searchInput || !searchDropdown) {
             return;
@@ -1506,7 +1460,7 @@ function initProjectSearchUI() {
 
         const query = searchInput.value.trim().toLowerCase();
 
-        if (query.length < 2) {
+        if (query.length < 1) {
             searchDropdown.hidden = true;
             searchDropdown.innerHTML = '';
             activeSuggestionIndex = -1;
@@ -1514,10 +1468,22 @@ function initProjectSearchUI() {
         }
 
         const matches = projectCards
-            .filter(function (card) {
-                return (card.getAttribute('data-search') || '').toLowerCase().includes(query);
+            .map(function (card) {
+                return {
+                    card: card,
+                    score: calculateSearchScore(card, query)
+                };
             })
-            .slice(0, 5);
+            .filter(function (item) {
+                return item.score > 0;
+            })
+            .sort(function (a, b) {
+                return b.score - a.score;
+            })
+            .slice(0, 8)
+            .map(function (item) {
+                return item.card;
+            });
 
         if (matches.length === 0) {
             searchDropdown.innerHTML = '<div class="project-search-empty">No matching projects yet.</div>';
@@ -1532,10 +1498,17 @@ function initProjectSearchUI() {
             const link = card.getAttribute('data-link') || '#';
             const client = card.getAttribute('data-client') || 'N/A';
             const engineer = card.getAttribute('data-engineer') || 'Not assigned';
+            const statusBadgeClass = 'search-status-badge status-' + escapeHtml(status);
+            const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
 
             return '<a class="project-search-result" href="' + link + '">' +
+                '<div class="search-result-header">' +
                 '<strong>' + highlightMatch(title, query) + '</strong>' +
-                '<span>Client: ' + escapeHtml(client) + ' · Engineer: ' + escapeHtml(engineer) + ' · ' + escapeHtml(status.charAt(0).toUpperCase() + status.slice(1)) + '</span>' +
+                '<span class="' + statusBadgeClass + '">' + escapeHtml(statusLabel) + '</span>' +
+                '</div>' +
+                '<div class="search-result-meta">' +
+                '<small>👤 ' + escapeHtml(client) + ' · 👨‍💼 ' + escapeHtml(engineer) + '</small>' +
+                '</div>' +
                 '</a>';
         }).join('');
         searchDropdown.hidden = false;
@@ -1586,10 +1559,49 @@ function initProjectSearchUI() {
             });
     }
 
+    function buildProjectsUrl() {
+        const params = new URLSearchParams();
+        const queryValue = searchInput ? searchInput.value.trim() : '';
+        const statusValue = statusInput ? statusInput.value.trim() : '';
+
+        if (queryValue !== '') {
+            params.set('q', queryValue);
+        }
+
+        if (statusValue !== '') {
+            params.set('status', statusValue);
+        }
+
+        const queryString = params.toString();
+        return '/codesamplecaps/SUPERADMIN/sidebar/projects.php' + (queryString ? '?' + queryString : '');
+    }
+
+    function triggerSearchRefresh(immediate) {
+        if (!searchInput) {
+            return;
+        }
+
+        if (searchDebounceId) {
+            window.clearTimeout(searchDebounceId);
+        }
+
+        const runSearch = function () {
+            refreshProjectsSection(buildProjectsUrl());
+        };
+
+        if (immediate) {
+            runSearch();
+            return;
+        }
+
+        searchDebounceId = window.setTimeout(runSearch, 420);
+    }
+
     if (searchInput) {
         searchInput.addEventListener('input', function () {
             updateClearVisibility();
             updateSearchDropdown();
+            triggerSearchRefresh(false);
         });
 
         searchInput.addEventListener('focus', updateSearchDropdown);
@@ -1620,10 +1632,23 @@ function initProjectSearchUI() {
                 return;
             }
 
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                triggerSearchRefresh(true);
+                return;
+            }
+
             if (event.key === 'Escape') {
                 searchDropdown.hidden = true;
                 activeSuggestionIndex = -1;
             }
+        });
+    }
+
+    if (searchForm) {
+        searchForm.addEventListener('submit', function (event) {
+            event.preventDefault();
+            triggerSearchRefresh(true);
         });
     }
 
@@ -1640,6 +1665,10 @@ function initProjectSearchUI() {
             if (searchDropdown) {
                 searchDropdown.hidden = true;
                 searchDropdown.innerHTML = '';
+            }
+
+            if (searchDebounceId) {
+                window.clearTimeout(searchDebounceId);
             }
 
             const resetUrl = section?.getAttribute('data-reset-url') || searchClear.getAttribute('href') || '/codesamplecaps/SUPERADMIN/sidebar/projects.php';

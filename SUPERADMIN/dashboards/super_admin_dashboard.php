@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/audit_log.php';
+require_once __DIR__ . '/../../config/profile_photo_storage.php';
 
 require_role('super_admin');
 
@@ -19,6 +20,12 @@ $old = [
 ];
 
 ensureUserProfilePhotoColumn($conn);
+$dashboardFlash = consumeDashboardFlash();
+if ($dashboardFlash['type'] === 'success') {
+    $message = $dashboardFlash['text'];
+} elseif ($dashboardFlash['type'] === 'error') {
+    $error = $dashboardFlash['text'];
+}
 
 function normalizeRole(string $role): string {
     $role = strtolower(trim($role));
@@ -56,6 +63,37 @@ function isValidCsrfToken(?string $token): bool {
     return hash_equals($_SESSION['csrf_token'], $token);
 }
 
+function setDashboardFlash(string $type, string $text): void {
+    $_SESSION['super_admin_dashboard_flash'] = [
+        'type' => $type,
+        'text' => $text,
+    ];
+}
+
+function consumeDashboardFlash(): array {
+    $flash = $_SESSION['super_admin_dashboard_flash'] ?? null;
+    unset($_SESSION['super_admin_dashboard_flash']);
+
+    if (!is_array($flash)) {
+        return ['type' => '', 'text' => ''];
+    }
+
+    return [
+        'type' => (string)($flash['type'] ?? ''),
+        'text' => (string)($flash['text'] ?? ''),
+    ];
+}
+
+function redirectToDashboardTab(string $tab): void {
+    $location = '/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php';
+    if ($tab !== '') {
+        $location .= '?tab=' . rawurlencode($tab);
+    }
+
+    header('Location: ' . $location);
+    exit;
+}
+
 function hasColumn(mysqli $conn, string $tableName, string $columnName): bool {
     $stmt = $conn->prepare(
         'SELECT 1
@@ -87,6 +125,13 @@ function ensureUserProfilePhotoColumn(mysqli $conn): void {
 
 if (!function_exists('build_default_profile_avatar_data_uri')) {
     function build_default_profile_avatar_data_uri(): string {
+        $relativePath = '/codesamplecaps/IMAGES/nodp.jpg';
+        $absoluteFile = __DIR__ . '/../../IMAGES/nodp.jpg';
+
+        if (is_file($absoluteFile) && is_readable($absoluteFile)) {
+            return $relativePath;
+        }
+
         $svg = <<<'SVG'
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
   <defs>
@@ -95,9 +140,7 @@ if (!function_exists('build_default_profile_avatar_data_uri')) {
       <stop offset="100%" style="stop-color:#f0f2f5;stop-opacity:1" />
     </linearGradient>
   </defs>
-  <!-- White background like Facebook -->
   <rect width="200" height="200" fill="url(#fbAvatarBg)"/>
-  <!-- User silhouette in light gray (Facebook style) -->
   <circle cx="100" cy="70" r="35" fill="#ccc"/>
   <path d="M 30 180 Q 30 140 100 140 Q 170 140 170 180 L 170 200 L 30 200 Z" fill="#ccc"/>
 </svg>
@@ -124,55 +167,7 @@ function getUserById(mysqli $conn, int $userId): ?array {
 }
 
 function storeProfilePhotoUpload(array $file, int $userId): array {
-    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
-        return ['path' => null, 'error' => null];
-    }
-
-    if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
-        return ['path' => null, 'error' => 'Profile photo upload failed. Please try again.'];
-    }
-
-    $tmpName = (string)($file['tmp_name'] ?? '');
-    if ($tmpName === '' || !is_uploaded_file($tmpName)) {
-        return ['path' => null, 'error' => 'Invalid profile photo upload.'];
-    }
-
-    $imageInfo = @getimagesize($tmpName);
-    if ($imageInfo === false) {
-        return ['path' => null, 'error' => 'Profile photo must be a valid image file.'];
-    }
-
-    $mime = (string)($imageInfo['mime'] ?? '');
-    $allowedExtensions = [
-        'image/jpeg' => 'jpg',
-        'image/png' => 'png',
-        'image/webp' => 'webp',
-    ];
-
-    if (!isset($allowedExtensions[$mime])) {
-        return ['path' => null, 'error' => 'Use JPG, PNG, or WEBP for the profile photo.'];
-    }
-
-    if ((int)($file['size'] ?? 0) > 3 * 1024 * 1024) {
-        return ['path' => null, 'error' => 'Profile photo must be 3MB or smaller.'];
-    }
-
-    $uploadDirectory = __DIR__ . '/../../uploads/profile_photos';
-    if (!is_dir($uploadDirectory) && !mkdir($uploadDirectory, 0775, true) && !is_dir($uploadDirectory)) {
-        return ['path' => null, 'error' => 'Unable to prepare the profile photo folder.'];
-    }
-
-    $filename = 'super-admin-' . $userId . '-' . time() . '.' . $allowedExtensions[$mime];
-    $destination = $uploadDirectory . '/' . $filename;
-
-    if (!move_uploaded_file($tmpName, $destination)) {
-        return ['path' => null, 'error' => 'Unable to save the profile photo.'];
-    }
-
-    return [
-        'path' => 'uploads/profile_photos/' . $filename,
-        'error' => null,
-    ];
+    return profile_photo_store_upload($file, $userId);
 }
 
 function getUserForStatusChange(mysqli $conn, int $userId): ?array {
@@ -666,6 +661,7 @@ $old['role'] = $role;
                     $error = (string)$uploadedPhoto['error'];
                 } else {
                     $newPhotoPath = $uploadedPhoto['path'] ?? ($currentUser['profile_photo_path'] ?? null);
+                    $uploadedNewPhoto = $uploadedPhoto['path'] !== null;
                     $stmt = $supportsProfilePhoto
                         ? $conn->prepare('UPDATE users SET full_name = ?, email = ?, phone = ?, profile_photo_path = ? WHERE id = ?')
                         : $conn->prepare('UPDATE users SET full_name = ?, email = ?, phone = ? WHERE id = ?');
@@ -677,27 +673,37 @@ $old['role'] = $role;
                     }
 
                     if ($stmt->execute()) {
-                    $_SESSION['name'] = $fullName;
-                    audit_log_event(
-                        $conn,
-                        $userId,
-                        'update_user_profile',
-                        'user',
-                        $userId,
-                        [
-                            'full_name' => $currentUser['full_name'] ?? null,
-                            'email' => $currentUser['email'] ?? null,
-                            'phone' => $currentUser['phone'] ?? null,
-                            'profile_photo_path' => $currentUser['profile_photo_path'] ?? null,
-                        ],
-                        [
-                            'full_name' => $fullName,
-                            'email' => $email,
-                            'phone' => $phone,
-                            'profile_photo_path' => $newPhotoPath,
-                        ]
-                    );
-                    $message = 'Your admin profile was updated.';
+                        $_SESSION['name'] = $fullName;
+
+                        if ($uploadedNewPhoto) {
+                            profile_photo_cleanup_duplicates(
+                                $userId,
+                                profile_photo_file_name_from_reference($newPhotoPath)
+                            );
+                        }
+
+                        audit_log_event(
+                            $conn,
+                            $userId,
+                            'update_user_profile',
+                            'user',
+                            $userId,
+                            [
+                                'full_name' => $currentUser['full_name'] ?? null,
+                                'email' => $currentUser['email'] ?? null,
+                                'phone' => $currentUser['phone'] ?? null,
+                                'profile_photo_path' => $currentUser['profile_photo_path'] ?? null,
+                            ],
+                            [
+                                'full_name' => $fullName,
+                                'email' => $email,
+                                'phone' => $phone,
+                                'profile_photo_path' => $newPhotoPath,
+                            ]
+                        );
+
+                        setDashboardFlash('success', 'Your admin profile was updated.');
+                        redirectToDashboardTab('profile');
                     } else {
                         $error = 'Failed to update your profile.';
                     }
@@ -790,6 +796,13 @@ $clients = fetchUsersByRoles($conn, ['client'], $activeTab === 'users' ? $userSt
 $totalUsers = count($engineers) + count($foremen) + count($clients);
 $csrfToken = getCsrfToken();
 $currentAdmin = getUserById($conn, (int)($_SESSION['user_id'] ?? 0));
+if ($supportsProfilePhoto && $currentAdmin) {
+    $currentAdmin['profile_photo_path'] = profile_photo_migrate_legacy_reference(
+        $conn,
+        (int)($currentAdmin['id'] ?? 0),
+        $currentAdmin['profile_photo_path'] ?? null
+    );
+}
 $currentAdminName = (string)($currentAdmin['full_name'] ?? ($_SESSION['name'] ?? 'Super Admin'));
 $currentAdminEmail = (string)($currentAdmin['email'] ?? '');
 $currentAdminPhone = (string)($currentAdmin['phone'] ?? '');
@@ -799,7 +812,7 @@ $currentAdminCreatedAt = formatRelativeDate($currentAdmin['created_at'] ?? null)
 $defaultAdminPhotoUrl = build_default_profile_avatar_data_uri();
 $currentAdminPhoto = trim((string)($currentAdmin['profile_photo_path'] ?? ''));
 $currentAdminPhotoUrl = $currentAdminPhoto !== ''
-    ? '/codesamplecaps/' . ltrim(str_replace('\\', '/', $currentAdminPhoto), '/')
+    ? profile_photo_public_url($currentAdminPhoto)
     : '';
 $currentAdminPhotoPreviewUrl = $currentAdminPhotoUrl !== '' ? $currentAdminPhotoUrl : $defaultAdminPhotoUrl;
 
@@ -913,8 +926,7 @@ $scanTrendPeak = !empty($scanTrend) ? getTrendPeak($scanTrend) : 0;
                 <section class="dashboard-panel summary-panel">
                     <div class="panel-heading">
                         <div>
-                            <h2 class="dashboard-section-title">Summary</h2>
-                            <p class="panel-copy">Quick system check.</p>
+                            <h1 class="dashboard-section-title">Summary</h1>
                         </div>
                     </div>
                     <div class="metric-strip metric-strip-compact">
@@ -945,7 +957,6 @@ $scanTrendPeak = !empty($scanTrend) ? getTrendPeak($scanTrend) : 0;
                     <div class="panel-heading">
                         <div>
                             <h2 class="dashboard-section-title">Operations Analytics</h2>
-                            <p class="panel-copy">Best place for admin analytics: directly under Summary, so risks and capacity are visible first on load.</p>
                         </div>
                     </div>
                     <div class="mini-overview">
@@ -1086,14 +1097,7 @@ $scanTrendPeak = !empty($scanTrend) ? getTrendPeak($scanTrend) : 0;
         </div>
 
         <div id="profile" class="tab-content <?php echo $activeTab === 'profile' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'profile' ? 'display: block;' : 'display: none;'; ?>">
-            <section class="profile-shell">
-                <article class="profile-overview-card">
-                    <img src="<?php echo htmlspecialchars($currentAdminPhotoPreviewUrl); ?>" alt="Super admin profile picture" class="profile-overview-card__avatar-image">
-                    <div class="profile-overview-card__content">
-                        <h2>Admin Profile</h2>
-                        <p>Update your admin details, preview your next photo before saving, and manage password security here.</p>
-                    </div>
-                </article>
+              
 
                 <div class="profile-grid">
                     <section class="form-section profile-form-card">
