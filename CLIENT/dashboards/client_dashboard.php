@@ -2,123 +2,654 @@
 session_start();
 require_once __DIR__ . '/../../config/database.php';
 
-if (!isset($_SESSION['role']) || $_SESSION['role'] != 'client') {
-    header("Location: ../../LOGIN/php/login.php");
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'client') {
+    header('Location: ../../LOGIN/php/login.php');
     exit();
 }
 
-$user_id = $_SESSION['user_id'];
+$userId = (int)($_SESSION['user_id'] ?? 0);
+$clientName = trim((string)($_SESSION['name'] ?? 'Client User'));
+$clientEmail = trim((string)($_SESSION['email'] ?? ''));
+$clientEmailDisplay = $clientEmail !== '' ? $clientEmail : 'No email on record';
+$clientInitial = strtoupper(substr($clientName !== '' ? $clientName : 'C', 0, 1));
+
+function client_format_date(?string $value): string
+{
+    $value = trim((string)$value);
+    if ($value === '') {
+        return 'Not set';
+    }
+
+    try {
+        return (new DateTimeImmutable($value))->format('M j, Y');
+    } catch (Throwable $exception) {
+        return $value;
+    }
+}
+
+function client_status_label(string $status): string
+{
+    $labels = [
+        'pending' => 'Pending',
+        'ongoing' => 'In Progress',
+        'completed' => 'Completed',
+        'on-hold' => 'On Hold',
+    ];
+
+    return $labels[$status] ?? ucfirst(str_replace('-', ' ', $status));
+}
+
+function client_build_deadline_meta(?string $deadline, string $status): array
+{
+    $deadline = trim((string)$deadline);
+    if ($deadline === '') {
+        return [
+            'label' => 'No deadline',
+            'class' => 'deadline-flag--neutral',
+        ];
+    }
+
+    $deadlineDate = DateTimeImmutable::createFromFormat('Y-m-d', $deadline);
+    if (!$deadlineDate) {
+        return [
+            'label' => $deadline,
+            'class' => 'deadline-flag--neutral',
+        ];
+    }
+
+    if ($status === 'completed') {
+        return [
+            'label' => 'Delivered',
+            'class' => 'deadline-flag--ok',
+        ];
+    }
+
+    $today = new DateTimeImmutable('today');
+    $days = (int)$today->diff($deadlineDate)->format('%r%a');
+
+    if ($days < 0) {
+        return [
+            'label' => 'Overdue by ' . abs($days) . ' day' . (abs($days) === 1 ? '' : 's'),
+            'class' => 'deadline-flag--danger',
+        ];
+    }
+
+    if ($days <= 2) {
+        return [
+            'label' => $days === 0 ? 'Due today' : 'Due in ' . $days . ' day' . ($days === 1 ? '' : 's'),
+            'class' => 'deadline-flag--warning',
+        ];
+    }
+
+    return [
+        'label' => 'Due ' . $deadlineDate->format('M j, Y'),
+        'class' => 'deadline-flag--ok',
+    ];
+}
 
 /* PROJECT SUMMARY COUNTS */
-$totalProjects = $conn->prepare("SELECT COUNT(*) FROM projects WHERE client_id=? AND status <> 'draft'");
-$totalProjects->bind_param("i",$user_id);
-$totalProjects->execute();
-$totalProjects->bind_result($totalCount);
-$totalProjects->fetch();
-$totalProjects->close();
+$totalProjectsStmt = $conn->prepare("SELECT COUNT(*) FROM projects WHERE client_id = ? AND status <> 'draft'");
+$totalProjectsStmt->bind_param('i', $userId);
+$totalProjectsStmt->execute();
+$totalProjectsStmt->bind_result($totalCount);
+$totalProjectsStmt->fetch();
+$totalProjectsStmt->close();
 
-$ongoing = $conn->prepare("SELECT COUNT(*) FROM projects WHERE client_id=? AND status='ongoing'");
-$ongoing->bind_param("i",$user_id);
-$ongoing->execute();
-$ongoing->bind_result($ongoingCount);
-$ongoing->fetch();
-$ongoing->close();
+$ongoingStmt = $conn->prepare("SELECT COUNT(*) FROM projects WHERE client_id = ? AND status = 'ongoing'");
+$ongoingStmt->bind_param('i', $userId);
+$ongoingStmt->execute();
+$ongoingStmt->bind_result($ongoingCount);
+$ongoingStmt->fetch();
+$ongoingStmt->close();
 
-$completed = $conn->prepare("SELECT COUNT(*) FROM projects WHERE client_id=? AND status='completed'");
-$completed->bind_param("i",$user_id);
-$completed->execute();
-$completed->bind_result($completedCount);
-$completed->fetch();
-$completed->close();
+$completedStmt = $conn->prepare("SELECT COUNT(*) FROM projects WHERE client_id = ? AND status = 'completed'");
+$completedStmt->bind_param('i', $userId);
+$completedStmt->execute();
+$completedStmt->bind_result($completedCount);
+$completedStmt->fetch();
+$completedStmt->close();
 
-/* TOTAL ENGINEERS COUNT (used in stats) */
-$totalEngineersStmt = $conn->prepare("SELECT COUNT(*) FROM users WHERE role='engineer'");
-$totalEngineersStmt->execute();
-$totalEngineersStmt->bind_result($availCount);
-$totalEngineersStmt->fetch();
-$totalEngineersStmt->close();
+$engineerSummaryRow = [
+    'total_engineers' => 0,
+    'active_engineers' => 0,
+];
+$engineerSummaryResult = $conn->query(
+    "SELECT
+        COUNT(*) AS total_engineers,
+        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_engineers
+     FROM users
+     WHERE role = 'engineer'"
+);
+if ($engineerSummaryResult) {
+    $engineerSummaryRow = $engineerSummaryResult->fetch_assoc() ?: $engineerSummaryRow;
+}
+$totalEngineerCount = (int)($engineerSummaryRow['total_engineers'] ?? 0);
+$activeEngineerCount = (int)($engineerSummaryRow['active_engineers'] ?? 0);
 
-/* FETCH ENGINEERS */
-$engineersStmt = $conn->prepare("SELECT id, full_name, status FROM users WHERE role='engineer' ORDER BY full_name ASC");
-$engineersStmt->execute();
-$available_engineers = $engineersStmt->get_result();
+$engineersPreview = [];
+$engineersPreviewResult = $conn->query(
+    "SELECT full_name, status
+     FROM users
+     WHERE role = 'engineer'
+     ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, full_name ASC
+     LIMIT 5"
+);
+if ($engineersPreviewResult) {
+    $engineersPreview = $engineersPreviewResult->fetch_all(MYSQLI_ASSOC);
+}
 
-$projectsStmt = $conn->prepare("
-SELECT p.*, u.full_name AS engineer_name
-FROM projects p
-LEFT JOIN project_assignments pa ON pa.project_id = p.id
-LEFT JOIN users u ON u.id = pa.engineer_id
-WHERE p.client_id=?
-AND p.status <> 'draft'
-ORDER BY p.created_at DESC
-");$projectsStmt->bind_param("i",$user_id);
+$projectsStmt = $conn->prepare(
+    "SELECT
+        p.id,
+        p.project_name,
+        p.description,
+        p.start_date,
+        p.end_date,
+        p.status,
+        p.created_at,
+        engineer.full_name AS engineer_name,
+        COALESCE(task_totals.total_tasks, 0) AS total_tasks,
+        COALESCE(task_totals.completed_tasks, 0) AS completed_tasks,
+        COALESCE(task_totals.ongoing_tasks, 0) AS ongoing_tasks,
+        COALESCE(task_totals.delayed_tasks, 0) AS delayed_tasks,
+        task_totals.next_deadline
+     FROM projects p
+     LEFT JOIN (
+         SELECT pa.project_id, pa.engineer_id
+         FROM project_assignments pa
+         INNER JOIN (
+             SELECT project_id, MAX(id) AS latest_id
+             FROM project_assignments
+             GROUP BY project_id
+         ) latest_assignment ON latest_assignment.latest_id = pa.id
+     ) latest_assignment ON latest_assignment.project_id = p.id
+     LEFT JOIN users engineer ON engineer.id = latest_assignment.engineer_id
+     LEFT JOIN (
+         SELECT
+             project_id,
+             COUNT(*) AS total_tasks,
+             SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_tasks,
+             SUM(CASE WHEN status = 'ongoing' THEN 1 ELSE 0 END) AS ongoing_tasks,
+             SUM(CASE WHEN status = 'delayed' THEN 1 ELSE 0 END) AS delayed_tasks,
+             MIN(CASE WHEN status <> 'completed' AND deadline IS NOT NULL THEN deadline END) AS next_deadline
+         FROM tasks
+         GROUP BY project_id
+     ) task_totals ON task_totals.project_id = p.id
+     WHERE p.client_id = ?
+     AND p.status <> 'draft'
+     ORDER BY
+        CASE p.status
+            WHEN 'ongoing' THEN 1
+            WHEN 'pending' THEN 2
+            WHEN 'on-hold' THEN 3
+            WHEN 'completed' THEN 4
+            ELSE 5
+        END,
+        p.created_at DESC,
+        p.id DESC"
+);
+$projectsStmt->bind_param('i', $userId);
 $projectsStmt->execute();
-$client_projects = $projectsStmt->get_result();
+$projectsResult = $projectsStmt->get_result();
+$projectRows = $projectsResult ? $projectsResult->fetch_all(MYSQLI_ASSOC) : [];
+$projectsStmt->close();
+
+$pendingCount = 0;
+$onHoldCount = 0;
+$overallTasks = 0;
+$overallCompletedTasks = 0;
+$nextDeadlineValue = null;
+
+foreach ($projectRows as $project) {
+    $status = (string)($project['status'] ?? 'pending');
+
+    if ($status === 'pending') {
+        $pendingCount++;
+    } elseif ($status === 'on-hold') {
+        $onHoldCount++;
+    }
+
+    $overallTasks += (int)($project['total_tasks'] ?? 0);
+    $overallCompletedTasks += (int)($project['completed_tasks'] ?? 0);
+
+    $candidateDeadline = trim((string)($project['next_deadline'] ?? ''));
+    if ($candidateDeadline !== '' && ($nextDeadlineValue === null || $candidateDeadline < $nextDeadlineValue)) {
+        $nextDeadlineValue = $candidateDeadline;
+    }
+}
+
+$activeProjectCount = $ongoingCount + $pendingCount + $onHoldCount;
+$overallProgressPercent = $overallTasks > 0
+    ? (int)round(($overallCompletedTasks / $overallTasks) * 100)
+    : ($totalCount > 0 ? (int)round(($completedCount / max(1, $totalCount)) * 100) : 0);
+$nextDeadlineDisplay = $nextDeadlineValue !== null ? client_format_date($nextDeadlineValue) : 'No active deadline';
+$nextDeadlineHint = $nextDeadlineValue !== null
+    ? 'Closest open target across your current projects'
+    : 'No upcoming task deadline is tracked right now';
+
+$portfolioMix = [
+    ['label' => 'Completed', 'count' => $completedCount, 'class' => 'is-completed'],
+    ['label' => 'In Progress', 'count' => $ongoingCount, 'class' => 'is-ongoing'],
+    ['label' => 'Pending', 'count' => $pendingCount, 'class' => 'is-pending'],
+    ['label' => 'On Hold', 'count' => $onHoldCount, 'class' => 'is-on-hold'],
+];
+
+$notificationItems = [
+    [
+        'title' => $activeProjectCount . ' active project(s)',
+        'detail' => 'Pending, ongoing, and on-hold work still needs visibility.',
+    ],
+    [
+        'title' => $overallProgressPercent . '% overall progress',
+        'detail' => $overallTasks > 0
+            ? $overallCompletedTasks . ' of ' . $overallTasks . ' tracked tasks are already complete.'
+            : 'No task progress data is available yet.',
+    ],
+    [
+        'title' => $nextDeadlineDisplay,
+        'detail' => $nextDeadlineValue !== null ? 'Closest open deadline in your current project queue.' : 'No urgent due date is currently recorded.',
+    ],
+];
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Client Dashboard - Edge Automation</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../../FOREMAN/css/global.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Dashboard - Edge Automation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/client-sidebar.css">
+    <link rel="stylesheet" href="../css/client-dashboard.css">
 </head>
 <body>
+    <?php include '../sidebar/sidebar_client.php'; ?>
+    <div class="client-page-overlay" data-sidebar-overlay hidden></div>
 
-<?php include("../sidebar/sidebar_client.php"); ?>
+    <main class="main-content" id="mainContent">
+        <header class="dashboard-topbar">
+            <div class="dashboard-topbar__left">
+                <button
+                    type="button"
+                    class="icon-btn icon-btn--menu"
+                    data-sidebar-mobile-toggle
+                    aria-controls="clientSidebar"
+                    aria-expanded="false"
+                    aria-label="Open navigation"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 7h16M4 12h16M4 17h16"></path>
+                    </svg>
+                </button>
+                <button
+                    type="button"
+                    class="icon-btn icon-btn--desktop"
+                    data-sidebar-desktop-toggle
+                    aria-label="Collapse sidebar"
+                    aria-expanded="true"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M15 6l-6 6 6 6"></path>
+                    </svg>
+                </button>
 
-<main class="main-content">
-
-<header class="dashboard-header">
-<h1>💼 Welcome, <?php echo htmlspecialchars($_SESSION['name']); ?></h1>
-</header>
-    <div class="stats-grid">
-        <div class="stat-card"><h4>📁 Your Projects</h4><p><?php echo $totalCount; ?></p></div>
-        <div class="stat-card"><h4>⏳ In Progress</h4><p><?php echo $ongoingCount; ?></p></div>
-        <div class="stat-card"><h4>✅ Completed</h4><p><?php echo $completedCount; ?></p></div>
-        <div class="stat-card"><h4>👷 Engineers</h4><p><?php echo $availCount; ?></p></div>
-    </div>
-    
-    <div class="tabs">
-        <button class="tab" onclick="showTab('projects-tab', this)">📁 My Projects</button>
-        <button class="tab" onclick="showTab('profile-tab', this)">⚙️ Profile</button>
-    </div>
-    
-
-    <div id="projects-tab" class="tab-content">
-        <h2>My Projects</h2>
-        <div class="projects-grid">
-        <?php if($client_projects->num_rows > 0):
-            while($proj = $client_projects->fetch_assoc()): ?>
-            <div class="project-card">
-                <h3><?php echo htmlspecialchars($proj['project_name']); ?></h3>
-                <span class="status <?php echo $proj['status']; ?>">📊 <?php echo ucfirst($proj['status']); ?></span>
-                <p><strong>👨‍💼 Engineer:</strong> <?php echo htmlspecialchars($proj['engineer_name'] ?? 'Not Assigned'); ?></p>
-                <p style="color: #7f8c8d; font-size: 14px;"><?php echo htmlspecialchars(substr($proj['description'] ?? '', 0, 150)); ?></p>
+                <div class="dashboard-topbar__copy">
+                    <span class="section-badge">Client Workspace</span>
+                    <h1>Welcome, <?php echo htmlspecialchars($clientName); ?></h1>
+                    <p>Track project delivery, assigned engineers, and real task progress in one clean view.</p>
+                </div>
             </div>
-        <?php endwhile; else: ?>
-            <div class="no-data" style="grid-column: 1/-1;"><p>📁 No projects yet</p></div>
-        <?php endif; ?>
+
+            <div class="dashboard-topbar__right">
+                <div class="topbar-chip">
+                    <span>Today</span>
+                    <strong data-ph-date>Loading date...</strong>
+                </div>
+                <div class="topbar-chip topbar-chip--time">
+                    <span>Philippine Time</span>
+                    <strong data-ph-time>Loading time...</strong>
+                </div>
+
+                <div class="notification-shell" data-notification-shell>
+                    <button
+                        type="button"
+                        class="icon-btn notification-toggle"
+                        id="clientNotificationToggle"
+                        aria-expanded="false"
+                        aria-controls="clientNotificationPanel"
+                        aria-label="Open updates panel"
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5"></path>
+                            <path d="M10 17a2 2 0 0 0 4 0"></path>
+                        </svg>
+                        <?php if ($activeProjectCount > 0): ?>
+                            <span class="notification-toggle__badge"><?php echo $activeProjectCount; ?></span>
+                        <?php endif; ?>
+                    </button>
+
+                    <div class="notification-panel" id="clientNotificationPanel" hidden>
+                        <div class="notification-panel__head">
+                            <div>
+                                <span class="section-badge">Recent Updates</span>
+                                <h2>Project signals</h2>
+                            </div>
+                        </div>
+                        <div class="notification-list">
+                            <?php foreach ($notificationItems as $notification): ?>
+                                <article class="notification-item">
+                                    <strong><?php echo htmlspecialchars($notification['title']); ?></strong>
+                                    <p><?php echo htmlspecialchars($notification['detail']); ?></p>
+                                </article>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <section class="hero-panel" id="dashboard-home">
+            <div class="hero-panel__copy">
+                <span class="hero-panel__eyebrow">Delivery Overview</span>
+                <h2>See what matters without digging through dense screens.</h2>
+                <p>
+                    This dashboard gives you a cleaner view of project status, real progress, and the engineering support
+                    behind every active request.
+                </p>
+                <div class="hero-panel__actions">
+                    <button type="button" class="btn-primary" data-jump-tab="projects-tab">View My Projects</button>
+                    <button type="button" class="btn-secondary" data-jump-tab="profile-tab">Open Profile</button>
+                </div>
+            </div>
+
+            <div class="hero-panel__stats">
+                <article class="hero-stat">
+                    <span>Overall Progress</span>
+                    <strong><?php echo $overallProgressPercent; ?>%</strong>
+                    <small><?php echo $overallCompletedTasks; ?> of <?php echo $overallTasks; ?> tasks completed</small>
+                </article>
+                <article class="hero-stat">
+                    <span>Next Deadline</span>
+                    <strong><?php echo htmlspecialchars($nextDeadlineDisplay); ?></strong>
+                    <small><?php echo htmlspecialchars($nextDeadlineHint); ?></small>
+                </article>
+            </div>
+        </section>
+
+        <section class="stats-grid" aria-label="Project summary cards">
+            <article class="stat-card">
+                <div class="stat-card__icon stat-card__icon--projects" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"></path>
+                    </svg>
+                </div>
+                <div class="stat-card__content">
+                    <span>Your Projects</span>
+                    <strong><?php echo $totalCount; ?></strong>
+                    <small>All active and completed client projects</small>
+                </div>
+            </article>
+
+            <article class="stat-card">
+                <div class="stat-card__icon stat-card__icon--ongoing" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 6v6l4 2"></path>
+                        <path d="M21 12a9 9 0 1 1-3-6.7"></path>
+                    </svg>
+                </div>
+                <div class="stat-card__content">
+                    <span>In Progress</span>
+                    <strong><?php echo $ongoingCount; ?></strong>
+                    <small>Projects currently being delivered</small>
+                </div>
+            </article>
+
+            <article class="stat-card">
+                <div class="stat-card__icon stat-card__icon--completed" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M20 6L9 17l-5-5"></path>
+                    </svg>
+                </div>
+                <div class="stat-card__content">
+                    <span>Completed</span>
+                    <strong><?php echo $completedCount; ?></strong>
+                    <small>Projects already delivered to completion</small>
+                </div>
+            </article>
+
+            <article class="stat-card">
+                <div class="stat-card__icon stat-card__icon--engineers" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path>
+                        <path d="M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path>
+                        <path d="M21 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                </div>
+                <div class="stat-card__content">
+                    <span>Active Engineers</span>
+                    <strong><?php echo $activeEngineerCount; ?></strong>
+                    <small><?php echo $totalEngineerCount; ?> engineering team members in total</small>
+                </div>
+            </article>
+        </section>
+
+        <section class="status-strip" aria-label="Portfolio mix">
+            <?php foreach ($portfolioMix as $mix): ?>
+                <article class="status-strip__item">
+                    <span><?php echo htmlspecialchars($mix['label']); ?></span>
+                    <strong><?php echo (int)$mix['count']; ?></strong>
+                </article>
+            <?php endforeach; ?>
+        </section>
+
+        <div class="tabs" role="tablist" aria-label="Client dashboard sections">
+            <button type="button" class="tab active" data-tab-target="projects-tab" role="tab" aria-selected="true">Projects</button>
+            <button type="button" class="tab" data-tab-target="profile-tab" role="tab" aria-selected="false">Profile</button>
         </div>
-    </div>
-    
-    <div id="profile-tab" class="tab-content">
-        <h2>Profile Settings</h2>
-        <div class="profile-form">
-            <div class="form-group">
-                <label>Full Name</label>
-                <input type="text" value="<?php echo htmlspecialchars($_SESSION['name']); ?>" disabled>
-            </div>
-            <div class="form-group">
-                <label>Email</label>
-                <input type="email" value="<?php echo htmlspecialchars($_SESSION['email'] ?? ''); ?>" disabled>
-            </div>
-            <button class="btn" onclick="window.location.href='change_password.php'">🔐 Change Password</button>
-        </div>
-    </div>
-</div>
 
+        <section id="projects-tab" class="tab-content active">
+            <div class="section-heading">
+                <div>
+                    <span class="section-badge">Projects</span>
+                    <h2>My Projects</h2>
+                    <p>Each card shows delivery status, assigned engineer, and real task-based progress.</p>
+                </div>
+            </div>
+
+            <div class="dashboard-content-grid">
+                <div class="projects-grid">
+                    <?php if (!empty($projectRows)): ?>
+                        <?php foreach ($projectRows as $project): ?>
+                            <?php
+                            $projectStatus = (string)($project['status'] ?? 'pending');
+                            $projectTotalTasks = (int)($project['total_tasks'] ?? 0);
+                            $projectCompletedTasks = (int)($project['completed_tasks'] ?? 0);
+                            $projectProgressPercent = $projectTotalTasks > 0
+                                ? (int)round(($projectCompletedTasks / $projectTotalTasks) * 100)
+                                : ($projectStatus === 'completed' ? 100 : 0);
+                            $deadlineMeta = client_build_deadline_meta($project['next_deadline'] ?? null, $projectStatus);
+                            $projectDescription = trim((string)($project['description'] ?? ''));
+                            if ($projectDescription === '') {
+                                $projectDescription = 'Project details will appear here as the work scope is finalized.';
+                            }
+                            ?>
+                            <article class="project-card project-card--<?php echo htmlspecialchars($projectStatus); ?>">
+                                <div class="project-card__header">
+                                    <div>
+                                        <span class="project-card__eyebrow">Project #<?php echo (int)($project['id'] ?? 0); ?></span>
+                                        <h3><?php echo htmlspecialchars((string)($project['project_name'] ?? 'Untitled Project')); ?></h3>
+                                    </div>
+                                    <span class="status-badge status-badge--<?php echo htmlspecialchars($projectStatus); ?>">
+                                        <?php echo htmlspecialchars(client_status_label($projectStatus)); ?>
+                                    </span>
+                                </div>
+
+                                <p class="project-card__description"><?php echo htmlspecialchars(substr($projectDescription, 0, 180)); ?></p>
+
+                                <div class="project-card__meta-grid">
+                                    <div class="project-meta">
+                                        <span>Assigned Engineer</span>
+                                        <strong><?php echo htmlspecialchars((string)($project['engineer_name'] ?? 'Not assigned')); ?></strong>
+                                    </div>
+                                    <div class="project-meta">
+                                        <span>Timeline</span>
+                                        <strong><?php echo htmlspecialchars(client_format_date($project['start_date'] ?? null)); ?> - <?php echo htmlspecialchars(client_format_date($project['end_date'] ?? null)); ?></strong>
+                                    </div>
+                                </div>
+
+                                <div class="project-progress">
+                                    <div class="project-progress__meta">
+                                        <strong><?php echo $projectProgressPercent; ?>%</strong>
+                                        <span><?php echo $projectCompletedTasks; ?> of <?php echo $projectTotalTasks; ?> tasks completed</span>
+                                    </div>
+                                    <div class="project-progress__bar" aria-hidden="true">
+                                        <span style="width: <?php echo $projectProgressPercent; ?>%;"></span>
+                                    </div>
+                                </div>
+
+                                <div class="project-card__footer">
+                                    <span class="project-pill"><?php echo (int)($project['ongoing_tasks'] ?? 0); ?> active tasks</span>
+                                    <span class="project-pill project-pill--alert"><?php echo (int)($project['delayed_tasks'] ?? 0); ?> delayed</span>
+                                    <span class="deadline-flag <?php echo htmlspecialchars($deadlineMeta['class']); ?>">
+                                        <?php echo htmlspecialchars($deadlineMeta['label']); ?>
+                                    </span>
+                                </div>
+                            </article>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <div class="empty-state">
+                            <h3>No projects yet</h3>
+                            <p>Your active project cards will appear here once work is assigned to your account.</p>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <aside class="dashboard-aside">
+                    <article class="aside-card">
+                        <div class="aside-card__head">
+                            <div>
+                                <span class="section-badge">Support</span>
+                                <h3>Engineering Desk</h3>
+                            </div>
+                        </div>
+                        <p>Quick visibility into the engineering team currently supporting delivery work.</p>
+                        <div class="engineer-list">
+                            <?php if (!empty($engineersPreview)): ?>
+                                <?php foreach ($engineersPreview as $engineer): ?>
+                                    <div class="engineer-list__item">
+                                        <div>
+                                            <strong><?php echo htmlspecialchars((string)($engineer['full_name'] ?? 'Engineer')); ?></strong>
+                                            <span>Engineering support</span>
+                                        </div>
+                                        <span class="mini-status mini-status--<?php echo htmlspecialchars((string)($engineer['status'] ?? 'inactive')); ?>">
+                                            <?php echo htmlspecialchars(ucfirst((string)($engineer['status'] ?? 'inactive'))); ?>
+                                        </span>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <p class="aside-card__empty">No engineer availability data yet.</p>
+                            <?php endif; ?>
+                        </div>
+                    </article>
+
+                    <article class="aside-card">
+                        <div class="aside-card__head">
+                            <div>
+                                <span class="section-badge">Portfolio</span>
+                                <h3>Project Mix</h3>
+                            </div>
+                        </div>
+
+                        <div class="mix-bars">
+                            <?php foreach ($portfolioMix as $mix): ?>
+                                <?php
+                                $mixCount = (int)$mix['count'];
+                                $mixWidth = $totalCount > 0 ? (int)round(($mixCount / $totalCount) * 100) : 0;
+                                ?>
+                                <div class="mix-bars__row">
+                                    <div class="mix-bars__meta">
+                                        <span><?php echo htmlspecialchars($mix['label']); ?></span>
+                                        <strong><?php echo $mixCount; ?></strong>
+                                    </div>
+                                    <div class="mix-bars__track">
+                                        <span class="mix-bars__fill <?php echo htmlspecialchars($mix['class']); ?>" style="width: <?php echo $mixWidth; ?>%;"></span>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </article>
+                </aside>
+            </div>
+        </section>
+
+        <section id="profile-tab" class="tab-content">
+            <div class="section-heading">
+                <div>
+                    <span class="section-badge">Profile</span>
+                    <h2>Account Details</h2>
+                    <p>Your account is read-only here so client records stay consistent across the system.</p>
+                </div>
+            </div>
+
+            <div class="profile-grid">
+                <article class="profile-card profile-card--identity">
+                    <div class="profile-card__avatar" aria-hidden="true"><?php echo htmlspecialchars($clientInitial); ?></div>
+                    <div class="profile-card__identity">
+                        <h3><?php echo htmlspecialchars($clientName); ?></h3>
+                        <p><?php echo htmlspecialchars($clientEmailDisplay); ?></p>
+                    </div>
+                    <div class="profile-highlights">
+                        <span>Role: Client</span>
+                        <span>Projects: <?php echo $totalCount; ?></span>
+                        <span>Active: <?php echo $activeProjectCount; ?></span>
+                    </div>
+                </article>
+
+                <article class="profile-card">
+                    <h3>Profile Snapshot</h3>
+                    <div class="profile-form-grid">
+                        <div class="form-field">
+                            <label>Full Name</label>
+                            <input type="text" value="<?php echo htmlspecialchars($clientName); ?>" disabled>
+                        </div>
+                        <div class="form-field">
+                            <label>Email</label>
+                            <input type="email" value="<?php echo htmlspecialchars($clientEmailDisplay); ?>" disabled>
+                        </div>
+                        <div class="form-field">
+                            <label>Account Type</label>
+                            <input type="text" value="Client" disabled>
+                        </div>
+                        <div class="form-field">
+                            <label>Progress Visibility</label>
+                            <input type="text" value="Enabled" disabled>
+                        </div>
+                    </div>
+
+                    <div class="profile-actions">
+                        <button type="button" class="btn-secondary" data-jump-tab="projects-tab">Back to Projects</button>
+                        <a href="/codesamplecaps/LOGIN/php/forgot.php" class="btn-ghost">Reset Password</a>
+                    </div>
+                </article>
+
+                <article class="profile-card profile-card--support">
+                    <h3>Need help?</h3>
+                    <p>
+                        For timeline changes, new scope requests, or account concerns, coordinate with the Edge Automation
+                        admin team so project records and approvals stay aligned.
+                    </p>
+                    <div class="support-notes">
+                        <span>Review live task progress from the project cards.</span>
+                        <span>Use the password reset flow if you need credential help.</span>
+                        <span>Track upcoming deadlines from the top dashboard summary.</span>
+                    </div>
+                </article>
+            </div>
+        </section>
+    </main>
+
+    <script src="../js/client_dashboard.js"></script>
 </body>
-<script src="../js/client_dashboard.js"></script>
 </html>

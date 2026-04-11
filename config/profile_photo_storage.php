@@ -140,7 +140,6 @@ if (!function_exists('profile_photo_output_reference')) {
                 if (is_string($detectedMime) && $detectedMime !== '') {
                     $mime = $detectedMime;
                 }
-                finfo_close($finfo);
             }
         }
 
