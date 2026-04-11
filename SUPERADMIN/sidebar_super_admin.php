@@ -470,8 +470,8 @@ if (
                     </span>
                 <?php endif; ?>
                 <span class="topbar-profile__identity">
-                    <strong><?php echo htmlspecialchars($superAdminProfileName); ?></strong>
-                    <span>Super Admin</span>
+                    <strong>Super Admin</strong>
+                    <span>Profile Menu</span>
                 </span>
             </button>
 
@@ -485,7 +485,7 @@ if (
                         </span>
                     <?php endif; ?>
                     <div>
-                        <strong><?php echo htmlspecialchars($superAdminProfileName); ?></strong>
+                        <strong>Admin Menu</strong>
                         <span><?php echo htmlspecialchars($superAdminProfileRole); ?></span>
                     </div>
                 </div>

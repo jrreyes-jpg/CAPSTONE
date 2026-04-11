@@ -849,6 +849,20 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
          ) active_deployments"
     )
     : 0;
+$activeEngineerCount = count(array_filter($engineers, static fn(array $user): bool => ($user['status'] ?? 'inactive') === 'active'));
+$activeForemanCount = count(array_filter($foremen, static fn(array $user): bool => ($user['status'] ?? 'inactive') === 'active'));
+$activeClientCount = count(array_filter($clients, static fn(array $user): bool => ($user['status'] ?? 'inactive') === 'active'));
+$projectCompletionRate = $totalProjects > 0 ? (int)round(($completedProjects / $totalProjects) * 100) : 0;
+$taskDelayRate = $totalTasks > 0 ? (int)round(($delayedTasks / $totalTasks) * 100) : 0;
+$inventoryAlertCount = $lowStockItems + $outOfStockItems;
+$inventoryAlertRate = $inventoryItems > 0 ? (int)round(($inventoryAlertCount / $inventoryItems) * 100) : 0;
+$projectTrend = getDateRangeTrend($conn, 'projects', 'created_at', 7);
+$taskTrend = hasTable($conn, 'tasks') ? getDateRangeTrend($conn, 'tasks', 'created_at', 7) : [];
+$scanTrend = hasTable($conn, 'asset_scan_history') ? getDateRangeTrend($conn, 'asset_scan_history', 'scan_time', 7) : [];
+$projectsCreatedThisWeek = array_sum(array_map(static fn(array $item): int => (int)($item['value'] ?? 0), $projectTrend));
+$tasksCreatedThisWeek = array_sum(array_map(static fn(array $item): int => (int)($item['value'] ?? 0), $taskTrend));
+$scansThisWeek = array_sum(array_map(static fn(array $item): int => (int)($item['value'] ?? 0), $scanTrend));
+$scanTrendPeak = !empty($scanTrend) ? getTrendPeak($scanTrend) : 0;
 
 ?>
 <!DOCTYPE html>
@@ -874,7 +888,7 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
             </div>
             <?php if ($activeTab !== 'profile'): ?>
                 <div class="user-info">
-                    <span><?php echo htmlspecialchars($currentAdminName); ?></span>
+                    <span>Operations View</span>
                 </div>
             <?php endif; ?>
         </div>
@@ -912,6 +926,47 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
                             <strong><?php echo $scansToday; ?></strong>
                             <small>Open scan history</small>
                         </a>
+                    </div>
+                </section>
+
+                <section class="dashboard-panel analytics-panel">
+                    <div class="panel-heading">
+                        <div>
+                            <h2 class="dashboard-section-title">Operations Analytics</h2>
+                            <p class="panel-copy">Best place for admin analytics: directly under Summary, so risks and capacity are visible first on load.</p>
+                        </div>
+                    </div>
+                    <div class="mini-overview">
+                        <article class="mini-overview-card">
+                            <span>Project Completion</span>
+                            <strong><?php echo $projectCompletionRate; ?>%</strong>
+                            <small><?php echo $completedProjects; ?> of <?php echo $totalProjects; ?> projects completed</small>
+                        </article>
+                        <article class="mini-overview-card">
+                            <span>Task Delay Pressure</span>
+                            <strong><?php echo $taskDelayRate; ?>%</strong>
+                            <small><?php echo $delayedTasks; ?> delayed out of <?php echo $totalTasks; ?> total tasks</small>
+                        </article>
+                        <article class="mini-overview-card">
+                            <span>Inventory Alerts</span>
+                            <strong><?php echo $inventoryAlertCount; ?></strong>
+                            <small><?php echo $inventoryAlertRate; ?>% of inventory items need attention</small>
+                        </article>
+                        <article class="mini-overview-card">
+                            <span>Active Workforce</span>
+                            <strong><?php echo $activeEngineerCount + $activeForemanCount + $activeClientCount; ?></strong>
+                            <small><?php echo $activeEngineerCount; ?> engineers, <?php echo $activeForemanCount; ?> foremen, <?php echo $activeClientCount; ?> clients</small>
+                        </article>
+                        <article class="mini-overview-card">
+                            <span>7-Day Intake</span>
+                            <strong><?php echo $projectsCreatedThisWeek; ?>/<?php echo $tasksCreatedThisWeek; ?></strong>
+                            <small><?php echo $projectsCreatedThisWeek; ?> projects and <?php echo $tasksCreatedThisWeek; ?> tasks created this week</small>
+                        </article>
+                        <article class="mini-overview-card">
+                            <span>Scan Activity</span>
+                            <strong><?php echo $scansThisWeek; ?></strong>
+                            <small>Last 7 days, peak daily scans: <?php echo $scanTrendPeak; ?></small>
+                        </article>
                     </div>
                 </section>
 
@@ -1029,9 +1084,8 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
                         </div>
                     <?php endif; ?>
                     <div class="profile-overview-card__content">
-                        <span class="profile-eyebrow">Admin Edge</span>
-                        <h2><?php echo htmlspecialchars($currentAdminName); ?></h2>
-                        <p><?php echo htmlspecialchars($currentAdminEmail); ?></p>
+                        <h2>Admin Profile</h2>
+                        <p>Update your admin details, preview your next photo before saving, and manage password security here.</p>
                     </div>
                 </article>
 
@@ -1050,15 +1104,20 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
                                 <div class="form-group profile-photo-field">
                                     <label for="profile_photo">Profile Photo</label>
                                     <div class="profile-photo-upload">
-                                        <?php if ($currentAdminPhotoUrl !== ''): ?>
-                                            <img src="<?php echo htmlspecialchars($currentAdminPhotoUrl); ?>" alt="Current super admin profile picture" class="profile-photo-upload__preview">
-                                        <?php else: ?>
-                                            <img src="/codesamplecaps/IMAGES/edge.jpg" alt="Default profile preview" class="profile-photo-upload__preview">
-                                        <?php endif; ?>
+                                        <img
+                                            src="<?php echo htmlspecialchars($currentAdminPhotoPreviewUrl); ?>"
+                                            alt="Admin profile preview"
+                                            class="profile-photo-upload__preview"
+                                            data-profile-photo-preview
+                                            data-profile-photo-default="<?php echo htmlspecialchars($currentAdminPhotoPreviewUrl); ?>"
+                                        >
                                         <div class="profile-photo-upload__meta">
-                                            <strong>Upload a clean profile picture</strong>
-                                            <span>JPG, PNG, or WEBP only. Max 3MB.</span>
+                                            <strong>Upload profile picture</strong>
+                                            <span>Preview only while choosing. It will save only after you click Save Profile. JPG, PNG, or WEBP only. Max 3MB.</span>
                                             <input type="file" id="profile_photo" name="profile_photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+                                            <small class="profile-photo-upload__state" data-profile-photo-state>
+                                                <?php echo $currentAdminPhotoUrl !== '' ? 'Current profile photo ready.' : 'No new file selected.'; ?>
+                                            </small>
                                         </div>
                                     </div>
                                 </div>
@@ -1110,6 +1169,7 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
                                         <button type="button" class="togglePassword" data-target="new_password">Show</button>
                                     </div>
                                     <small class="password-tip">Use 12+ characters with uppercase, lowercase, number, and symbol.</small>
+                                    <small id="newPasswordStrength" class="pass-indicator">Strength: -</small>
                                 </div>
                                 <div class="form-group password-field">
                                     <label for="confirm_password">Confirm Password *</label>
@@ -1117,6 +1177,7 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
                                         <input type="password" id="confirm_password" name="confirm_password" minlength="12" required>
                                         <button type="button" class="togglePassword" data-target="confirm_password">Show</button>
                                     </div>
+                                    <small id="confirmPasswordMatch" class="pass-indicator">Confirmation: -</small>
                                 </div>
                             </div>
                             <button type="submit" class="btn-primary btn-primary--dark">Update Password</button>
