@@ -11,6 +11,9 @@ $isInventory = str_contains($currentPath, '/SUPERADMIN/sidebar/inventory.php');
 $isAssets = str_contains($currentPath, '/SUPERADMIN/sidebar/assets.php');
 $isScanHistory = str_contains($currentPath, '/SUPERADMIN/sidebar/scan_history.php');
 $isActivityHistory = str_contains($currentPath, '/SUPERADMIN/sidebar/activity_history.php');
+$superAdminProfileName = (string)($_SESSION['name'] ?? 'Super Admin');
+$superAdminProfileRole = ucfirst(str_replace('_', ' ', (string)($_SESSION['role'] ?? 'super_admin')));
+$superAdminProfilePhotoUrl = '';
 
 if (!function_exists('super_admin_sidebar_table_exists')) {
     function super_admin_sidebar_table_exists(mysqli $conn, string $tableName): bool {
@@ -27,6 +30,29 @@ if (!function_exists('super_admin_sidebar_table_exists')) {
         }
 
         $stmt->bind_param('s', $tableName);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        return (bool)($result && $result->fetch_assoc());
+    }
+}
+
+if (!function_exists('super_admin_sidebar_column_exists')) {
+    function super_admin_sidebar_column_exists(mysqli $conn, string $tableName, string $columnName): bool {
+        $stmt = $conn->prepare(
+            'SELECT 1
+             FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+             AND TABLE_NAME = ?
+             AND COLUMN_NAME = ?
+             LIMIT 1'
+        );
+
+        if (!$stmt) {
+            return false;
+        }
+
+        $stmt->bind_param('ss', $tableName, $columnName);
         $stmt->execute();
         $result = $stmt->get_result();
 
@@ -236,6 +262,25 @@ $superAdminNotificationData = isset($conn) && $conn instanceof mysqli
         'inactive_assignment_alerts' => [],
         'recent_activity' => [],
     ];
+
+if (
+    isset($conn)
+    && $conn instanceof mysqli
+    && super_admin_sidebar_column_exists($conn, 'users', 'profile_photo_path')
+    && isset($_SESSION['user_id'])
+) {
+    $profileStmt = $conn->prepare('SELECT profile_photo_path FROM users WHERE id = ? LIMIT 1');
+    if ($profileStmt) {
+        $profileStmt->bind_param('i', $_SESSION['user_id']);
+        $profileStmt->execute();
+        $profileResult = $profileStmt->get_result();
+        $profileRow = $profileResult ? $profileResult->fetch_assoc() : null;
+        $profilePhotoPath = trim((string)($profileRow['profile_photo_path'] ?? ''));
+        if ($profilePhotoPath !== '') {
+            $superAdminProfilePhotoUrl = '/codesamplecaps/' . ltrim(str_replace('\\', '/', $profilePhotoPath), '/');
+        }
+    }
+}
 ?>
 <button id="sidebarMobileToggle" class="sidebar-mobile-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">
     <span></span>
@@ -243,13 +288,18 @@ $superAdminNotificationData = isset($conn) && $conn instanceof mysqli
     <span></span>
 </button>
 <nav class="sidebar" id="sidebar">
-    <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Collapse sidebar" aria-controls="sidebar" aria-expanded="true">
-        <span id="toggleIcon" class="sidebar-toggle-icon" aria-hidden="true">
-            <svg class="sidebar-toggle-svg" viewBox="0 0 20 20" focusable="false" aria-hidden="true">
-                <path d="M11.75 4.75L6.5 10l5.25 5.25"></path>
-            </svg>
-        </span>
-    </button>
+    <div class="sidebar-toggle-row">
+        <button id="sidebarToggle" class="sidebar-toggle" type="button" aria-label="Collapse sidebar" aria-controls="sidebar" aria-expanded="true">
+            <span id="toggleIcon" class="sidebar-toggle-icon" aria-hidden="true">
+                <svg class="sidebar-toggle-svg" viewBox="0 0 20 20" focusable="false" aria-hidden="true">
+                    <path d="M11.75 4.75L6.5 10l5.25 5.25"></path>
+                </svg>
+            </span>
+        </button>
+        <div class="sidebar-toggle-title" aria-hidden="true">
+            <span class="sidebar-toggle-title__shine">Super Admin</span>
+        </div>
+    </div>
 
     <div class="nav-divider"></div>
 
@@ -412,23 +462,31 @@ $superAdminNotificationData = isset($conn) && $conn instanceof mysqli
                 aria-controls="topbarProfileDropdown"
                 aria-expanded="false"
             >
-                <span class="topbar-profile__avatar" aria-hidden="true">
-                    <?php echo htmlspecialchars(strtoupper(substr(trim((string)($_SESSION['name'] ?? 'A')), 0, 1))); ?>
-                </span>
+                <?php if ($superAdminProfilePhotoUrl !== ''): ?>
+                    <img src="<?php echo htmlspecialchars($superAdminProfilePhotoUrl); ?>" alt="Super admin profile picture" class="topbar-profile__avatar-image">
+                <?php else: ?>
+                    <span class="topbar-profile__avatar" aria-hidden="true">
+                        <?php echo htmlspecialchars(strtoupper(substr(trim($superAdminProfileName), 0, 1))); ?>
+                    </span>
+                <?php endif; ?>
                 <span class="topbar-profile__identity">
-                    <strong><?php echo htmlspecialchars((string)($_SESSION['name'] ?? 'Admin')); ?></strong>
+                    <strong><?php echo htmlspecialchars($superAdminProfileName); ?></strong>
                     <span>Super Admin</span>
                 </span>
             </button>
 
             <div id="topbarProfileDropdown" class="topbar-profile__dropdown" hidden>
                 <div class="topbar-profile__panel-head">
-                    <span class="topbar-profile__avatar topbar-profile__avatar--panel" aria-hidden="true">
-                        <?php echo htmlspecialchars(strtoupper(substr(trim((string)($_SESSION['name'] ?? 'A')), 0, 1))); ?>
-                    </span>
+                    <?php if ($superAdminProfilePhotoUrl !== ''): ?>
+                        <img src="<?php echo htmlspecialchars($superAdminProfilePhotoUrl); ?>" alt="Super admin profile picture" class="topbar-profile__avatar-image topbar-profile__avatar-image--panel">
+                    <?php else: ?>
+                        <span class="topbar-profile__avatar topbar-profile__avatar--panel" aria-hidden="true">
+                            <?php echo htmlspecialchars(strtoupper(substr(trim($superAdminProfileName), 0, 1))); ?>
+                        </span>
+                    <?php endif; ?>
                     <div>
-                        <strong><?php echo htmlspecialchars((string)($_SESSION['name'] ?? 'Admin')); ?></strong>
-                        <span><?php echo htmlspecialchars((string)($_SESSION['role'] ?? 'super_admin')); ?></span>
+                        <strong><?php echo htmlspecialchars($superAdminProfileName); ?></strong>
+                        <span><?php echo htmlspecialchars($superAdminProfileRole); ?></span>
                     </div>
                 </div>
                 <div class="topbar-profile__links">

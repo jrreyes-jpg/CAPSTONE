@@ -18,6 +18,8 @@ $old = [
     'role' => ''
 ];
 
+ensureUserProfilePhotoColumn($conn);
+
 function normalizeRole(string $role): string {
     $role = strtolower(trim($role));
     return $role === 'foremen' ? 'foreman' : $role;
@@ -54,8 +56,40 @@ function isValidCsrfToken(?string $token): bool {
     return hash_equals($_SESSION['csrf_token'], $token);
 }
 
+function hasColumn(mysqli $conn, string $tableName, string $columnName): bool {
+    $stmt = $conn->prepare(
+        'SELECT 1
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = ?
+         AND COLUMN_NAME = ?
+         LIMIT 1'
+    );
+
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param('ss', $tableName, $columnName);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return (bool)($result && $result->fetch_assoc());
+}
+
+function ensureUserProfilePhotoColumn(mysqli $conn): void {
+    if (hasColumn($conn, 'users', 'profile_photo_path')) {
+        return;
+    }
+
+    $conn->query("ALTER TABLE users ADD COLUMN profile_photo_path VARCHAR(255) DEFAULT NULL AFTER token_expiry");
+}
+
 function getUserById(mysqli $conn, int $userId): ?array {
-    $stmt = $conn->prepare('SELECT id, full_name, email, phone, role, status, created_at FROM users WHERE id = ? LIMIT 1');
+    $selectPhoto = hasColumn($conn, 'users', 'profile_photo_path')
+        ? ', profile_photo_path'
+        : ', NULL AS profile_photo_path';
+    $stmt = $conn->prepare("SELECT id, full_name, email, phone, role, status, created_at{$selectPhoto} FROM users WHERE id = ? LIMIT 1");
     if (!$stmt) {
         return null;
     }
@@ -65,6 +99,58 @@ function getUserById(mysqli $conn, int $userId): ?array {
     $result = $stmt->get_result();
 
     return $result ? $result->fetch_assoc() : null;
+}
+
+function storeProfilePhotoUpload(array $file, int $userId): array {
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+        return ['path' => null, 'error' => null];
+    }
+
+    if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+        return ['path' => null, 'error' => 'Profile photo upload failed. Please try again.'];
+    }
+
+    $tmpName = (string)($file['tmp_name'] ?? '');
+    if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+        return ['path' => null, 'error' => 'Invalid profile photo upload.'];
+    }
+
+    $imageInfo = @getimagesize($tmpName);
+    if ($imageInfo === false) {
+        return ['path' => null, 'error' => 'Profile photo must be a valid image file.'];
+    }
+
+    $mime = (string)($imageInfo['mime'] ?? '');
+    $allowedExtensions = [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+    ];
+
+    if (!isset($allowedExtensions[$mime])) {
+        return ['path' => null, 'error' => 'Use JPG, PNG, or WEBP for the profile photo.'];
+    }
+
+    if ((int)($file['size'] ?? 0) > 3 * 1024 * 1024) {
+        return ['path' => null, 'error' => 'Profile photo must be 3MB or smaller.'];
+    }
+
+    $uploadDirectory = __DIR__ . '/../../uploads/profile_photos';
+    if (!is_dir($uploadDirectory) && !mkdir($uploadDirectory, 0775, true) && !is_dir($uploadDirectory)) {
+        return ['path' => null, 'error' => 'Unable to prepare the profile photo folder.'];
+    }
+
+    $filename = 'super-admin-' . $userId . '-' . time() . '.' . $allowedExtensions[$mime];
+    $destination = $uploadDirectory . '/' . $filename;
+
+    if (!move_uploaded_file($tmpName, $destination)) {
+        return ['path' => null, 'error' => 'Unable to save the profile photo.'];
+    }
+
+    return [
+        'path' => 'uploads/profile_photos/' . $filename,
+        'error' => null,
+    ];
 }
 
 function getUserForStatusChange(mysqli $conn, int $userId): ?array {
@@ -333,6 +419,8 @@ function getDeactivationBlockers(mysqli $conn, int $userId, string $role): array
     return $blockers;
 }
 
+$supportsProfilePhoto = hasColumn($conn, 'users', 'profile_photo_path');
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     if (!isValidCsrfToken($_POST['csrf_token'] ?? null)) {
@@ -526,6 +614,7 @@ $old['role'] = $role;
         $fullName = trim($_POST['full_name'] ?? '');
         $email = trim($_POST['email'] ?? '');
         $phone = trim($_POST['phone'] ?? '');
+        $profilePhotoUpload = $_FILES['profile_photo'] ?? null;
         $currentUser = $userId > 0 ? getUserById($conn, $userId) : null;
 
         if ($userId <= 0 || !$currentUser) {
@@ -547,10 +636,25 @@ $old['role'] = $role;
             if ($dup && $dup->num_rows > 0) {
                 $error = 'Full name, email, and phone must stay unique.';
             } else {
-                $stmt = $conn->prepare('UPDATE users SET full_name = ?, email = ?, phone = ? WHERE id = ?');
-                $stmt->bind_param('sssi', $fullName, $email, $phone, $userId);
+                $uploadedPhoto = ($supportsProfilePhoto && $profilePhotoUpload)
+                    ? storeProfilePhotoUpload($profilePhotoUpload, $userId)
+                    : ['path' => null, 'error' => null];
 
-                if ($stmt->execute()) {
+                if ($uploadedPhoto['error'] !== null) {
+                    $error = (string)$uploadedPhoto['error'];
+                } else {
+                    $newPhotoPath = $uploadedPhoto['path'] ?? ($currentUser['profile_photo_path'] ?? null);
+                    $stmt = $supportsProfilePhoto
+                        ? $conn->prepare('UPDATE users SET full_name = ?, email = ?, phone = ?, profile_photo_path = ? WHERE id = ?')
+                        : $conn->prepare('UPDATE users SET full_name = ?, email = ?, phone = ? WHERE id = ?');
+
+                    if ($supportsProfilePhoto) {
+                        $stmt->bind_param('ssssi', $fullName, $email, $phone, $newPhotoPath, $userId);
+                    } else {
+                        $stmt->bind_param('sssi', $fullName, $email, $phone, $userId);
+                    }
+
+                    if ($stmt->execute()) {
                     $_SESSION['name'] = $fullName;
                     audit_log_event(
                         $conn,
@@ -562,16 +666,19 @@ $old['role'] = $role;
                             'full_name' => $currentUser['full_name'] ?? null,
                             'email' => $currentUser['email'] ?? null,
                             'phone' => $currentUser['phone'] ?? null,
+                            'profile_photo_path' => $currentUser['profile_photo_path'] ?? null,
                         ],
                         [
                             'full_name' => $fullName,
                             'email' => $email,
                             'phone' => $phone,
+                            'profile_photo_path' => $newPhotoPath,
                         ]
                     );
                     $message = 'Your admin profile was updated.';
-                } else {
-                    $error = 'Failed to update your profile.';
+                    } else {
+                        $error = 'Failed to update your profile.';
+                    }
                 }
             }
         }
@@ -667,6 +774,10 @@ $currentAdminPhone = (string)($currentAdmin['phone'] ?? '');
 $currentAdminRole = ucwords(str_replace('_', ' ', (string)($currentAdmin['role'] ?? 'super_admin')));
 $currentAdminStatus = ucfirst((string)($currentAdmin['status'] ?? 'active'));
 $currentAdminCreatedAt = formatRelativeDate($currentAdmin['created_at'] ?? null);
+$currentAdminPhoto = trim((string)($currentAdmin['profile_photo_path'] ?? ''));
+$currentAdminPhotoUrl = $currentAdminPhoto !== ''
+    ? '/codesamplecaps/' . ltrim(str_replace('\\', '/', $currentAdminPhoto), '/')
+    : '';
 
 $projectMetrics = $conn->query(
     "SELECT
@@ -757,16 +868,15 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
         <div class="header">
             <div class="header-copy">
                 <h1><?php echo $activeTab === 'profile' ? 'Admin Profile' : 'Super Admin Dashboard'; ?></h1>
-                <p>
-                    <?php echo $activeTab === 'profile'
-                        ? 'Keep your admin account details current and your access secure.'
-                        : 'Monitor the system, manage people, and keep operations moving.'; ?>
-                </p>
+                <?php if ($activeTab !== 'profile'): ?>
+                    <p>Monitor the system, manage people, and keep operations moving.</p>
+                <?php endif; ?>
             </div>
-            <div class="user-info">
-                <span><?php echo htmlspecialchars($currentAdminName); ?></span>
-                <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=profile">Open profile</a>
-            </div>
+            <?php if ($activeTab !== 'profile'): ?>
+                <div class="user-info">
+                    <span><?php echo htmlspecialchars($currentAdminName); ?></span>
+                </div>
+            <?php endif; ?>
         </div>
 
         <?php if ($message): ?><div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div><?php endif; ?>
@@ -911,27 +1021,17 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
         <div id="profile" class="tab-content <?php echo $activeTab === 'profile' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'profile' ? 'display: block;' : 'display: none;'; ?>">
             <section class="profile-shell">
                 <article class="profile-overview-card">
-                    <div class="profile-overview-card__avatar" aria-hidden="true">
-                        <?php echo htmlspecialchars(strtoupper(substr(trim($currentAdminName), 0, 1))); ?>
-                    </div>
+                    <?php if ($currentAdminPhotoUrl !== ''): ?>
+                        <img src="<?php echo htmlspecialchars($currentAdminPhotoUrl); ?>" alt="Super admin profile picture" class="profile-overview-card__avatar-image">
+                    <?php else: ?>
+                        <div class="profile-overview-card__avatar" aria-hidden="true">
+                            <?php echo htmlspecialchars(strtoupper(substr(trim($currentAdminName), 0, 1))); ?>
+                        </div>
+                    <?php endif; ?>
                     <div class="profile-overview-card__content">
-                        <span class="profile-eyebrow">Account Overview</span>
+                        <span class="profile-eyebrow">Admin Edge</span>
                         <h2><?php echo htmlspecialchars($currentAdminName); ?></h2>
-                        <p>Primary super admin account for EDGE Automation system control and approvals.</p>
-                    </div>
-                    <div class="profile-overview-card__stats">
-                        <div class="profile-stat">
-                            <span>Role</span>
-                            <strong><?php echo htmlspecialchars($currentAdminRole); ?></strong>
-                        </div>
-                        <div class="profile-stat">
-                            <span>Status</span>
-                            <strong><?php echo htmlspecialchars($currentAdminStatus); ?></strong>
-                        </div>
-                        <div class="profile-stat">
-                            <span>Account Age</span>
-                            <strong><?php echo htmlspecialchars($currentAdminCreatedAt); ?></strong>
-                        </div>
+                        <p><?php echo htmlspecialchars($currentAdminEmail); ?></p>
                     </div>
                 </article>
 
@@ -943,9 +1043,26 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
                                 <p class="panel-copy">Update the core details shown across the admin workspace.</p>
                             </div>
                         </div>
-                        <form method="POST">
+                        <form method="POST" enctype="multipart/form-data">
                             <input type="hidden" name="action" value="update_my_profile">
                             <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                            <div class="form-row">
+                                <div class="form-group profile-photo-field">
+                                    <label for="profile_photo">Profile Photo</label>
+                                    <div class="profile-photo-upload">
+                                        <?php if ($currentAdminPhotoUrl !== ''): ?>
+                                            <img src="<?php echo htmlspecialchars($currentAdminPhotoUrl); ?>" alt="Current super admin profile picture" class="profile-photo-upload__preview">
+                                        <?php else: ?>
+                                            <img src="/codesamplecaps/IMAGES/edge.jpg" alt="Default profile preview" class="profile-photo-upload__preview">
+                                        <?php endif; ?>
+                                        <div class="profile-photo-upload__meta">
+                                            <strong>Upload a clean profile picture</strong>
+                                            <span>JPG, PNG, or WEBP only. Max 3MB.</span>
+                                            <input type="file" id="profile_photo" name="profile_photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="admin_full_name">Full Name *</label>
@@ -960,10 +1077,6 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
                                 <div class="form-group">
                                     <label for="admin_phone">Phone Number</label>
                                     <input type="tel" id="admin_phone" name="phone" value="<?php echo htmlspecialchars($currentAdminPhone); ?>" pattern="^09[0-9]{9}$" maxlength="11" placeholder="09XXXXXXXXX" inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,''); if(this.value && !this.value.startsWith('09')){this.value='09';}">
-                                </div>
-                                <div class="form-group">
-                                    <label for="admin_role">Role</label>
-                                    <input type="text" id="admin_role" value="<?php echo htmlspecialchars($currentAdminRole); ?>" readonly>
                                 </div>
                             </div>
                             <button type="submit" class="btn-primary">Save Profile</button>
