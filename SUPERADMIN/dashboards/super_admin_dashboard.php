@@ -85,6 +85,28 @@ function ensureUserProfilePhotoColumn(mysqli $conn): void {
     $conn->query("ALTER TABLE users ADD COLUMN profile_photo_path VARCHAR(255) DEFAULT NULL AFTER token_expiry");
 }
 
+if (!function_exists('build_default_profile_avatar_data_uri')) {
+    function build_default_profile_avatar_data_uri(): string {
+        $svg = <<<'SVG'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="fbAvatarBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f0f2f5;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- White background like Facebook -->
+  <rect width="200" height="200" fill="url(#fbAvatarBg)"/>
+  <!-- User silhouette in light gray (Facebook style) -->
+  <circle cx="100" cy="70" r="35" fill="#ccc"/>
+  <path d="M 30 180 Q 30 140 100 140 Q 170 140 170 180 L 170 200 L 30 200 Z" fill="#ccc"/>
+</svg>
+SVG;
+
+        return 'data:image/svg+xml;utf8,' . rawurlencode($svg);
+    }
+}
+
 function getUserById(mysqli $conn, int $userId): ?array {
     $selectPhoto = hasColumn($conn, 'users', 'profile_photo_path')
         ? ', profile_photo_path'
@@ -774,10 +796,12 @@ $currentAdminPhone = (string)($currentAdmin['phone'] ?? '');
 $currentAdminRole = ucwords(str_replace('_', ' ', (string)($currentAdmin['role'] ?? 'super_admin')));
 $currentAdminStatus = ucfirst((string)($currentAdmin['status'] ?? 'active'));
 $currentAdminCreatedAt = formatRelativeDate($currentAdmin['created_at'] ?? null);
+$defaultAdminPhotoUrl = build_default_profile_avatar_data_uri();
 $currentAdminPhoto = trim((string)($currentAdmin['profile_photo_path'] ?? ''));
 $currentAdminPhotoUrl = $currentAdminPhoto !== ''
     ? '/codesamplecaps/' . ltrim(str_replace('\\', '/', $currentAdminPhoto), '/')
     : '';
+$currentAdminPhotoPreviewUrl = $currentAdminPhotoUrl !== '' ? $currentAdminPhotoUrl : $defaultAdminPhotoUrl;
 
 $projectMetrics = $conn->query(
     "SELECT
@@ -879,19 +903,7 @@ $scanTrendPeak = !empty($scanTrend) ? getTrendPeak($scanTrend) : 0;
     <?php include __DIR__ . '/../sidebar_super_admin.php'; ?>
 
     <main class="main-content">
-        <div class="header">
-            <div class="header-copy">
-                <h1><?php echo $activeTab === 'profile' ? 'Admin Profile' : 'Super Admin Dashboard'; ?></h1>
-                <?php if ($activeTab !== 'profile'): ?>
-                    <p>Monitor the system, manage people, and keep operations moving.</p>
-                <?php endif; ?>
-            </div>
-            <?php if ($activeTab !== 'profile'): ?>
-                <div class="user-info">
-                    <span>Operations View</span>
-                </div>
-            <?php endif; ?>
-        </div>
+     
 
         <?php if ($message): ?><div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div><?php endif; ?>
         <?php if ($error): ?><div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
@@ -1076,13 +1088,7 @@ $scanTrendPeak = !empty($scanTrend) ? getTrendPeak($scanTrend) : 0;
         <div id="profile" class="tab-content <?php echo $activeTab === 'profile' ? 'active' : ''; ?>" style="<?php echo $activeTab === 'profile' ? 'display: block;' : 'display: none;'; ?>">
             <section class="profile-shell">
                 <article class="profile-overview-card">
-                    <?php if ($currentAdminPhotoUrl !== ''): ?>
-                        <img src="<?php echo htmlspecialchars($currentAdminPhotoUrl); ?>" alt="Super admin profile picture" class="profile-overview-card__avatar-image">
-                    <?php else: ?>
-                        <div class="profile-overview-card__avatar" aria-hidden="true">
-                            <?php echo htmlspecialchars(strtoupper(substr(trim($currentAdminName), 0, 1))); ?>
-                        </div>
-                    <?php endif; ?>
+                    <img src="<?php echo htmlspecialchars($currentAdminPhotoPreviewUrl); ?>" alt="Super admin profile picture" class="profile-overview-card__avatar-image">
                     <div class="profile-overview-card__content">
                         <h2>Admin Profile</h2>
                         <p>Update your admin details, preview your next photo before saving, and manage password security here.</p>
@@ -1116,7 +1122,7 @@ $scanTrendPeak = !empty($scanTrend) ? getTrendPeak($scanTrend) : 0;
                                             <span>Preview only while choosing. It will save only after you click Save Profile. JPG, PNG, or WEBP only. Max 3MB.</span>
                                             <input type="file" id="profile_photo" name="profile_photo" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
                                             <small class="profile-photo-upload__state" data-profile-photo-state>
-                                                <?php echo $currentAdminPhotoUrl !== '' ? 'Current profile photo ready.' : 'No new file selected.'; ?>
+                                                <?php echo $currentAdminPhotoUrl !== '' ? 'Current profile photo ready.' : 'Default profile photo is active.'; ?>
                                             </small>
                                         </div>
                                     </div>
