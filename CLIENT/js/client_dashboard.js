@@ -6,8 +6,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const desktopToggle = document.getElementById('sidebarToggle');
     const toggleIcon = document.getElementById('toggleIcon');
     const sectionLinks = document.querySelectorAll('[data-section-link]');
-    const jumpButtons = document.querySelectorAll('[data-jump-section]');
-    const sectionPanels = document.querySelectorAll('[data-section-panel]');
+    const tabButtons = document.querySelectorAll('[data-tab-target]');
+    const jumpButtons = document.querySelectorAll('[data-jump-section], [data-jump-tab]');
+    const sectionPanels = document.querySelectorAll('.tab-content');
     const notificationRoot = document.querySelector('[data-notification-root]');
     const notificationToggle = document.getElementById('topbarNotificationToggle');
     const notificationPanel = document.getElementById('topbarNotificationDropdown');
@@ -18,11 +19,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const phTime = document.querySelector('[data-ph-time]');
     const collapsedStorageKey = 'edgeClientSidebarCollapsed';
     const mobileMedia = window.matchMedia('(max-width: 992px)');
-    const defaultSectionId = 'overview-section';
+    const defaultSectionId = 'projects-tab';
 
- if (!sidebar) {
-    console.warn('Sidebar not found, skipping sidebar logic.');
-}
+    if (!sidebar) {
+        return;
+    }
 
     const setMobileOpen = function (isOpen) {
         sidebar.classList.toggle('mobile-open', isOpen);
@@ -70,19 +71,27 @@ document.addEventListener('DOMContentLoaded', function () {
             link.classList.toggle('active', isActive);
             link.setAttribute('aria-current', isActive ? 'page' : 'false');
         });
+
+        tabButtons.forEach(function (button) {
+            const isActive = button.dataset.tabTarget === activeSectionId;
+            button.classList.toggle('active', isActive);
+            button.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        });
     };
 
     const activateSection = function (sectionId, options) {
         const settings = Object.assign({ updateHash: true }, options || {});
         let targetPanel = document.getElementById(sectionId);
 
-        if (!targetPanel || !targetPanel.hasAttribute('data-section-panel')) {
+        if (!targetPanel || !targetPanel.classList.contains('tab-content')) {
             targetPanel = document.getElementById(defaultSectionId);
             sectionId = defaultSectionId;
         }
 
         sectionPanels.forEach(function (panel) {
-            panel.classList.toggle('workspace-section--active', panel === targetPanel);
+            const isActive = panel === targetPanel;
+            panel.classList.toggle('active', isActive);
+            panel.style.display = isActive ? 'block' : 'none';
         });
 
         if (settings.updateHash) {
@@ -116,6 +125,12 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!root.contains(event.target)) {
                 setOpen(false);
             }
+        });
+
+        panel.querySelectorAll('a').forEach(function (link) {
+            link.addEventListener('click', function () {
+                setOpen(false);
+            });
         });
 
         return function () {
@@ -164,7 +179,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     jumpButtons.forEach(function (button) {
         button.addEventListener('click', function () {
-            const sectionId = button.dataset.jumpSection;
+            const sectionId = button.dataset.jumpSection || button.dataset.jumpTab;
 
             if (!sectionId) {
                 return;
@@ -172,6 +187,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
             activateSection(sectionId, { updateHash: true });
             setMobileOpen(false);
+        });
+    });
+
+    tabButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+            const sectionId = button.dataset.tabTarget;
+            if (!sectionId) {
+                return;
+            }
+
+            activateSection(sectionId, { updateHash: true });
         });
     });
 

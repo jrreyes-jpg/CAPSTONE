@@ -265,74 +265,101 @@ $notificationItems = [
 </head>
 <body>
     <?php include '../sidebar/client_sidebar.php'; ?>
-    <div class="client-page-overlay" data-sidebar-overlay hidden></div>
 
     <main class="main-content" id="mainContent">
-        <header class="dashboard-topbar">
-            <div class="dashboard-topbar__left">
-                <button
-                    type="button"
-                    class="icon-btn icon-btn--menu"
-                    data-sidebar-mobile-toggle
-                    aria-controls="clientSidebar"
-                    aria-expanded="false"
-                    aria-label="Open navigation"
-                >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M4 7h16M4 12h16M4 17h16"></path>
-                    </svg>
-                </button>
-               
-
-                <div class="dashboard-topbar__copy">
-                    <h1>Welcome, <?php echo htmlspecialchars($clientName); ?></h1>
+        <header class="global-topbar" aria-live="polite">
+            <div class="global-topbar__copy">
+                <img src="/codesamplecaps/IMAGES/edge.jpg" alt="Edge Automation logo" class="global-topbar__brand-logo">
+                <div class="global-topbar__copy-text">
+                    <strong>EDGE Automation</strong>
+                    <span>Welcome, <?php echo htmlspecialchars($clientName); ?></span>
                 </div>
             </div>
 
-            <div class="dashboard-topbar__right">
-                <div class="topbar-chip">
-                    <span>Today</span>
-                    <strong data-ph-date>Loading date...</strong>
-                </div>
-                <div class="topbar-chip topbar-chip--time">
-                    <span>Philippine Time</span>
-                    <strong data-ph-time>Loading time...</strong>
-                </div>
-
-                <div class="notification-shell" data-notification-shell>
+            <div class="global-topbar__actions">
+                <div class="topbar-notifications" data-notification-root>
                     <button
+                        id="topbarNotificationToggle"
+                        class="topbar-notifications__toggle"
                         type="button"
-                        class="icon-btn notification-toggle"
-                        id="clientNotificationToggle"
+                        aria-label="Open notifications"
+                        aria-controls="topbarNotificationDropdown"
                         aria-expanded="false"
-                        aria-controls="clientNotificationPanel"
-                        aria-label="Open updates panel"
                     >
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5"></path>
-                            <path d="M10 17a2 2 0 0 0 4 0"></path>
-                        </svg>
+                        <span class="topbar-notifications__icon" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" focusable="false">
+                                <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5"></path>
+                                <path d="M10 17a2 2 0 0 0 4 0"></path>
+                            </svg>
+                        </span>
                         <?php if ($activeProjectCount > 0): ?>
-                            <span class="notification-toggle__badge"><?php echo $activeProjectCount; ?></span>
+                            <span class="topbar-notifications__badge"><?php echo $activeProjectCount; ?></span>
                         <?php endif; ?>
                     </button>
 
-                    <div class="notification-panel" id="clientNotificationPanel" hidden>
-                        <div class="notification-panel__head">
+                    <div id="topbarNotificationDropdown" class="topbar-notifications__dropdown" hidden>
+                        <div class="topbar-notifications__panel-head">
                             <div>
-                                <span class="section-badge">Recent Updates</span>
-                                <h2>Project signals</h2>
+                                <strong>Project Updates</strong>
+                                <span><?php echo (int)$activeProjectCount; ?> active items</span>
                             </div>
                         </div>
-                        <div class="notification-list">
+                        <div class="topbar-notifications__section">
+                            <div class="topbar-notifications__section-title">Recent signals</div>
                             <?php foreach ($notificationItems as $notification): ?>
-                                <article class="notification-item">
-                                    <strong><?php echo htmlspecialchars($notification['title']); ?></strong>
-                                    <p><?php echo htmlspecialchars($notification['detail']); ?></p>
+                                <article class="notification-item notification-item--neutral">
+                                    <span class="notification-item__dot"></span>
+                                    <div class="notification-item__copy">
+                                        <strong><?php echo htmlspecialchars($notification['title']); ?></strong>
+                                        <span><?php echo htmlspecialchars($notification['detail']); ?></span>
+                                    </div>
                                 </article>
                             <?php endforeach; ?>
                         </div>
                     </div>
+                </div>
+
+                <div class="topbar-profile" data-profile-root>
+                    <button
+                        id="topbarProfileToggle"
+                        class="topbar-profile__toggle"
+                        type="button"
+                        aria-label="Open profile menu"
+                        aria-controls="topbarProfileDropdown"
+                        aria-expanded="false"
+                    >
+                        <span class="topbar-profile__avatar" aria-hidden="true"><?php echo htmlspecialchars($clientInitial); ?></span>
+                        <span class="topbar-profile__identity">
+                            <strong><?php echo htmlspecialchars($clientName); ?></strong>
+                            <span>Client</span>
+                        </span>
+                        <span class="topbar-profile__chevron" aria-hidden="true">
+                            <svg viewBox="0 0 20 20" focusable="false">
+                                <path d="M5 7.5 10 12.5 15 7.5"></path>
+                            </svg>
+                        </span>
+                    </button>
+
+                    <div id="topbarProfileDropdown" class="topbar-profile__dropdown" hidden>
+                        <div class="topbar-profile__panel-head">
+                            <span class="topbar-profile__avatar topbar-profile__avatar--panel" aria-hidden="true"><?php echo htmlspecialchars($clientInitial); ?></span>
+                            <div>
+                                <strong><?php echo htmlspecialchars($clientName); ?></strong>
+                                <span>Client</span>
+                            </div>
+                        </div>
+                        <div class="topbar-profile__links">
+                            <a href="#projects-tab">Projects</a>
+                            <a href="#profile-tab">Profile</a>
+                            <a href="../../LOGIN/php/logout.php">Logout</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="global-topbar__clock">
+                    <span class="global-topbar__clock-label">Philippines Time</span>
+                    <strong class="global-topbar__time" data-ph-time>--:--:--</strong>
+                    <span class="global-topbar__date" data-ph-date>Loading date...</span>
                 </div>
             </div>
         </header>
