@@ -111,19 +111,20 @@
 }
 
 .client-sidebar__collapse {
-    width: 100%;
-    min-height: 48px;
-    border-radius: 16px;
-    padding: 0 16px;
-    justify-content: flex-start;
-    font-weight: 600;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: transparent;
     color: rgba(255, 255, 255, 0.92);
+    border-radius: 8px;
+    padding: 0;
+    justify-content: center;
+    font-weight: 600;
+    transition: background 0.2s ease, transform 0.2s ease;
 }
 
-.client-sidebar__close:hover,
 .client-sidebar__collapse:hover {
     background: rgba(255, 255, 255, 0.14);
-    border-color: rgba(255, 255, 255, 0.22);
     transform: translateY(-1px);
 }
 

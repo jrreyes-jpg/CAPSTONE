@@ -20,9 +20,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const mobileMedia = window.matchMedia('(max-width: 992px)');
     const defaultSectionId = 'overview-section';
 
-    if (!sidebar) {
-        return;
-    }
+ if (!sidebar) {
+    console.warn('Sidebar not found, skipping sidebar logic.');
+}
 
     const setMobileOpen = function (isOpen) {
         sidebar.classList.toggle('mobile-open', isOpen);

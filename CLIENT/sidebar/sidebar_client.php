@@ -3,6 +3,15 @@ $clientSidebarName = trim((string)($_SESSION['name'] ?? 'Client User'));
 $clientSidebarInitial = strtoupper(substr($clientSidebarName !== '' ? $clientSidebarName : 'C', 0, 1));
 ?>
 <nav class="client-sidebar" id="clientSidebar" data-client-sidebar aria-label="Client navigation">
+    <div class="client-sidebar__top">
+        <div class="client-sidebar__brand">
+            <span class="client-sidebar__brand-mark" aria-hidden="true">EA</span>
+            <div class="client-sidebar__brand-copy">
+                <span class="client-sidebar__eyebrow">Edge Automation</span>
+                <strong>Client Portal</strong>
+                <small>Projects, progress, and updates</small>
+            </div>
+        </div>
         <button
             type="button"
             class="client-sidebar__close"
@@ -13,6 +22,14 @@ $clientSidebarInitial = strtoupper(substr($clientSidebarName !== '' ? $clientSid
                 <path d="M6 6l12 12M18 6L6 18"></path>
             </svg>
         </button>
+    </div>
+
+    <div class="client-sidebar__profile">
+        <span class="client-sidebar__avatar" aria-hidden="true"><?php echo htmlspecialchars($clientSidebarInitial); ?></span>
+        <div class="client-sidebar__profile-copy">
+            <strong><?php echo htmlspecialchars($clientSidebarName); ?></strong>
+            <span>Client Workspace</span>
+        </div>
     </div>
 
     <button

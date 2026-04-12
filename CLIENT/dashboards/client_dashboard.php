@@ -285,9 +285,7 @@ $notificationItems = [
                
 
                 <div class="dashboard-topbar__copy">
-                    <span class="section-badge">Client Workspace</span>
                     <h1>Welcome, <?php echo htmlspecialchars($clientName); ?></h1>
-                    <p>Track project delivery, assigned engineers, and real task progress in one clean view.</p>
                 </div>
             </div>
 
@@ -338,34 +336,6 @@ $notificationItems = [
                 </div>
             </div>
         </header>
-
-        <section class="hero-panel" id="dashboard-home">
-            <div class="hero-panel__copy">
-                <span class="hero-panel__eyebrow">Delivery Overview</span>
-                <h2>See what matters without digging through dense screens.</h2>
-                <p>
-                    This dashboard gives you a cleaner view of project status, real progress, and the engineering support
-                    behind every active request.
-                </p>
-                <div class="hero-panel__actions">
-                    <button type="button" class="btn-primary" data-jump-tab="projects-tab">View My Projects</button>
-                    <button type="button" class="btn-secondary" data-jump-tab="profile-tab">Open Profile</button>
-                </div>
-            </div>
-
-            <div class="hero-panel__stats">
-                <article class="hero-stat">
-                    <span>Overall Progress</span>
-                    <strong><?php echo $overallProgressPercent; ?>%</strong>
-                    <small><?php echo $overallCompletedTasks; ?> of <?php echo $overallTasks; ?> tasks completed</small>
-                </article>
-                <article class="hero-stat">
-                    <span>Next Deadline</span>
-                    <strong><?php echo htmlspecialchars($nextDeadlineDisplay); ?></strong>
-                    <small><?php echo htmlspecialchars($nextDeadlineHint); ?></small>
-                </article>
-            </div>
-        </section>
 
         <section class="stats-grid" aria-label="Project summary cards">
             <article class="stat-card">
