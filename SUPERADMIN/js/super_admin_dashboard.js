@@ -170,6 +170,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 setProfileState(false);
             }
         });
+
+        profileDropdown.querySelectorAll('a').forEach(function (link) {
+            link.addEventListener('click', function () {
+                setProfileState(false);
+            });
+        });
     }
 
     document.querySelectorAll('.togglePassword').forEach(function (btn) {

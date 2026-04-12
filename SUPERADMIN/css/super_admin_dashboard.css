@@ -244,10 +244,21 @@ body.page-loaded {
     outline-offset: 3px;
 }
 
+.topbar-profile__avatar-shell {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, #0f172a, #16a34a);
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.14);
+}
+
 .topbar-profile__avatar {
     width: 40px;
     height: 40px;
-    border-radius: 14px;
+    border-radius: 999px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -262,24 +273,47 @@ body.page-loaded {
 .topbar-profile__avatar-image {
     width: 40px;
     height: 40px;
-    border-radius: 14px;
+    border-radius: 999px;
     display: block;
     object-fit: cover;
     flex-shrink: 0;
     border: 1px solid rgba(148, 163, 184, 0.22);
     box-shadow: 0 10px 20px rgba(15, 23, 42, 0.14);
+    position: relative;
+    z-index: 1;
+}
+
+.topbar-profile__avatar-fallback {
+    position: absolute;
+    inset: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
 }
 
 .topbar-profile__avatar--panel {
     width: 48px;
     height: 48px;
-    border-radius: 16px;
+    border-radius: 999px;
+}
+
+.topbar-profile__avatar-shell--panel {
+    width: 48px;
+    height: 48px;
 }
 
 .topbar-profile__avatar-image--panel {
     width: 48px;
     height: 48px;
-    border-radius: 16px;
+    border-radius: 999px;
+}
+
+.topbar-profile__avatar-fallback--panel {
+    font-size: 1rem;
 }
 
 .topbar-profile__identity {
@@ -305,6 +339,34 @@ body.page-loaded {
     font-size: 0.72rem;
     text-transform: uppercase;
     letter-spacing: 0.08em;
+}
+
+.topbar-profile__chevron {
+    width: 18px;
+    height: 18px;
+    color: #64748b;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.topbar-profile__chevron svg {
+    width: 100%;
+    height: 100%;
+}
+
+.topbar-profile__chevron path {
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.topbar-profile__toggle[aria-expanded="true"] .topbar-profile__chevron {
+    transform: rotate(180deg);
+    color: #16a34a;
 }
 
 .topbar-profile__dropdown {
@@ -365,6 +427,16 @@ body.page-loaded {
 .topbar-profile__links a:focus-visible {
     background: #ecfdf5;
     transform: translateX(2px);
+}
+
+.topbar-profile__links a:last-child {
+    color: #b91c1c;
+    background: #fef2f2;
+}
+
+.topbar-profile__links a:last-child:hover,
+.topbar-profile__links a:last-child:focus-visible {
+    background: #fee2e2;
 }
 
 .global-topbar__clock-label {

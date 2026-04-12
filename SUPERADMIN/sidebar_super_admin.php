@@ -16,6 +16,7 @@ $isActivityHistory = str_contains($currentPath, '/SUPERADMIN/sidebar/activity_hi
 $superAdminProfileName = (string)($_SESSION['name'] ?? 'Super Admin');
 $superAdminProfileRole = ucfirst(str_replace('_', ' ', (string)($_SESSION['role'] ?? 'super_admin')));
 $superAdminProfilePhotoUrl = '';
+$superAdminProfileInitials = '';
 
 if (!function_exists('build_default_profile_avatar_data_uri')) {
     function build_default_profile_avatar_data_uri(): string {
@@ -316,9 +317,36 @@ if (
     }
 }
 
+if (!function_exists('super_admin_profile_initials')) {
+    function super_admin_profile_initials(string $name): string {
+        $name = trim($name);
+        if ($name === '') {
+            return 'SA';
+        }
+
+        $parts = preg_split('/\s+/', $name) ?: [];
+        $initials = '';
+
+        foreach ($parts as $part) {
+            if ($part === '') {
+                continue;
+            }
+
+            $initials .= strtoupper(substr($part, 0, 1));
+            if (strlen($initials) >= 2) {
+                break;
+            }
+        }
+
+        return $initials !== '' ? $initials : 'SA';
+    }
+}
+
 if ($superAdminProfilePhotoUrl === '') {
     $superAdminProfilePhotoUrl = build_default_profile_avatar_data_uri();
 }
+
+$superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName);
 ?>
 <button id="sidebarMobileToggle" class="sidebar-mobile-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">
     <span></span>
@@ -500,23 +528,35 @@ if ($superAdminProfilePhotoUrl === '') {
                 aria-controls="topbarProfileDropdown"
                 aria-expanded="false"
             >
-                <img src="<?php echo htmlspecialchars($superAdminProfilePhotoUrl); ?>" alt="Super admin profile picture" class="topbar-profile__avatar-image">
+                <span class="topbar-profile__avatar-shell" aria-hidden="true">
+                    <img src="<?php echo htmlspecialchars($superAdminProfilePhotoUrl); ?>" alt="Super admin profile picture" class="topbar-profile__avatar-image">
+                    <span class="topbar-profile__avatar-fallback"><?php echo htmlspecialchars($superAdminProfileInitials); ?></span>
+                </span>
                 <span class="topbar-profile__identity">
-                    <strong>Super Admin</strong>
-                    <span>Profile Menu</span>
+                    <strong><?php echo htmlspecialchars($superAdminProfileName); ?></strong>
+                    <span><?php echo htmlspecialchars($superAdminProfileRole); ?></span>
+                </span>
+                <span class="topbar-profile__chevron" aria-hidden="true">
+                    <svg viewBox="0 0 20 20" focusable="false">
+                        <path d="M5 7.5 10 12.5 15 7.5"></path>
+                    </svg>
                 </span>
             </button>
 
             <div id="topbarProfileDropdown" class="topbar-profile__dropdown" hidden>
                 <div class="topbar-profile__panel-head">
-                    <img src="<?php echo htmlspecialchars($superAdminProfilePhotoUrl); ?>" alt="Super admin profile picture" class="topbar-profile__avatar-image topbar-profile__avatar-image--panel">
+                    <span class="topbar-profile__avatar-shell topbar-profile__avatar-shell--panel" aria-hidden="true">
+                        <img src="<?php echo htmlspecialchars($superAdminProfilePhotoUrl); ?>" alt="Super admin profile picture" class="topbar-profile__avatar-image topbar-profile__avatar-image--panel">
+                        <span class="topbar-profile__avatar-fallback topbar-profile__avatar-fallback--panel"><?php echo htmlspecialchars($superAdminProfileInitials); ?></span>
+                    </span>
                     <div>
-                        <strong>Admin Menu</strong>
+                        <strong><?php echo htmlspecialchars($superAdminProfileName); ?></strong>
                         <span><?php echo htmlspecialchars($superAdminProfileRole); ?></span>
                     </div>
                 </div>
                 <div class="topbar-profile__links">
-                    <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=profile">My Profile</a>
+                    <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=profile">Profile</a>
+                    <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=profile#security-settings">Settings</a>
                     <a href="/codesamplecaps/LOGIN/php/logout.php">Logout</a>
                 </div>
             </div>

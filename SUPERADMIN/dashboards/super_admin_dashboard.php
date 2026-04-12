@@ -1100,7 +1100,7 @@ $scanTrendPeak = !empty($scanTrend) ? getTrendPeak($scanTrend) : 0;
               
 
                 <div class="profile-grid">
-                    <section class="form-section profile-form-card">
+                    <section id="profile-details" class="form-section profile-form-card">
                         <div class="panel-heading">
                             <div>
                                 <h2 class="dashboard-section-title">Profile Details</h2>
@@ -1152,7 +1152,7 @@ $scanTrendPeak = !empty($scanTrend) ? getTrendPeak($scanTrend) : 0;
                         </form>
                     </section>
 
-                    <section class="form-section profile-form-card profile-form-card--security">
+                    <section id="security-settings" class="form-section profile-form-card profile-form-card--security">
                         <div class="panel-heading">
                             <div>
                                 <h2 class="dashboard-section-title">Security</h2>
