@@ -349,6 +349,7 @@ $notificationItems = [
                             </div>
                         </div>
                         <div class="topbar-profile__links">
+                            <a href="#overview-section">Dashboard</a>
                             <a href="#projects-tab">Projects</a>
                             <a href="#profile-tab">Profile</a>
                             <a href="../../LOGIN/php/logout.php">Logout</a>
@@ -364,79 +365,90 @@ $notificationItems = [
             </div>
         </header>
 
-        <section class="stats-grid" aria-label="Project summary cards">
-            <article class="stat-card">
-                <div class="stat-card__icon stat-card__icon--projects" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"></path>
-                    </svg>
-                </div>
-                <div class="stat-card__content">
-                    <span>Your Projects</span>
-                    <strong><?php echo $totalCount; ?></strong>
-                    <small>All active and completed client projects</small>
-                </div>
-            </article>
-
-            <article class="stat-card">
-                <div class="stat-card__icon stat-card__icon--ongoing" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M12 6v6l4 2"></path>
-                        <path d="M21 12a9 9 0 1 1-3-6.7"></path>
-                    </svg>
-                </div>
-                <div class="stat-card__content">
-                    <span>In Progress</span>
-                    <strong><?php echo $ongoingCount; ?></strong>
-                    <small>Projects currently being delivered</small>
-                </div>
-            </article>
-
-            <article class="stat-card">
-                <div class="stat-card__icon stat-card__icon--completed" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M20 6L9 17l-5-5"></path>
-                    </svg>
-                </div>
-                <div class="stat-card__content">
-                    <span>Completed</span>
-                    <strong><?php echo $completedCount; ?></strong>
-                    <small>Projects already delivered to completion</small>
-                </div>
-            </article>
-
-            <article class="stat-card">
-                <div class="stat-card__icon stat-card__icon--engineers" aria-hidden="true">
-                    <svg viewBox="0 0 24 24">
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path>
-                        <path d="M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path>
-                        <path d="M21 21v-2a4 4 0 0 0-3-3.87"></path>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
-                </div>
-                <div class="stat-card__content">
-                    <span>Active Engineers</span>
-                    <strong><?php echo $activeEngineerCount; ?></strong>
-                    <small><?php echo $totalEngineerCount; ?> engineering team members in total</small>
-                </div>
-            </article>
-        </section>
-
-        <section class="status-strip" aria-label="Portfolio mix">
-            <?php foreach ($portfolioMix as $mix): ?>
-                <article class="status-strip__item">
-                    <span><?php echo htmlspecialchars($mix['label']); ?></span>
-                    <strong><?php echo (int)$mix['count']; ?></strong>
-                </article>
-            <?php endforeach; ?>
-        </section>
-
         <div class="tabs" role="tablist" aria-label="Client dashboard sections">
-            <button type="button" class="tab active" data-tab-target="projects-tab" role="tab" aria-selected="true">Projects</button>
+            <button type="button" class="tab active" data-tab-target="overview-section" role="tab" aria-selected="true">Dashboard</button>
+            <button type="button" class="tab" data-tab-target="projects-tab" role="tab" aria-selected="false">Projects</button>
             <button type="button" class="tab" data-tab-target="profile-tab" role="tab" aria-selected="false">Profile</button>
         </div>
 
-        <section id="projects-tab" class="tab-content active">
+        <section id="overview-section" class="tab-content active">
+            <div class="section-heading">
+                <div>
+                    <span class="section-badge">Dashboard</span>
+                    <h2>Overview</h2>
+                    <p>Quick summary of your projects, live delivery progress, and team visibility.</p>
+                </div>
+            </div>
+
+            <section class="stats-grid" aria-label="Project summary cards">
+                <article class="stat-card">
+                    <div class="stat-card__icon stat-card__icon--projects" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"></path>
+                        </svg>
+                    </div>
+                    <div class="stat-card__content">
+                        <span>Your Projects</span>
+                        <strong><?php echo $totalCount; ?></strong>
+                        <small>All active and completed client projects</small>
+                    </div>
+                </article>
+
+                <article class="stat-card">
+                    <div class="stat-card__icon stat-card__icon--ongoing" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M12 6v6l4 2"></path>
+                            <path d="M21 12a9 9 0 1 1-3-6.7"></path>
+                        </svg>
+                    </div>
+                    <div class="stat-card__content">
+                        <span>In Progress</span>
+                        <strong><?php echo $ongoingCount; ?></strong>
+                        <small>Projects currently being delivered</small>
+                    </div>
+                </article>
+
+                <article class="stat-card">
+                    <div class="stat-card__icon stat-card__icon--completed" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M20 6L9 17l-5-5"></path>
+                        </svg>
+                    </div>
+                    <div class="stat-card__content">
+                        <span>Completed</span>
+                        <strong><?php echo $completedCount; ?></strong>
+                        <small>Projects already delivered to completion</small>
+                    </div>
+                </article>
+
+                <article class="stat-card">
+                    <div class="stat-card__icon stat-card__icon--engineers" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path>
+                            <path d="M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"></path>
+                            <path d="M21 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <div class="stat-card__content">
+                        <span>Active Engineers</span>
+                        <strong><?php echo $activeEngineerCount; ?></strong>
+                        <small><?php echo $totalEngineerCount; ?> engineering team members in total</small>
+                    </div>
+                </article>
+            </section>
+
+            <section class="status-strip" aria-label="Portfolio mix">
+                <?php foreach ($portfolioMix as $mix): ?>
+                    <article class="status-strip__item">
+                        <span><?php echo htmlspecialchars($mix['label']); ?></span>
+                        <strong><?php echo (int)$mix['count']; ?></strong>
+                    </article>
+                <?php endforeach; ?>
+            </section>
+        </section>
+
+        <section id="projects-tab" class="tab-content">
             <div class="section-heading">
                 <div>
                     <span class="section-badge">Projects</span>

@@ -1,36 +1,3 @@
-<?php
-$clientSidebarName = trim((string)($_SESSION['name'] ?? 'Client User'));
-$clientSidebarRole = 'Client';
-$clientSidebarInitials = '';
-
-if (!function_exists('client_sidebar_initials')) {
-    function client_sidebar_initials(string $name): string
-    {
-        $name = trim($name);
-        if ($name === '') {
-            return 'CL';
-        }
-
-        $parts = preg_split('/\s+/', $name) ?: [];
-        $initials = '';
-
-        foreach ($parts as $part) {
-            if ($part === '') {
-                continue;
-            }
-
-            $initials .= strtoupper(substr($part, 0, 1));
-            if (strlen($initials) >= 2) {
-                break;
-            }
-        }
-
-        return $initials !== '' ? $initials : 'CL';
-    }
-}
-
-$clientSidebarInitials = client_sidebar_initials($clientSidebarName);
-?>
 <button id="sidebarMobileToggle" class="sidebar-mobile-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">
     <span></span>
     <span></span>
@@ -46,32 +13,12 @@ $clientSidebarInitials = client_sidebar_initials($clientSidebarName);
                 </svg>
             </span>
         </button>
-        <div class="sidebar-toggle-title">
-            <span class="sidebar-toggle-title__eyebrow">Edge Automation</span>
-            <strong>Client Portal</strong>
-        </div>
-    </div>
-
-    <div class="sidebar-header">
-        <div class="sidebar-brand-mark" aria-hidden="true">EA</div>
-        <div class="sidebar-brand-copy">
-            <strong>Workspace</strong>
-            <small>Client dashboard access</small>
-        </div>
-    </div>
-
-    <div class="client-sidebar__profile-card">
-        <span class="client-sidebar__avatar" aria-hidden="true"><?php echo htmlspecialchars($clientSidebarInitials); ?></span>
-        <div class="client-sidebar__profile-copy">
-            <strong><?php echo htmlspecialchars($clientSidebarName); ?></strong>
-            <span><?php echo htmlspecialchars($clientSidebarRole); ?></span>
-        </div>
     </div>
 
     <nav class="nav-menu" aria-label="Client menu">
         <ul class="sidebar-menu">
             <li>
-                <a href="../dashboards/client_dashboard.php" class="menu-link">
+                <a href="../dashboards/client_dashboard.php#overview-section" class="menu-link" data-section-link="overview-section">
                     <span class="menu-visual" aria-hidden="true">
                         <span class="menu-icon">
                             <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false">

@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const phTime = document.querySelector('[data-ph-time]');
     const collapsedStorageKey = 'edgeClientSidebarCollapsed';
     const mobileMedia = window.matchMedia('(max-width: 992px)');
-    const defaultSectionId = 'projects-tab';
+    const defaultSectionId = 'overview-section';
 
     if (!sidebar) {
         return;
