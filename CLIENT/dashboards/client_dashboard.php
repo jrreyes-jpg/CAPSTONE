@@ -260,11 +260,11 @@ $notificationItems = [
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../css/client-sidebar.css">
-    <link rel="stylesheet" href="../css/client-dashboard.css">
+    <link rel="stylesheet" href="../css/client_sidebar.css">
+    <link rel="stylesheet" href="../css/client_dashboard.css">
 </head>
 <body>
-    <?php include '../sidebar/sidebar_client.php'; ?>
+    <?php include '../sidebar/client_sidebar.php'; ?>
     <div class="client-page-overlay" data-sidebar-overlay hidden></div>
 
     <main class="main-content" id="mainContent">
@@ -282,17 +282,7 @@ $notificationItems = [
                         <path d="M4 7h16M4 12h16M4 17h16"></path>
                     </svg>
                 </button>
-                <button
-                    type="button"
-                    class="icon-btn icon-btn--desktop"
-                    data-sidebar-desktop-toggle
-                    aria-label="Collapse sidebar"
-                    aria-expanded="true"
-                >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M15 6l-6 6 6 6"></path>
-                    </svg>
-                </button>
+               
 
                 <div class="dashboard-topbar__copy">
                     <span class="section-badge">Client Workspace</span>
