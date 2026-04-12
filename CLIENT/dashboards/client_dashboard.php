@@ -277,6 +277,44 @@ $notificationItems = [
             </div>
 
             <div class="global-topbar__actions">
+                <div class="topbar-profile" data-profile-root>
+                    <button
+                        id="topbarProfileToggle"
+                        class="topbar-profile__toggle"
+                        type="button"
+                        aria-label="Open profile menu"
+                        aria-controls="topbarProfileDropdown"
+                        aria-expanded="false"
+                    >
+                        <span class="topbar-profile__avatar" aria-hidden="true"><?php echo htmlspecialchars($clientInitial); ?></span>
+                        <span class="topbar-profile__identity">
+                            <strong>Client</strong>
+                            <span><?php echo htmlspecialchars($clientName); ?></span>
+                        </span>
+                        <span class="topbar-profile__chevron" aria-hidden="true">
+                            <svg viewBox="0 0 20 20" focusable="false">
+                                <path d="M5 7.5 10 12.5 15 7.5"></path>
+                            </svg>
+                        </span>
+                    </button>
+
+                    <div id="topbarProfileDropdown" class="topbar-profile__dropdown" hidden>
+                        <div class="topbar-profile__panel-head">
+                            <span class="topbar-profile__avatar topbar-profile__avatar--panel" aria-hidden="true"><?php echo htmlspecialchars($clientInitial); ?></span>
+                            <div>
+                                <strong><?php echo htmlspecialchars($clientName); ?></strong>
+                                <span>Client</span>
+                            </div>
+                        </div>
+                        <div class="topbar-profile__links">
+                            <a href="#overview-section">Dashboard</a>
+                            <a href="#projects-tab">Projects</a>
+                            <a href="#profile-tab">Profile</a>
+                            <a href="../../LOGIN/php/logout.php">Logout</a>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="topbar-notifications" data-notification-root>
                     <button
                         id="topbarNotificationToggle"
@@ -319,44 +357,6 @@ $notificationItems = [
                     </div>
                 </div>
 
-                <div class="topbar-profile" data-profile-root>
-                    <button
-                        id="topbarProfileToggle"
-                        class="topbar-profile__toggle"
-                        type="button"
-                        aria-label="Open profile menu"
-                        aria-controls="topbarProfileDropdown"
-                        aria-expanded="false"
-                    >
-                        <span class="topbar-profile__avatar" aria-hidden="true"><?php echo htmlspecialchars($clientInitial); ?></span>
-                        <span class="topbar-profile__identity">
-                            <strong><?php echo htmlspecialchars($clientName); ?></strong>
-                            <span>Client</span>
-                        </span>
-                        <span class="topbar-profile__chevron" aria-hidden="true">
-                            <svg viewBox="0 0 20 20" focusable="false">
-                                <path d="M5 7.5 10 12.5 15 7.5"></path>
-                            </svg>
-                        </span>
-                    </button>
-
-                    <div id="topbarProfileDropdown" class="topbar-profile__dropdown" hidden>
-                        <div class="topbar-profile__panel-head">
-                            <span class="topbar-profile__avatar topbar-profile__avatar--panel" aria-hidden="true"><?php echo htmlspecialchars($clientInitial); ?></span>
-                            <div>
-                                <strong><?php echo htmlspecialchars($clientName); ?></strong>
-                                <span>Client</span>
-                            </div>
-                        </div>
-                        <div class="topbar-profile__links">
-                            <a href="#overview-section">Dashboard</a>
-                            <a href="#projects-tab">Projects</a>
-                            <a href="#profile-tab">Profile</a>
-                            <a href="../../LOGIN/php/logout.php">Logout</a>
-                        </div>
-                    </div>
-                </div>
-
                 <div class="global-topbar__clock">
                     <span class="global-topbar__clock-label">Philippines Time</span>
                     <strong class="global-topbar__time" data-ph-time>--:--:--</strong>
@@ -364,12 +364,6 @@ $notificationItems = [
                 </div>
             </div>
         </header>
-
-        <div class="tabs" role="tablist" aria-label="Client dashboard sections">
-            <button type="button" class="tab active" data-tab-target="overview-section" role="tab" aria-selected="true">Dashboard</button>
-            <button type="button" class="tab" data-tab-target="projects-tab" role="tab" aria-selected="false">Projects</button>
-            <button type="button" class="tab" data-tab-target="profile-tab" role="tab" aria-selected="false">Profile</button>
-        </div>
 
         <section id="overview-section" class="tab-content active">
             <div class="section-heading">
@@ -440,7 +434,7 @@ $notificationItems = [
 
             <section class="status-strip" aria-label="Portfolio mix">
                 <?php foreach ($portfolioMix as $mix): ?>
-                    <article class="status-strip__item">
+                    <article class="status-strip__item status-strip__item--<?php echo htmlspecialchars($mix['class']); ?>">
                         <span><?php echo htmlspecialchars($mix['label']); ?></span>
                         <strong><?php echo (int)$mix['count']; ?></strong>
                     </article>
@@ -455,6 +449,30 @@ $notificationItems = [
                     <h2>My Projects</h2>
                     <p>Each card shows delivery status, assigned engineer, and real task-based progress.</p>
                 </div>
+            </div>
+
+            <div class="client-project-search" data-client-project-search>
+                <div class="client-project-search__input-row">
+                    <span class="client-project-search__icon" aria-hidden="true">&#128269;</span>
+                    <input
+                        type="text"
+                        id="client-project-search"
+                        class="client-project-search__input"
+                        placeholder="Search project, engineer, timeline, or status"
+                        autocomplete="off"
+                        aria-label="Search my projects"
+                        aria-controls="client-project-search-dropdown"
+                        aria-expanded="false"
+                    >
+                    <button type="button" class="client-project-search__clear" id="client-project-search-clear" aria-label="Clear client project search">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="client-project-search__meta">
+                    <span id="client-project-search-hint">Type your keyword, then pause for 3 seconds to search.</span>
+                    <span id="client-project-search-count"><?php echo count($projectRows); ?> project(s)</span>
+                </div>
+                <div class="client-project-search__dropdown" id="client-project-search-dropdown" role="listbox" hidden></div>
             </div>
 
             <div class="dashboard-content-grid">
@@ -473,8 +491,24 @@ $notificationItems = [
                             if ($projectDescription === '') {
                                 $projectDescription = 'Project details will appear here as the work scope is finalized.';
                             }
+                            $projectSearchText = strtolower(trim(implode(' ', [
+                                $project['project_name'] ?? '',
+                                $project['engineer_name'] ?? '',
+                                $project['status'] ?? '',
+                                $project['start_date'] ?? '',
+                                $project['end_date'] ?? '',
+                                $projectDescription,
+                            ])));
                             ?>
-                            <article class="project-card project-card--<?php echo htmlspecialchars($projectStatus); ?>">
+                            <article
+                                class="project-card project-card--<?php echo htmlspecialchars($projectStatus); ?>"
+                                data-client-project-card
+                                data-search="<?php echo htmlspecialchars($projectSearchText); ?>"
+                                data-title="<?php echo htmlspecialchars((string)($project['project_name'] ?? 'Untitled Project')); ?>"
+                                data-engineer="<?php echo htmlspecialchars((string)($project['engineer_name'] ?? 'Not assigned')); ?>"
+                                data-status="<?php echo htmlspecialchars($projectStatus); ?>"
+                                data-timeline="<?php echo htmlspecialchars(client_format_date($project['start_date'] ?? null) . ' - ' . client_format_date($project['end_date'] ?? null)); ?>"
+                            >
                                 <div class="project-card__header">
                                     <div>
                                         <span class="project-card__eyebrow">Project #<?php echo (int)($project['id'] ?? 0); ?></span>
@@ -523,6 +557,10 @@ $notificationItems = [
                             <p>Your active project cards will appear here once work is assigned to your account.</p>
                         </div>
                     <?php endif; ?>
+                    <div class="empty-state empty-state--search" id="client-project-search-empty" hidden>
+                        <h3>No matching projects</h3>
+                        <p>Try a different project name, engineer, status, or timeline keyword.</p>
+                    </div>
                 </div>
 
                 <aside class="dashboard-aside">

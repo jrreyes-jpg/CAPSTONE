@@ -1270,7 +1270,7 @@ $projects = project_search_fetch_page($conn, $hasProjectAddressColumn, $searchQu
                             <div class="project-search-input-row">
                                 <span class="project-search-icon" aria-hidden="true">&#128269;</span>
                                 <input
-                                    type="search"
+                                    type="text"
                                     id="project-search"
                                     name="q"
                                     value="<?php echo htmlspecialchars($searchQuery); ?>"
@@ -1390,6 +1390,7 @@ function initProjectSearchUI() {
     const statusInput = searchForm?.querySelector('input[name="status"]');
     let activeSuggestionIndex = -1;
     let searchDebounceId = null;
+    const savedFocusState = window.__projectSearchFocusState || null;
 
     function escapeHtml(value) {
         return String(value)
@@ -1530,6 +1531,14 @@ function initProjectSearchUI() {
             return;
         }
 
+        if (searchInput) {
+            window.__projectSearchFocusState = {
+                value: searchInput.value,
+                selectionStart: searchInput.selectionStart ?? searchInput.value.length,
+                selectionEnd: searchInput.selectionEnd ?? searchInput.value.length,
+            };
+        }
+
         fetch(url, {
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
@@ -1594,7 +1603,7 @@ function initProjectSearchUI() {
             return;
         }
 
-        searchDebounceId = window.setTimeout(runSearch, 420);
+        searchDebounceId = window.setTimeout(runSearch, 3000);
     }
 
     if (searchInput) {
@@ -1691,6 +1700,16 @@ function initProjectSearchUI() {
 
     updateClearVisibility();
     updateSearchDropdown();
+
+    if (savedFocusState && searchInput) {
+        const restoredValue = typeof savedFocusState.value === 'string' ? savedFocusState.value : searchInput.value;
+        searchInput.value = restoredValue;
+        searchInput.focus();
+        const cursorStart = typeof savedFocusState.selectionStart === 'number' ? savedFocusState.selectionStart : restoredValue.length;
+        const cursorEnd = typeof savedFocusState.selectionEnd === 'number' ? savedFocusState.selectionEnd : restoredValue.length;
+        searchInput.setSelectionRange(cursorStart, cursorEnd);
+        window.__projectSearchFocusState = null;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', initProjectSearchUI);

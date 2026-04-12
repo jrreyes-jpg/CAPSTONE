@@ -245,8 +245,7 @@ body.sidebar-collapsed .global-topbar {
 .topbar-profile__identity span {
     color: #64748b;
     font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.02em;
 }
 
 .topbar-profile__chevron {
@@ -837,6 +836,26 @@ body.sidebar-collapsed .global-topbar {
     border: 1px solid rgba(16, 84, 58, 0.08);
 }
 
+.status-strip__item--pending {
+    background: linear-gradient(135deg, #fff7ed, #fffbeb);
+    border-color: rgba(245, 158, 11, 0.2);
+}
+
+.status-strip__item--ongoing {
+    background: linear-gradient(135deg, #ecfeff, #eff6ff);
+    border-color: rgba(14, 165, 233, 0.2);
+}
+
+.status-strip__item--completed {
+    background: linear-gradient(135deg, #ecfdf5, #f0fdf4);
+    border-color: rgba(34, 197, 94, 0.2);
+}
+
+.status-strip__item--on-hold {
+    background: linear-gradient(135deg, #fef2f2, #fff1f2);
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
 .status-strip__item span {
     display: block;
     color: var(--text-muted);
@@ -888,6 +907,129 @@ body.sidebar-collapsed .global-topbar {
 
 .tab-content.active {
     display: block;
+}
+
+.client-project-search {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 18px;
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(15, 157, 112, 0.12);
+    box-shadow: var(--shadow-soft);
+}
+
+.client-project-search__input-row {
+    position: relative;
+}
+
+.client-project-search__icon {
+    position: absolute;
+    top: 50%;
+    left: 16px;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    pointer-events: none;
+}
+
+.client-project-search__input {
+    width: 100%;
+    min-height: 52px;
+    padding: 0 54px 0 44px;
+    border-radius: 999px;
+    border: 1px solid var(--surface-stroke);
+    background: #ffffff;
+    color: var(--text-primary);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.client-project-search__input:focus {
+    outline: none;
+    border-color: #22c55e;
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.12);
+}
+
+.client-project-search__clear {
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 999px;
+    background: #f1f5f9;
+    color: #475569;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease, background 0.18s ease;
+}
+
+.client-project-search__clear.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.client-project-search__clear:hover,
+.client-project-search__clear:focus-visible {
+    background: #e2e8f0;
+    outline: none;
+}
+
+.client-project-search__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+}
+
+.client-project-search__dropdown {
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+    border-radius: 16px;
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+}
+
+.client-project-search__dropdown[hidden] {
+    display: none;
+}
+
+.client-project-search__result,
+.client-project-search__empty {
+    display: grid;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    text-decoration: none;
+}
+
+.client-project-search__result:hover,
+.client-project-search__result.is-active {
+    background: #ecfdf5;
+}
+
+.client-project-search__result strong {
+    color: #0f172a;
+}
+
+.client-project-search__result span,
+.client-project-search__empty {
+    color: #64748b;
+    font-size: 0.82rem;
+}
+
+.empty-state--search {
+    margin-top: 18px;
 }
 
 .section-heading {
@@ -1436,6 +1578,11 @@ body.sidebar-collapsed .global-topbar {
 
     .topbar-profile__identity {
         display: none;
+    }
+
+    .client-project-search__meta {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .tab {
