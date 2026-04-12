@@ -324,12 +324,11 @@ $notificationItems = [
                         aria-controls="topbarNotificationDropdown"
                         aria-expanded="false"
                     >
-                        <span class="topbar-notifications__icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" focusable="false">
-                                <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5"></path>
-                                <path d="M10 17a2 2 0 0 0 4 0"></path>
-                            </svg>
-                        </span>
+                          <span class="topbar-notifications__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" focusable="false">
+                        <path d="M12 3a4 4 0 0 0-4 4v1.1a7 7 0 0 1-1.52 4.33L5 14.5V16h14v-1.5l-1.48-2.07A7 7 0 0 1 16 8.1V7a4 4 0 0 0-4-4Zm0 18a3 3 0 0 0 2.83-2H9.17A3 3 0 0 0 12 21Z" fill="currentColor"/>
+                    </svg>
+                </span>
                         <?php if ($activeProjectCount > 0): ?>
                             <span class="topbar-notifications__badge"><?php echo $activeProjectCount; ?></span>
                         <?php endif; ?>

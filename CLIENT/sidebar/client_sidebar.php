@@ -13,6 +13,10 @@
                 </svg>
             </span>
         </button>
+                <div class="sidebar-toggle-title" aria-hidden="true">
+            <span class="sidebar-toggle-title__shine">Client</span>
+        </div>
+
     </div>
 
     <nav class="nav-menu" aria-label="Client menu">
