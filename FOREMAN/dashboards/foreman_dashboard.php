@@ -27,7 +27,7 @@ $teamMembers = [];
 </head>
 <body class="foreman-dashboard">
 
-<?php include(__DIR__ . '/../components/sidebar_foreman.php'); ?>
+<?php include(__DIR__ . '/../sidebar/sidebar_foreman.php'); ?>
 
 <div class="main-content">
     <h1>🛠️ Foreman Dashboard</h1>
