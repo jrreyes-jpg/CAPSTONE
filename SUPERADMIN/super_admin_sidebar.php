@@ -532,10 +532,7 @@ $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName
                     <img src="<?php echo htmlspecialchars($superAdminProfilePhotoUrl); ?>" alt="Super admin profile picture" class="topbar-profile__avatar-image">
                     <span class="topbar-profile__avatar-fallback"><?php echo htmlspecialchars($superAdminProfileInitials); ?></span>
                 </span>
-                <span class="topbar-profile__identity">
-                    <strong><?php echo htmlspecialchars($superAdminProfileName); ?></strong>
-                    <span><?php echo htmlspecialchars($superAdminProfileRole); ?></span>
-                </span>
+               
                 <span class="topbar-profile__chevron" aria-hidden="true">
                     <svg viewBox="0 0 20 20" focusable="false">
                         <path d="M5 7.5 10 12.5 15 7.5"></path>

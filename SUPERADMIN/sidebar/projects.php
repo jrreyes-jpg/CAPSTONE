@@ -1116,7 +1116,7 @@ $projects = project_search_fetch_page($conn, $hasProjectAddressColumn, $searchQu
 </head>
 <body>
 <div class="container">
-    <?php include __DIR__ . '/../sidebar_super_admin.php'; ?>
+    <?php include __DIR__ . '/../super_admin_sidebar.php'; ?>
 
     <main class="main-content projects-content">
         <div class="page-stack">

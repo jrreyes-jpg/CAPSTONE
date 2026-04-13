@@ -186,7 +186,7 @@ if (function_exists('audit_log_table_exists') ? audit_log_table_exists($conn) : 
 </head>
 <body>
 <div class="container">
-    <?php include __DIR__ . '/../sidebar_super_admin.php'; ?>
+    <?php include __DIR__ . '/../super_admin_sidebar.php'; ?>
 
     <main class="main-content scan-history-content">
         <div class="header page-header-card">

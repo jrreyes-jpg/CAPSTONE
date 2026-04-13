@@ -291,7 +291,7 @@ if ($projectId > 0) {
 </head>
 <body>
 <div class="container">
-    <?php include __DIR__ . '/../sidebar_super_admin.php'; ?>
+    <?php include __DIR__ . '/../super_admin_sidebar.php'; ?>
 
     <main class="main-content">
         <div class="page-stack">
