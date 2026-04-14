@@ -3661,6 +3661,193 @@ tbody tr:hover {
     min-height: 96px;
 }
 
+.budget-panel {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: linear-gradient(180deg, #ffffff, #f8fafc);
+}
+
+.budget-panel--healthy {
+    border-color: rgba(34, 197, 94, 0.24);
+    background: linear-gradient(180deg, #ffffff, #f0fdf4);
+}
+
+.budget-panel--warning {
+    border-color: rgba(245, 158, 11, 0.28);
+    background: linear-gradient(180deg, #ffffff, #fffbeb);
+}
+
+.budget-panel--over {
+    border-color: rgba(239, 68, 68, 0.24);
+    background: linear-gradient(180deg, #ffffff, #fef2f2);
+}
+
+.budget-panel--unplanned {
+    border-color: rgba(148, 163, 184, 0.24);
+}
+
+.budget-panel__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.budget-panel__header h4 {
+    margin: 0 0 6px;
+    font-size: 0.96rem;
+}
+
+.budget-panel__header > strong {
+    color: #0f172a;
+    font-size: 1rem;
+}
+
+.budget-health {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 0.74rem;
+    font-weight: 700;
+}
+
+.budget-health--healthy {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.budget-health--warning {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.budget-health--over {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.budget-health--unplanned {
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.budget-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.budget-stats div {
+    display: grid;
+    gap: 4px;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.budget-stats span,
+.budget-progress small,
+.budget-ledger__item span,
+.budget-ledger__item small,
+.budget-notes {
+    color: #64748b;
+}
+
+.budget-stats span {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+}
+
+.budget-stats strong {
+    color: #0f172a;
+    font-size: 0.92rem;
+}
+
+.budget-progress {
+    display: grid;
+    gap: 8px;
+}
+
+.budget-progress__track {
+    height: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.18);
+}
+
+.budget-progress__fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+}
+
+.budget-progress__fill--healthy {
+    background: linear-gradient(90deg, #22c55e, #16a34a);
+}
+
+.budget-progress__fill--warning {
+    background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.budget-progress__fill--over {
+    background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+.budget-progress__fill--unplanned {
+    background: linear-gradient(90deg, #94a3b8, #64748b);
+}
+
+.budget-notes {
+    font-size: 0.84rem;
+    line-height: 1.5;
+}
+
+.budget-ledger {
+    display: grid;
+    gap: 10px;
+}
+
+.budget-ledger__item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.budget-ledger__item div {
+    display: grid;
+    gap: 3px;
+}
+
+.budget-ledger__item span,
+.budget-ledger__item small {
+    display: block;
+    font-size: 0.78rem;
+}
+
+.project-finance-forms {
+    display: grid;
+    gap: 14px;
+}
+
+.project-finance-form {
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: #f8fafc;
+}
+
 .project-card__actions {
     margin-top: auto;
 }
@@ -3981,11 +4168,20 @@ tbody tr:hover {
             padding: 18px;
         }
 
-        .projects-content .project-meta,
-        .projects-content .task-list,
-        .projects-content .card-split {
-            gap: 12px;
-        }
+    .projects-content .project-meta,
+    .projects-content .task-list,
+    .projects-content .card-split {
+        gap: 12px;
+    }
+
+    .budget-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .budget-panel__header,
+    .budget-ledger__item {
+        flex-direction: column;
+    }
 
     .project-details-shell,
     .project-details-tabs {

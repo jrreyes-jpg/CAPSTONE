@@ -350,6 +350,12 @@ function buildAuditSummary(array $entry): array {
     } elseif ($action === 'update_project_details') {
         $title = 'Project details updated';
         $details = (string)($newValues['project_name'] ?? 'Project') . ' • by ' . $actorName;
+    } elseif ($action === 'update_project_budget') {
+        $title = 'Project budget updated';
+        $details = (string)($newValues['project_name'] ?? 'Project') . ' â€¢ ' . number_format((float)($newValues['budget_amount'] ?? 0), 2);
+    } elseif ($action === 'add_project_cost') {
+        $title = 'Project cost logged';
+        $details = (string)($newValues['project_name'] ?? 'Project') . ' â€¢ ' . (string)($newValues['cost_category'] ?? 'Cost');
     } elseif ($action === 'add_task') {
         $title = 'Task added';
         $details = (string)($newValues['task_name'] ?? 'Task') . ' • ' . (string)($newValues['project_name'] ?? 'Project');

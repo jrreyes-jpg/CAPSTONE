@@ -200,12 +200,27 @@ if (!function_exists('project_search_fetch_page')) {
                 client.full_name AS client_name,
                 latest_assignment.engineer_id,
                 engineer.full_name AS engineer_name,
+                COALESCE(budget_profiles.budget_amount, 0) AS budget_amount,
+                budget_profiles.budget_notes,
+                COALESCE(cost_totals.total_cost, 0) AS total_cost,
+                COALESCE(cost_totals.cost_entry_count, 0) AS cost_entry_count,
+                cost_totals.last_cost_date,
                 COALESCE(task_totals.total_tasks, 0) AS total_tasks,
                 COALESCE(task_totals.completed_tasks, 0) AS completed_tasks
             FROM projects p
             LEFT JOIN users client ON client.id = p.client_id
             " . project_search_latest_assignment_sql() . "
             LEFT JOIN users engineer ON engineer.id = latest_assignment.engineer_id
+            LEFT JOIN project_budget_profiles budget_profiles ON budget_profiles.project_id = p.id
+            LEFT JOIN (
+                SELECT
+                    project_id,
+                    SUM(amount) AS total_cost,
+                    COUNT(*) AS cost_entry_count,
+                    MAX(cost_date) AS last_cost_date
+                FROM project_cost_entries
+                GROUP BY project_id
+            ) cost_totals ON cost_totals.project_id = p.id
             LEFT JOIN (
                 SELECT
                     project_id,

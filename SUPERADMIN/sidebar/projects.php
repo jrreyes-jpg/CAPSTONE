@@ -95,9 +95,81 @@ function ensure_project_inventory_return_logs_table(mysqli $conn): void {
     );
 }
 
+function ensure_project_budget_profiles_table(mysqli $conn): void {
+    $conn->query(
+        "CREATE TABLE IF NOT EXISTS project_budget_profiles (
+            project_id INT(11) NOT NULL PRIMARY KEY,
+            budget_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+            budget_notes TEXT DEFAULT NULL,
+            created_by INT(11) NOT NULL,
+            updated_by INT(11) DEFAULT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            KEY idx_project_budget_profiles_updated_at (updated_at),
+            CONSTRAINT fk_project_budget_profiles_project FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+            CONSTRAINT fk_project_budget_profiles_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE CASCADE,
+            CONSTRAINT fk_project_budget_profiles_updated_by FOREIGN KEY (updated_by) REFERENCES users (id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
+function ensure_project_cost_entries_table(mysqli $conn): void {
+    $conn->query(
+        "CREATE TABLE IF NOT EXISTS project_cost_entries (
+            id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            project_id INT(11) NOT NULL,
+            cost_date DATE NOT NULL,
+            cost_category VARCHAR(80) NOT NULL,
+            description VARCHAR(255) DEFAULT NULL,
+            amount DECIMAL(14,2) NOT NULL,
+            created_by INT(11) NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_project_cost_entries_project_date (project_id, cost_date, id),
+            KEY idx_project_cost_entries_created_by (created_by),
+            CONSTRAINT fk_project_cost_entries_project FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+            CONSTRAINT fk_project_cost_entries_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
 function normalize_positive_int($value): int {
     $normalized = (int)$value;
     return $normalized > 0 ? $normalized : 0;
+}
+
+function normalize_money_or_null($value): ?float {
+    $value = trim((string)$value);
+    if ($value === '') {
+        return null;
+    }
+
+    $normalized = str_replace([',', ' '], '', $value);
+    if (!is_numeric($normalized)) {
+        return null;
+    }
+
+    return round((float)$normalized, 2);
+}
+
+function format_money($value): string {
+    return 'PHP ' . number_format((float)$value, 2);
+}
+
+function build_budget_health(float $budgetAmount, float $totalCost): array {
+    if ($budgetAmount <= 0) {
+        return ['status' => 'unplanned', 'label' => 'No budget set'];
+    }
+
+    $usage = $totalCost / $budgetAmount;
+    if ($usage >= 1) {
+        return ['status' => 'over', 'label' => 'Over budget'];
+    }
+
+    if ($usage >= 0.85) {
+        return ['status' => 'warning', 'label' => 'Budget watch'];
+    }
+
+    return ['status' => 'healthy', 'label' => 'On track'];
 }
 
 function determine_inventory_status(int $quantity, ?int $minStock): string {
@@ -135,6 +207,8 @@ $todayDate = today_date();
 
 ensure_project_inventory_deployments_table($conn);
 ensure_project_inventory_return_logs_table($conn);
+ensure_project_budget_profiles_table($conn);
+ensure_project_cost_entries_table($conn);
 
 function get_projects_redirect_target(): string {
     $redirectTo = $_POST['redirect_to'] ?? $_GET['redirect_to'] ?? '';
@@ -166,6 +240,80 @@ function normalize_text(?string $value): string {
 function normalize_date_or_null(?string $value): ?string {
     $value = trim((string)$value);
     return $value === '' ? null : $value;
+}
+
+function getProjectFinancialSnapshot(mysqli $conn, int $projectId): ?array {
+    $stmt = $conn->prepare(
+        'SELECT
+            p.id,
+            p.project_name,
+            p.status,
+            COALESCE(bp.budget_amount, 0) AS budget_amount,
+            bp.budget_notes,
+            COALESCE(cost_totals.total_cost, 0) AS total_cost,
+            COALESCE(cost_totals.cost_entry_count, 0) AS cost_entry_count
+         FROM projects p
+         LEFT JOIN project_budget_profiles bp ON bp.project_id = p.id
+         LEFT JOIN (
+             SELECT project_id, SUM(amount) AS total_cost, COUNT(*) AS cost_entry_count
+             FROM project_cost_entries
+             GROUP BY project_id
+         ) cost_totals ON cost_totals.project_id = p.id
+         WHERE p.id = ?
+         LIMIT 1'
+    );
+
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('i', $projectId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result ? $result->fetch_assoc() : null;
+}
+
+function fetchRecentProjectCostEntries(mysqli $conn, array $projectIds, int $limitPerProject = 3): array {
+    $projectIds = array_values(array_filter(array_map('intval', $projectIds)));
+    if ($projectIds === []) {
+        return [];
+    }
+
+    $inList = implode(',', $projectIds);
+    $result = $conn->query(
+        "SELECT
+            pce.project_id,
+            pce.cost_date,
+            pce.cost_category,
+            pce.description,
+            pce.amount,
+            u.full_name AS created_by_name
+         FROM project_cost_entries pce
+         LEFT JOIN users u ON u.id = pce.created_by
+         WHERE pce.project_id IN ({$inList})
+         ORDER BY pce.project_id ASC, pce.cost_date DESC, pce.id DESC"
+    );
+
+    if (!$result) {
+        return [];
+    }
+
+    $groupedEntries = [];
+    while ($row = $result->fetch_assoc()) {
+        $projectId = (int)($row['project_id'] ?? 0);
+        if (!isset($groupedEntries[$projectId])) {
+            $groupedEntries[$projectId] = [];
+        }
+
+        if (count($groupedEntries[$projectId]) >= $limitPerProject) {
+            continue;
+        }
+
+        $groupedEntries[$projectId][] = $row;
+    }
+
+    return $groupedEntries;
 }
 
 function getProjectSnapshot(mysqli $conn, int $projectId): ?array {
@@ -316,6 +464,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $status = normalize_text($_POST['status'] ?? 'pending');
         $startDate = normalize_date_or_null($_POST['start_date'] ?? null);
         $endDate = normalize_date_or_null($_POST['end_date'] ?? null);
+        $budgetAmount = normalize_money_or_null($_POST['budget_amount'] ?? null);
+        $budgetNotes = normalize_text_or_null($_POST['budget_notes'] ?? null);
         $createdBy = (int)($_SESSION['user_id'] ?? 0);
 
         if ($projectName === '' || $clientId <= 0 || $engineerId <= 0) {
@@ -365,6 +515,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($startDate === null && $endDate !== null && $endDate < $todayDate) {
             set_projects_flash('error', 'End date cannot be earlier than today.');
+            redirect_projects_page();
+        }
+
+        if (($_POST['budget_amount'] ?? '') !== '' && $budgetAmount === null) {
+            set_projects_flash('error', 'Budget must be a valid amount.');
+            redirect_projects_page();
+        }
+
+        if ($budgetAmount !== null && $budgetAmount < 0) {
+            set_projects_flash('error', 'Budget cannot be negative.');
             redirect_projects_page();
         }
 
@@ -433,6 +593,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('Failed to assign engineer to project.');
             }
 
+            if ($budgetAmount !== null || $budgetNotes !== null) {
+                $saveBudget = $conn->prepare(
+                    'INSERT INTO project_budget_profiles (project_id, budget_amount, budget_notes, created_by, updated_by)
+                     VALUES (?, ?, ?, ?, ?)'
+                );
+
+                if (!$saveBudget) {
+                    throw new RuntimeException('Failed to prepare project budget.');
+                }
+
+                $initialBudget = $budgetAmount ?? 0.00;
+                if (
+                    !$saveBudget->bind_param('idsii', $projectId, $initialBudget, $budgetNotes, $createdBy, $createdBy) ||
+                    !$saveBudget->execute()
+                ) {
+                    throw new RuntimeException('Failed to save project budget.');
+                }
+            }
+
             $conn->commit();
             audit_log_event(
                 $conn,
@@ -446,12 +625,133 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'status' => $status,
                     'client_id' => $clientId,
                     'engineer_id' => $engineerId,
+                    'budget_amount' => $budgetAmount,
                 ]
             );
             set_projects_flash('success', 'Project created successfully.');
         } catch (Throwable $exception) {
             $conn->rollback();
             set_projects_flash('error', $exception->getMessage());
+        }
+
+        redirect_projects_page();
+    }
+
+    if ($action === 'save_project_budget') {
+        $projectId = (int)($_POST['project_id'] ?? 0);
+        $budgetAmountInput = $_POST['budget_amount'] ?? '';
+        $budgetAmount = normalize_money_or_null($budgetAmountInput);
+        $budgetNotes = normalize_text_or_null($_POST['budget_notes'] ?? null);
+        $updatedBy = (int)($_SESSION['user_id'] ?? 0);
+        $projectFinancials = $projectId > 0 ? getProjectFinancialSnapshot($conn, $projectId) : null;
+
+        if ($projectId <= 0 || !$projectFinancials) {
+            set_projects_flash('error', 'Project not found.');
+            redirect_projects_page();
+        }
+
+        if ($budgetAmountInput !== '' && $budgetAmount === null) {
+            set_projects_flash('error', 'Budget must be a valid amount.');
+            redirect_projects_page();
+        }
+
+        if ($budgetAmount === null || $budgetAmount < 0) {
+            set_projects_flash('error', 'Budget cannot be blank or negative.');
+            redirect_projects_page();
+        }
+
+        $saveBudget = $conn->prepare(
+            'INSERT INTO project_budget_profiles (project_id, budget_amount, budget_notes, created_by, updated_by)
+             VALUES (?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                budget_amount = VALUES(budget_amount),
+                budget_notes = VALUES(budget_notes),
+                updated_by = VALUES(updated_by)'
+        );
+
+        if (
+            $saveBudget &&
+            $saveBudget->bind_param('idsii', $projectId, $budgetAmount, $budgetNotes, $updatedBy, $updatedBy) &&
+            $saveBudget->execute()
+        ) {
+            audit_log_event(
+                $conn,
+                $updatedBy,
+                'update_project_budget',
+                'project',
+                $projectId,
+                [
+                    'project_name' => $projectFinancials['project_name'] ?? null,
+                    'budget_amount' => (float)($projectFinancials['budget_amount'] ?? 0),
+                    'budget_notes' => $projectFinancials['budget_notes'] ?? null,
+                ],
+                [
+                    'project_name' => $projectFinancials['project_name'] ?? null,
+                    'budget_amount' => $budgetAmount,
+                    'budget_notes' => $budgetNotes,
+                ]
+            );
+            set_projects_flash('success', 'Project budget saved.');
+        } else {
+            set_projects_flash('error', 'Failed to save project budget.');
+        }
+
+        redirect_projects_page();
+    }
+
+    if ($action === 'add_project_cost_entry') {
+        $projectId = (int)($_POST['project_id'] ?? 0);
+        $costDate = normalize_date_or_null($_POST['cost_date'] ?? null);
+        $costCategory = normalize_text($_POST['cost_category'] ?? '');
+        $costDescription = normalize_text_or_null($_POST['cost_description'] ?? null);
+        $amountInput = $_POST['cost_amount'] ?? '';
+        $costAmount = normalize_money_or_null($amountInput);
+        $createdBy = (int)($_SESSION['user_id'] ?? 0);
+        $projectFinancials = $projectId > 0 ? getProjectFinancialSnapshot($conn, $projectId) : null;
+
+        if ($projectId <= 0 || !$projectFinancials) {
+            set_projects_flash('error', 'Project not found.');
+            redirect_projects_page();
+        }
+
+        if ($costDate === null || $costCategory === '') {
+            set_projects_flash('error', 'Cost date and category are required.');
+            redirect_projects_page();
+        }
+
+        if ($amountInput === '' || $costAmount === null || $costAmount <= 0) {
+            set_projects_flash('error', 'Cost amount must be greater than zero.');
+            redirect_projects_page();
+        }
+
+        $insertCostEntry = $conn->prepare(
+            'INSERT INTO project_cost_entries (project_id, cost_date, cost_category, description, amount, created_by)
+             VALUES (?, ?, ?, ?, ?, ?)'
+        );
+
+        if (
+            $insertCostEntry &&
+            $insertCostEntry->bind_param('isssdi', $projectId, $costDate, $costCategory, $costDescription, $costAmount, $createdBy) &&
+            $insertCostEntry->execute()
+        ) {
+            audit_log_event(
+                $conn,
+                $createdBy,
+                'add_project_cost',
+                'project',
+                $projectId,
+                null,
+                [
+                    'project_name' => $projectFinancials['project_name'] ?? null,
+                    'cost_date' => $costDate,
+                    'cost_category' => $costCategory,
+                    'amount' => $costAmount,
+                    'description' => $costDescription,
+                ]
+            );
+            set_projects_flash('success', 'Project cost entry added.');
+        } else {
+            set_projects_flash('error', 'Failed to save project cost entry.');
         }
 
         redirect_projects_page();
@@ -1104,6 +1404,23 @@ if ($currentPage > $totalPages) {
 }
 
 $projects = project_search_fetch_page($conn, $hasProjectAddressColumn, $searchQuery, $statusFilter, $perPage, $offset);
+$projectIds = array_map(static fn(array $project): int => (int)($project['id'] ?? 0), $projects);
+$recentProjectCosts = fetchRecentProjectCostEntries($conn, $projectIds);
+$financialSummaryResult = $conn->query(
+    "SELECT
+        COALESCE(SUM(bp.budget_amount), 0) AS total_budget,
+        COALESCE((SELECT SUM(amount) FROM project_cost_entries), 0) AS total_cost,
+        COUNT(bp.project_id) AS projects_with_budget,
+        (SELECT COUNT(*) FROM project_cost_entries) AS total_cost_entries
+     FROM project_budget_profiles bp"
+);
+$financialSummary = $financialSummaryResult ? $financialSummaryResult->fetch_assoc() : [];
+$totalBudgetAmount = (float)($financialSummary['total_budget'] ?? 0);
+$totalTrackedCost = (float)($financialSummary['total_cost'] ?? 0);
+$projectsWithBudget = (int)($financialSummary['projects_with_budget'] ?? 0);
+$totalCostEntries = (int)($financialSummary['total_cost_entries'] ?? 0);
+$budgetCoverageRate = $totalProjects > 0 ? round(($projectsWithBudget / $totalProjects) * 100) : 0;
+$portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -1125,6 +1442,25 @@ $projects = project_search_fetch_page($conn, $hasProjectAddressColumn, $searchQu
                     <?php echo htmlspecialchars($flash['message']); ?>
                 </div>
             <?php endif; ?>
+
+            <section class="metrics-grid">
+                <article class="metric-card">
+                    <span>Total Budget</span>
+                    <strong><?php echo htmlspecialchars(format_money($totalBudgetAmount)); ?></strong>
+                </article>
+                <article class="metric-card">
+                    <span>Total Recorded Cost</span>
+                    <strong><?php echo htmlspecialchars(format_money($totalTrackedCost)); ?></strong>
+                </article>
+                <article class="metric-card">
+                    <span>Remaining Portfolio Budget</span>
+                    <strong><?php echo htmlspecialchars(format_money($portfolioRemainingBudget)); ?></strong>
+                </article>
+                <article class="metric-card">
+                    <span>Coverage / Entries</span>
+                    <strong><?php echo $budgetCoverageRate; ?>% / <?php echo $totalCostEntries; ?></strong>
+                </article>
+            </section>
 
             <section class="form-panel">
                 <h2 class="section-title-inline">Create Project</h2>
@@ -1213,6 +1549,16 @@ $projects = project_search_fetch_page($conn, $hasProjectAddressColumn, $searchQu
                                 </button>
                             </div>
                             <input type="date" id="end_date" name="end_date" min="<?php echo htmlspecialchars($todayDate); ?>">
+                        </div>
+
+                        <div class="input-group">
+                            <label for="budget_amount">Project Budget</label>
+                            <input type="number" id="budget_amount" name="budget_amount" min="0" step="0.01" placeholder="0.00">
+                        </div>
+
+                        <div class="input-group input-group-wide">
+                            <label for="budget_notes">Budget Notes</label>
+                            <textarea id="budget_notes" name="budget_notes" rows="2" placeholder="Approved ceiling, scope assumption, supplier cap, or payment notes"></textarea>
                         </div>
                     </div>
 
@@ -1310,6 +1656,13 @@ $projects = project_search_fetch_page($conn, $hasProjectAddressColumn, $searchQu
                             <?php
                             $isDraft = ($project['status'] ?? '') === 'draft';
                             $isCompleted = ($project['status'] ?? '') === 'completed';
+                            $budgetAmount = (float)($project['budget_amount'] ?? 0);
+                            $budgetNotes = (string)($project['budget_notes'] ?? '');
+                            $totalCost = (float)($project['total_cost'] ?? 0);
+                            $remainingBudget = $budgetAmount - $totalCost;
+                            $budgetUsage = $budgetAmount > 0 ? min(100, round(($totalCost / $budgetAmount) * 100)) : 0;
+                            $budgetHealth = build_budget_health($budgetAmount, $totalCost);
+                            $projectRecentCosts = $recentProjectCosts[(int)($project['id'] ?? 0)] ?? [];
                             $searchText = strtolower(trim(implode(' ', [
                                 $project['project_name'] ?? '',
                                 $project['client_name'] ?? '',
@@ -1345,6 +1698,109 @@ $projects = project_search_fetch_page($conn, $hasProjectAddressColumn, $searchQu
                                 <?php if (!empty($project['description'])): ?>
                                     <div class="empty-state empty-state-solid project-card__description"><?php echo nl2br(htmlspecialchars($project['description'])); ?></div>
                                 <?php endif; ?>
+
+                                <section class="budget-panel budget-panel--<?php echo htmlspecialchars($budgetHealth['status']); ?>">
+                                    <div class="budget-panel__header">
+                                        <div>
+                                            <h4>Budget Overview</h4>
+                                            <span class="budget-health budget-health--<?php echo htmlspecialchars($budgetHealth['status']); ?>">
+                                                <?php echo htmlspecialchars($budgetHealth['label']); ?>
+                                            </span>
+                                        </div>
+                                        <strong><?php echo htmlspecialchars(format_money($remainingBudget)); ?></strong>
+                                    </div>
+                                    <div class="budget-stats">
+                                        <div>
+                                            <span>Budget</span>
+                                            <strong><?php echo htmlspecialchars(format_money($budgetAmount)); ?></strong>
+                                        </div>
+                                        <div>
+                                            <span>Actual</span>
+                                            <strong><?php echo htmlspecialchars(format_money($totalCost)); ?></strong>
+                                        </div>
+                                        <div>
+                                            <span>Entries</span>
+                                            <strong><?php echo (int)($project['cost_entry_count'] ?? 0); ?></strong>
+                                        </div>
+                                    </div>
+                                    <div class="budget-progress">
+                                        <div class="budget-progress__track">
+                                            <span class="budget-progress__fill budget-progress__fill--<?php echo htmlspecialchars($budgetHealth['status']); ?>" style="width: <?php echo $budgetUsage; ?>%;"></span>
+                                        </div>
+                                        <small><?php echo $budgetAmount > 0 ? $budgetUsage . '% spent' : 'Set a budget to track project variance'; ?></small>
+                                    </div>
+                                    <?php if ($budgetNotes !== ''): ?>
+                                        <div class="budget-notes"><?php echo nl2br(htmlspecialchars($budgetNotes)); ?></div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($projectRecentCosts)): ?>
+                                        <div class="budget-ledger">
+                                            <?php foreach ($projectRecentCosts as $costEntry): ?>
+                                                <div class="budget-ledger__item">
+                                                    <div>
+                                                        <strong><?php echo htmlspecialchars($costEntry['cost_category'] ?? 'Cost'); ?></strong>
+                                                        <span><?php echo htmlspecialchars($costEntry['cost_date'] ?? ''); ?><?php echo !empty($costEntry['created_by_name']) ? ' • ' . htmlspecialchars($costEntry['created_by_name']) : ''; ?></span>
+                                                        <?php if (!empty($costEntry['description'])): ?>
+                                                            <small><?php echo htmlspecialchars($costEntry['description']); ?></small>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <strong><?php echo htmlspecialchars(format_money((float)($costEntry['amount'] ?? 0))); ?></strong>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="empty-state">No cost entries yet.</div>
+                                    <?php endif; ?>
+                                </section>
+
+                                <div class="project-finance-forms">
+                                    <form method="POST" class="mini-form project-finance-form">
+                                        <input type="hidden" name="action" value="save_project_budget">
+                                        <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
+                                        <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($_SERVER['REQUEST_URI'] ?? '/codesamplecaps/SUPERADMIN/sidebar/projects.php'); ?>">
+                                        <h4 class="subheading">Update Budget</h4>
+                                        <div class="form-grid">
+                                            <div class="input-group">
+                                                <label for="budget_amount_<?php echo (int)$project['id']; ?>">Budget Amount</label>
+                                                <input type="number" id="budget_amount_<?php echo (int)$project['id']; ?>" name="budget_amount" min="0" step="0.01" value="<?php echo htmlspecialchars(number_format($budgetAmount, 2, '.', '')); ?>" required>
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="budget_notes_<?php echo (int)$project['id']; ?>">Notes</label>
+                                                <input type="text" id="budget_notes_<?php echo (int)$project['id']; ?>" name="budget_notes" value="<?php echo htmlspecialchars($budgetNotes); ?>" placeholder="Approved budget notes">
+                                            </div>
+                                        </div>
+                                        <div class="form-actions">
+                                            <button type="submit" class="btn-secondary">Save Budget</button>
+                                        </div>
+                                    </form>
+
+                                    <form method="POST" class="mini-form project-finance-form">
+                                        <input type="hidden" name="action" value="add_project_cost_entry">
+                                        <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
+                                        <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($_SERVER['REQUEST_URI'] ?? '/codesamplecaps/SUPERADMIN/sidebar/projects.php'); ?>">
+                                        <h4 class="subheading">Log Cost</h4>
+                                        <div class="form-grid">
+                                            <div class="input-group">
+                                                <label for="cost_date_<?php echo (int)$project['id']; ?>">Date</label>
+                                                <input type="date" id="cost_date_<?php echo (int)$project['id']; ?>" name="cost_date" value="<?php echo htmlspecialchars($todayDate); ?>" required>
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="cost_category_<?php echo (int)$project['id']; ?>">Category</label>
+                                                <input type="text" id="cost_category_<?php echo (int)$project['id']; ?>" name="cost_category" placeholder="Labor, Materials, Permit" required>
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="cost_amount_<?php echo (int)$project['id']; ?>">Amount</label>
+                                                <input type="number" id="cost_amount_<?php echo (int)$project['id']; ?>" name="cost_amount" min="0.01" step="0.01" placeholder="0.00" required>
+                                            </div>
+                                            <div class="input-group">
+                                                <label for="cost_description_<?php echo (int)$project['id']; ?>">Description</label>
+                                                <input type="text" id="cost_description_<?php echo (int)$project['id']; ?>" name="cost_description" placeholder="Supplier, PO, or work package">
+                                            </div>
+                                        </div>
+                                        <div class="form-actions">
+                                            <button type="submit" class="btn-secondary">Add Cost</button>
+                                        </div>
+                                    </form>
+                                </div>
 
                                 <div class="form-actions project-card__actions">
                                     <a href="<?php echo htmlspecialchars($detailsPath); ?>" class="btn-primary project-card__details-btn">View Details</a>
