@@ -3118,6 +3118,20 @@ tbody tr:hover {
     gap: 20px;
 }
 
+.project-create-top-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+    align-items: end;
+}
+
+@media (max-width: 1200px) {
+    .project-create-top-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
     
         .page-stack {
             display: grid;
@@ -3172,6 +3186,10 @@ tbody tr:hover {
             gap: 16px;
         }
 
+        .form-grid--project-create {
+            align-items: start;
+        }
+
         .input-group {
             display: grid;
             gap: 8px;
@@ -3187,9 +3205,10 @@ tbody tr:hover {
         .input-group select,
         .input-group textarea {
             width: 100%;
-            padding: 12px 14px;
+            min-height: 44px;
+            padding: 10px 12px;
             border: 1px solid #d1d5db;
-            border-radius: 12px;
+            border-radius: 10px;
             font: inherit;
             background: #fff;
         }
@@ -3208,6 +3227,16 @@ tbody tr:hover {
         calc(100% - 12px) calc(50% - 3px);
     background-size: 6px 6px, 6px 6px;
     background-repeat: no-repeat;
+}
+
+.engineer-multi-select {
+    min-height: 132px;
+    padding-right: 12px;
+    background-image: none;
+}
+
+.engineer-multi-select option {
+    padding: 6px 8px;
 }
 
         .input-group textarea {
@@ -4606,6 +4635,11 @@ input[data-inline-editable]:disabled {
 }
 
 @media (max-width: 768px) {
+    .project-create-top-grid {
+        grid-template-columns: 1fr;
+        margin-bottom: 12px;
+    }
+
     .form-panel,
     .project-card {
         padding: 18px;

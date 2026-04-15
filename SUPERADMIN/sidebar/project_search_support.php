@@ -95,18 +95,18 @@ if (!function_exists('project_search_bind_params')) {
     }
 }
 
-if (!function_exists('project_search_latest_assignment_sql')) {
-    function project_search_latest_assignment_sql(): string {
+if (!function_exists('project_search_assignment_summary_sql')) {
+    function project_search_assignment_summary_sql(): string {
         return "
             LEFT JOIN (
-                SELECT pa.project_id, pa.engineer_id
+                SELECT
+                    pa.project_id,
+                    GROUP_CONCAT(DISTINCT pa.engineer_id ORDER BY pa.engineer_id SEPARATOR ',') AS engineer_ids_csv,
+                    GROUP_CONCAT(DISTINCT u.full_name ORDER BY u.full_name SEPARATOR ', ') AS engineer_names
                 FROM project_assignments pa
-                INNER JOIN (
-                    SELECT project_id, MAX(id) AS latest_id
-                    FROM project_assignments
-                    GROUP BY project_id
-                ) latest ON latest.latest_id = pa.id
-            ) latest_assignment ON latest_assignment.project_id = p.id
+                INNER JOIN users u ON u.id = pa.engineer_id
+                GROUP BY pa.project_id
+            ) assignment_summary ON assignment_summary.project_id = p.id
         ";
     }
 }
@@ -122,7 +122,7 @@ if (!function_exists('project_search_build_filter')) {
             $searchConditions = [
                 'p.project_name LIKE ?',
                 'client.full_name LIKE ?',
-                'engineer.full_name LIKE ?',
+                'assignment_summary.engineer_names LIKE ?',
                 'p.status LIKE ?',
             ];
             $searchParams = [$likeValue, $likeValue, $likeValue, $likeValue];
@@ -172,8 +172,7 @@ if (!function_exists('project_search_fetch_count')) {
             SELECT COUNT(*) AS total
             FROM projects p
             LEFT JOIN users client ON client.id = p.client_id
-            " . project_search_latest_assignment_sql() . "
-            LEFT JOIN users engineer ON engineer.id = latest_assignment.engineer_id
+            " . project_search_assignment_summary_sql() . "
             {$whereSql}
         ";
 
@@ -223,8 +222,8 @@ if (!function_exists('project_search_fetch_page')) {
                 p.created_at,
                 client.full_name AS client_name,
                 client.email AS client_email,
-                latest_assignment.engineer_id,
-                engineer.full_name AS engineer_name,
+                assignment_summary.engineer_ids_csv,
+                assignment_summary.engineer_names,
                 COALESCE(budget_profiles.budget_amount, 0) AS budget_amount,
                 budget_profiles.budget_notes,
                 COALESCE(cost_totals.total_cost, 0) AS total_cost,
@@ -234,8 +233,7 @@ if (!function_exists('project_search_fetch_page')) {
                 COALESCE(task_totals.completed_tasks, 0) AS completed_tasks
             FROM projects p
             LEFT JOIN users client ON client.id = p.client_id
-            " . project_search_latest_assignment_sql() . "
-            LEFT JOIN users engineer ON engineer.id = latest_assignment.engineer_id
+            " . project_search_assignment_summary_sql() . "
             LEFT JOIN project_budget_profiles budget_profiles ON budget_profiles.project_id = p.id
             LEFT JOIN (
                 SELECT
@@ -305,17 +303,16 @@ if (!function_exists('project_search_fetch_suggestions')) {
                 {$projectCodeSelect}
                 {$poNumberSelect}
                 client.full_name AS client_name,
-                engineer.full_name AS engineer_name
+                assignment_summary.engineer_names
             FROM projects p
             LEFT JOIN users client ON client.id = p.client_id
-            " . project_search_latest_assignment_sql() . "
-            LEFT JOIN users engineer ON engineer.id = latest_assignment.engineer_id
+            " . project_search_assignment_summary_sql() . "
             {$whereSql}
             ORDER BY
                 CASE
                     WHEN p.project_name LIKE ? THEN 0
                     WHEN client.full_name LIKE ? THEN 1
-                    WHEN engineer.full_name LIKE ? THEN 2
+                    WHEN assignment_summary.engineer_names LIKE ? THEN 2
                     " . ($hasProjectAddressColumn ? "WHEN p.project_address LIKE ? THEN 3" : '') . "
                     " . ($hasProjectEmailColumn ? "WHEN p.project_email LIKE ? THEN 4" : '') . "
                     " . ($hasProjectCodeColumn ? "WHEN p.project_code LIKE ? THEN 5" : '') . "

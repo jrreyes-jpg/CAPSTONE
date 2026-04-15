@@ -277,7 +277,7 @@ function set_projects_old_input(array $input, ?string $focusField = null): void 
         'project_code' => trim((string)($input['project_code'] ?? '')),
         'po_number' => trim((string)($input['po_number'] ?? '')),
         'client_id' => (string)($input['client_id'] ?? ''),
-        'engineer_id' => (string)($input['engineer_id'] ?? ''),
+        'engineer_ids' => array_values(array_map('strval', is_array($input['engineer_ids'] ?? null) ? $input['engineer_ids'] : [])),
         'status' => trim((string)($input['status'] ?? '')),
         'start_date' => trim((string)($input['start_date'] ?? '')),
         'budget_amount' => trim((string)($input['budget_amount'] ?? '')),
@@ -470,6 +470,20 @@ function projectFieldValueExists(mysqli $conn, string $columnName, string $value
     return (bool)($result && $result->fetch_assoc());
 }
 
+function normalize_engineer_ids($value): array {
+    $rawValues = is_array($value) ? $value : [$value];
+    $normalized = [];
+
+    foreach ($rawValues as $rawValue) {
+        $engineerId = (int)$rawValue;
+        if ($engineerId > 0) {
+            $normalized[$engineerId] = $engineerId;
+        }
+    }
+
+    return array_values($normalized);
+}
+
 function countOpenProjectTasks(mysqli $conn, int $projectId): int {
     $stmt = $conn->prepare(
         "SELECT COUNT(*) AS total
@@ -562,7 +576,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $projectCode = $hasProjectCodeColumn ? normalize_text_or_null($_POST['project_code'] ?? null) : null;
         $poNumber = $hasPoNumberColumn ? normalize_text_or_null($_POST['po_number'] ?? null) : null;
         $clientId = (int)($_POST['client_id'] ?? 0);
-        $engineerId = (int)($_POST['engineer_id'] ?? 0);
+        $engineerIds = normalize_engineer_ids($_POST['engineer_ids'] ?? []);
         $status = normalize_text($_POST['status'] ?? 'pending');
         $startDate = normalize_date_or_null($_POST['start_date'] ?? null);
         $endDate = null;
@@ -577,7 +591,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'project_code' => $_POST['project_code'] ?? '',
             'po_number' => $_POST['po_number'] ?? '',
             'client_id' => $_POST['client_id'] ?? '',
-            'engineer_id' => $_POST['engineer_id'] ?? '',
+            'engineer_ids' => $_POST['engineer_ids'] ?? [],
             'status' => $_POST['status'] ?? 'pending',
             'start_date' => $_POST['start_date'] ?? '',
             'budget_amount' => $_POST['budget_amount'] ?? '',
@@ -596,9 +610,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
-        if ($engineerId <= 0) {
-            set_projects_old_input($createProjectInput, 'engineer_id');
-            set_projects_flash('error', 'Project name, client, and engineer are required.');
+        if ($engineerIds === []) {
+            set_projects_old_input($createProjectInput, 'engineer_ids');
+            set_projects_flash('error', 'Project title, client, and assigned engineer/s are required.');
             redirect_projects_page();
         }
 
@@ -631,13 +645,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
-        if ($projectCode !== null && projectFieldValueExists($conn, 'project_code', $projectCode)) {
+        if ($projectCode === null) {
+            set_projects_old_input($createProjectInput, 'project_code');
+            set_projects_flash('error', 'Project code is required.');
+            redirect_projects_page();
+        }
+
+        if ($poNumber === null) {
+            set_projects_old_input($createProjectInput, 'po_number');
+            set_projects_flash('error', 'P.O Number is required.');
+            redirect_projects_page();
+        }
+
+        if (projectFieldValueExists($conn, 'project_code', $projectCode)) {
             set_projects_old_input($createProjectInput, 'project_code');
             set_projects_flash('error', 'Project code already exists.');
             redirect_projects_page();
         }
 
-        if ($poNumber !== null && projectFieldValueExists($conn, 'po_number', $poNumber)) {
+        if (projectFieldValueExists($conn, 'po_number', $poNumber)) {
             set_projects_old_input($createProjectInput, 'po_number');
             set_projects_flash('error', 'P.O Number already exists.');
             redirect_projects_page();
@@ -772,10 +798,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('Failed to prepare engineer assignment.');
             }
 
-            $assignEngineer->bind_param('iii', $projectId, $engineerId, $createdBy);
+            foreach ($engineerIds as $engineerId) {
+                $assignEngineer->bind_param('iii', $projectId, $engineerId, $createdBy);
 
-            if (!$assignEngineer->execute()) {
-                throw new RuntimeException('Failed to assign engineer to project.');
+                if (!$assignEngineer->execute()) {
+                    throw new RuntimeException('Failed to assign engineer to project.');
+                }
             }
 
             if ($budgetAmount !== null || $budgetNotes !== null) {
@@ -809,7 +837,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'project_name' => $projectName,
                     'status' => $status,
                     'client_id' => $clientId,
-                    'engineer_id' => $engineerId,
+                    'engineer_ids' => $engineerIds,
                     'project_email' => $projectEmail,
                     'project_code' => $projectCode,
                     'po_number' => $poNumber,
@@ -1059,7 +1087,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $projectCode = $hasProjectCodeColumn ? normalize_text_or_null($_POST['project_code'] ?? null) : null;
         $poNumber = $hasPoNumberColumn ? normalize_text_or_null($_POST['po_number'] ?? null) : null;
         $clientId = (int)($_POST['client_id'] ?? 0);
-        $engineerId = (int)($_POST['engineer_id'] ?? 0);
+        $engineerIds = normalize_engineer_ids($_POST['engineer_ids'] ?? []);
         $startDate = normalize_date_or_null($_POST['start_date'] ?? null);
         $endDate = null;
         $project = $projectId > 0 ? getProjectSnapshot($conn, $projectId) : null;
@@ -1075,8 +1103,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
-        if ($projectName === '' || $clientId <= 0 || $engineerId <= 0) {
-            set_projects_flash('error', 'Project name, client, and engineer are required.');
+        if ($projectName === '' || $clientId <= 0 || $engineerIds === []) {
+            set_projects_flash('error', 'Project title, client, and assigned engineer/s are required.');
             redirect_projects_page();
         }
 
@@ -1090,12 +1118,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
-        if ($projectCode !== null && projectFieldValueExists($conn, 'project_code', $projectCode, $projectId)) {
+        if ($projectCode === null) {
+            set_projects_flash('error', 'Project code is required.');
+            redirect_projects_page();
+        }
+
+        if ($poNumber === null) {
+            set_projects_flash('error', 'P.O Number is required.');
+            redirect_projects_page();
+        }
+
+        if (projectFieldValueExists($conn, 'project_code', $projectCode, $projectId)) {
             set_projects_flash('error', 'Project code already exists.');
             redirect_projects_page();
         }
 
-        if ($poNumber !== null && projectFieldValueExists($conn, 'po_number', $poNumber, $projectId)) {
+        if (projectFieldValueExists($conn, 'po_number', $poNumber, $projectId)) {
             set_projects_flash('error', 'P.O Number already exists.');
             redirect_projects_page();
         }
@@ -1182,8 +1220,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
+            $clearAssignments = $conn->prepare('DELETE FROM project_assignments WHERE project_id = ?');
+
+            if (!$clearAssignments) {
+                throw new RuntimeException('Failed to prepare engineer reassignment reset.');
+            }
+
+            if (
+                !$clearAssignments->bind_param('i', $projectId) ||
+                !$clearAssignments->execute()
+            ) {
+                throw new RuntimeException('Failed to reset current engineer assignments.');
+            }
+
             $reassignEngineer = $conn->prepare(
-                'INSERT IGNORE INTO project_assignments (project_id, engineer_id, assigned_by)
+                'INSERT INTO project_assignments (project_id, engineer_id, assigned_by)
                  VALUES (?, ?, ?)'
             );
 
@@ -1191,11 +1242,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('Failed to prepare engineer reassignment.');
             }
 
-            if (
-                !$reassignEngineer->bind_param('iii', $projectId, $engineerId, $updatedBy) ||
-                !$reassignEngineer->execute()
-            ) {
-                throw new RuntimeException('Failed to update engineer assignment.');
+            foreach ($engineerIds as $engineerId) {
+                if (
+                    !$reassignEngineer->bind_param('iii', $projectId, $engineerId, $updatedBy) ||
+                    !$reassignEngineer->execute()
+                ) {
+                    throw new RuntimeException('Failed to update engineer assignment.');
+                }
             }
 
             $conn->commit();
@@ -1212,7 +1265,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 [
                     'project_name' => $projectName,
                     'client_id' => $clientId,
-                    'engineer_id' => $engineerId,
+                    'engineer_ids' => $engineerIds,
                     'project_email' => $projectEmail,
                     'project_code' => $projectCode,
                     'po_number' => $poNumber,
@@ -1602,7 +1655,7 @@ $createProjectValues = [
     'project_code' => (string)($createProjectOldInput['project_code'] ?? ''),
     'po_number' => (string)($createProjectOldInput['po_number'] ?? ''),
     'client_id' => (string)($createProjectOldInput['client_id'] ?? ''),
-    'engineer_id' => (string)($createProjectOldInput['engineer_id'] ?? ''),
+    'engineer_ids' => array_values(array_map('strval', is_array($createProjectOldInput['engineer_ids'] ?? null) ? $createProjectOldInput['engineer_ids'] : [])),
     'status' => (string)($createProjectOldInput['status'] ?? 'pending'),
     'start_date' => array_key_exists('start_date', $createProjectOldInput) ? (string)$createProjectOldInput['start_date'] : $todayDate,
     'budget_amount' => (string)($createProjectOldInput['budget_amount'] ?? ''),
@@ -1736,10 +1789,10 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
 
             <section class="form-panel">
                 <h2 class="section-title-inline">Create Project</h2>
-                <form method="POST" id="create-project-form">
+                <form method="POST" id="create-project-form" class="project-create-form">
                     <input type="hidden" name="action" value="create_project">
 
-                    <div class="form-grid">
+                    <div class="project-create-top-grid">
                         <div class="input-group">
                             <label for="project_name">Project Title <span class="required-indicator" aria-hidden="true">*</span></label>
                             <input type="text" id="project_name" name="project_name" value="<?php echo htmlspecialchars($createProjectValues['project_name']); ?>" required>
@@ -1747,15 +1800,15 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
 
                         <?php if ($hasProjectCodeColumn): ?>
                             <div class="input-group">
-                                <label for="project_code">Project Code <span class="optional-indicator">(Optional)</span></label>
-                                <input type="text" id="project_code" name="project_code" value="<?php echo htmlspecialchars($createProjectValues['project_code']); ?>" placeholder="Enter project code">
+                                <label for="project_code">Project Code <span class="required-indicator" aria-hidden="true">*</span></label>
+                                <input type="text" id="project_code" name="project_code" value="<?php echo htmlspecialchars($createProjectValues['project_code']); ?>" placeholder="Enter project code" required>
                             </div>
                         <?php endif; ?>
 
                         <?php if ($hasPoNumberColumn): ?>
                             <div class="input-group">
-                                <label for="po_number">P.O Number <span class="optional-indicator">(Optional)</span></label>
-                                <input type="text" id="po_number" name="po_number" value="<?php echo htmlspecialchars($createProjectValues['po_number']); ?>" placeholder="Enter P.O number">
+                                <label for="po_number">P.O Number <span class="required-indicator" aria-hidden="true">*</span></label>
+                                <input type="text" id="po_number" name="po_number" value="<?php echo htmlspecialchars($createProjectValues['po_number']); ?>" placeholder="Enter P.O number" required>
                             </div>
                         <?php endif; ?>
 
@@ -1768,15 +1821,24 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                 <?php endforeach; ?>
                             </select>
                         </div>
+                    </div>
 
-                        <div class="input-group">
-                            <label for="engineer_id">Engineer <span class="required-indicator" aria-hidden="true">*</span></label>
-                            <select id="engineer_id" name="engineer_id" required>
-                                <option value="">Select engineer</option>
+                    <div class="form-grid form-grid--project-create">
+
+                        <div class="input-group input-group-wide">
+                            <div class="field-label-row">
+                                <label for="engineer_ids">Assigned Engineer/s <span class="required-indicator" aria-hidden="true">*</span></label>
+                                <button type="button" class="field-tip" aria-label="Assigned engineers help">
+                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                    <span class="field-tip__bubble">Click an engineer name once to assign it. Click the same name again to remove it from the project.</span>
+                                </button>
+                            </div>
+                            <select id="engineer_ids" name="engineer_ids[]" class="engineer-multi-select" multiple required size="<?php echo min(5, max(3, count($engineers))); ?>">
                                 <?php foreach ($engineers as $engineer): ?>
-                                    <option value="<?php echo (int)$engineer['id']; ?>" <?php echo $createProjectValues['engineer_id'] === (string)$engineer['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($engineer['full_name']); ?></option>
+                                    <option value="<?php echo (int)$engineer['id']; ?>" <?php echo in_array((string)$engineer['id'], $createProjectValues['engineer_ids'], true) ? 'selected' : ''; ?>><?php echo htmlspecialchars($engineer['full_name']); ?></option>
                                 <?php endforeach; ?>
                             </select>
+                            <small>Select one or more engineers depending on the project workload.</small>
                         </div>
 
                         <div class="input-group">
@@ -1942,19 +2004,20 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             $projectCode = trim((string)($project['project_code'] ?? ''));
                             $projectPoNumber = trim((string)($project['po_number'] ?? ''));
                             $projectEmail = trim((string)($project['project_email'] ?? ''));
+                            $assignedEngineerNames = trim((string)($project['engineer_names'] ?? ''));
                             $searchText = strtolower(trim(implode(' ', [
                                 $project['project_name'] ?? '',
                                 $projectCode,
                                 $projectPoNumber,
                                 $project['client_name'] ?? '',
-                                $project['engineer_name'] ?? '',
+                                $assignedEngineerNames,
                                 $project['project_address'] ?? '',
                                 $projectEmail,
                                 $project['status'] ?? '',
                             ])));
                             $detailsPath = '/codesamplecaps/SUPERADMIN/sidebar/project_details.php?id=' . (int)$project['id'];
                             ?>
-                            <article class="project-card<?php echo $isCompleted ? ' is-locked' : ''; ?><?php echo $isDraft ? ' is-draft' : ''; ?>" data-project-card data-status="<?php echo htmlspecialchars($project['status']); ?>" data-search="<?php echo htmlspecialchars($searchText); ?>" data-title="<?php echo htmlspecialchars($project['project_name']); ?>" data-link="<?php echo htmlspecialchars($detailsPath); ?>" data-client="<?php echo htmlspecialchars($project['client_name'] ?? 'N/A'); ?>" data-engineer="<?php echo htmlspecialchars($project['engineer_name'] ?? 'Not assigned'); ?>">
+                            <article class="project-card<?php echo $isCompleted ? ' is-locked' : ''; ?><?php echo $isDraft ? ' is-draft' : ''; ?>" data-project-card data-status="<?php echo htmlspecialchars($project['status']); ?>" data-search="<?php echo htmlspecialchars($searchText); ?>" data-title="<?php echo htmlspecialchars($project['project_name']); ?>" data-link="<?php echo htmlspecialchars($detailsPath); ?>" data-client="<?php echo htmlspecialchars($project['client_name'] ?? 'N/A'); ?>" data-engineer="<?php echo htmlspecialchars($assignedEngineerNames !== '' ? $assignedEngineerNames : 'Not assigned'); ?>">
                                 <div class="card-split">
                                     <div>
                                         <div class="project-card__eyebrow-row">
@@ -1972,17 +2035,17 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                     </div>
 
                                     <div class="project-meta">
+                                        <div><strong>Client:</strong> <?php echo htmlspecialchars($project['client_name'] ?? 'N/A'); ?></div>
                                         <div><strong>Project Code:</strong> <?php echo htmlspecialchars($projectCode !== '' ? $projectCode : 'Not set'); ?></div>
                                         <div><strong>P.O Number:</strong> <?php echo htmlspecialchars($projectPoNumber !== '' ? $projectPoNumber : 'Not set'); ?></div>
-                                        <div><strong>Client:</strong> <?php echo htmlspecialchars($project['client_name'] ?? 'N/A'); ?></div>
-                                        <div><strong>Engineer:</strong> <?php echo htmlspecialchars($project['engineer_name'] ?? 'Not assigned'); ?></div>
-                                        <?php if ($projectEmail !== ''): ?>
-                                            <div><strong>Email Address:</strong> <?php echo htmlspecialchars($projectEmail); ?></div>
-                                        <?php endif; ?>
+                                        <div><strong>P.O Date:</strong> <?php echo htmlspecialchars($project['start_date'] ?? 'N/A'); ?></div>
+                                        <div><strong>Assigned Engineer/s:</strong> <?php echo htmlspecialchars($assignedEngineerNames !== '' ? $assignedEngineerNames : 'Not assigned'); ?></div>
                                         <?php if ($hasProjectAddressColumn): ?>
                                             <div><strong>Project Site:</strong> <?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></div>
                                         <?php endif; ?>
-                                        <div><strong>P.O Date:</strong> <?php echo htmlspecialchars($project['start_date'] ?? 'N/A'); ?></div>
+                                        <?php if ($projectEmail !== ''): ?>
+                                            <div><strong>Email Address:</strong> <?php echo htmlspecialchars($projectEmail); ?></div>
+                                        <?php endif; ?>
                                         <div><strong>Completed:</strong> <?php echo htmlspecialchars($project['end_date'] ?? 'N/A'); ?></div>
                                         <div><strong>Tasks:</strong> <?php echo (int)$project['completed_tasks']; ?> / <?php echo (int)$project['total_tasks']; ?> completed</div>
                                     </div>
@@ -2427,7 +2490,7 @@ function initCreateProjectForm() {
     });
 
     if (focusFieldName !== '') {
-        const targetField = createProjectForm.elements.namedItem(focusFieldName);
+        const targetField = createProjectForm.elements.namedItem(focusFieldName) || document.getElementById(focusFieldName);
 
         if (targetField && typeof targetField.focus === 'function') {
             window.setTimeout(function () {
@@ -2440,8 +2503,32 @@ function initCreateProjectForm() {
     }
 }
 
+function initEngineerMultiSelectToggle() {
+    const engineerSelect = document.getElementById('engineer_ids');
+
+    if (!engineerSelect || engineerSelect.dataset.toggleBound === 'true') {
+        return;
+    }
+
+    engineerSelect.addEventListener('mousedown', function (event) {
+        const option = event.target;
+
+        if (!(option instanceof HTMLOptionElement)) {
+            return;
+        }
+
+        event.preventDefault();
+        option.selected = !option.selected;
+        engineerSelect.focus();
+        engineerSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    engineerSelect.dataset.toggleBound = 'true';
+}
+
 document.addEventListener('DOMContentLoaded', initProjectSearchUI);
 document.addEventListener('DOMContentLoaded', initCreateProjectForm);
+document.addEventListener('DOMContentLoaded', initEngineerMultiSelectToggle);
 </script>
 </body>
 </html>

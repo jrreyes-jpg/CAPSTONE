@@ -303,22 +303,21 @@ if ($projectId > 0) {
             p.created_at,
             client.full_name AS client_name,
             client.email AS client_email,
-            latest_assignment.engineer_id,
-            engineer.full_name AS engineer_name,
+            assignment_summary.engineer_ids_csv,
+            assignment_summary.engineer_names,
             COALESCE(task_totals.total_tasks, 0) AS total_tasks,
             COALESCE(task_totals.completed_tasks, 0) AS completed_tasks
         FROM projects p
         LEFT JOIN users client ON client.id = p.client_id
         LEFT JOIN (
-            SELECT pa.project_id, pa.engineer_id
+            SELECT
+                pa.project_id,
+                GROUP_CONCAT(DISTINCT pa.engineer_id ORDER BY pa.engineer_id SEPARATOR ',') AS engineer_ids_csv,
+                GROUP_CONCAT(DISTINCT u.full_name ORDER BY u.full_name SEPARATOR ', ') AS engineer_names
             FROM project_assignments pa
-            INNER JOIN (
-                SELECT project_id, MAX(id) AS latest_id
-                FROM project_assignments
-                GROUP BY project_id
-            ) latest ON latest.latest_id = pa.id
-        ) latest_assignment ON latest_assignment.project_id = p.id
-        LEFT JOIN users engineer ON engineer.id = latest_assignment.engineer_id
+            INNER JOIN users u ON u.id = pa.engineer_id
+            GROUP BY pa.project_id
+        ) assignment_summary ON assignment_summary.project_id = p.id
         LEFT JOIN (
             SELECT
                 project_id,
@@ -480,7 +479,9 @@ if ($projectId > 0) {
                 <?php
                 $isDraft = ($project['status'] ?? '') === 'draft';
                 $isCompleted = ($project['status'] ?? '') === 'completed';
-                $currentEngineerId = (int)($project['engineer_id'] ?? 0);
+                $assignedEngineerIds = array_values(array_filter(array_map('intval', explode(',', (string)($project['engineer_ids_csv'] ?? '')))));
+                $assignedEngineerNames = trim((string)($project['engineer_names'] ?? ''));
+                $defaultTaskEngineerId = $assignedEngineerIds[0] ?? 0;
                 $completionRate = (int)round(((int)($project['completed_tasks'] ?? 0) / max(1, (int)($project['total_tasks'] ?? 0))) * 100);
                 $budgetAmount = (float)($projectFinancials['budget_amount'] ?? 0);
                 $budgetNotes = trim((string)($projectFinancials['budget_notes'] ?? ''));
@@ -542,9 +543,9 @@ if ($projectId > 0) {
                                 <small>Assigned client</small>
                             </div>
                             <div class="project-details-stat">
-                                <span>Engineer</span>
-                                <strong><?php echo htmlspecialchars($project['engineer_name'] ?? 'Not assigned'); ?></strong>
-                                <small>Current lead</small>
+                                <span>Assigned Engineer/s</span>
+                                <strong><?php echo htmlspecialchars($assignedEngineerNames !== '' ? $assignedEngineerNames : 'Not assigned'); ?></strong>
+                                <small>Current assigned team</small>
                             </div>
                             <div class="project-details-stat">
                                 <span>Completed On</span>
@@ -619,15 +620,15 @@ if ($projectId > 0) {
 
                                     <?php if ($hasProjectCodeColumn): ?>
                                         <div class="input-group">
-                                            <label for="project_code">Project Code <span class="optional-indicator">(Optional)</span></label>
-                                            <input type="text" id="project_code" name="project_code" value="<?php echo htmlspecialchars($project['project_code'] ?? ''); ?>" readonly data-project-editable>
+                                            <label for="project_code">Project Code <span class="required-indicator" aria-hidden="true">*</span></label>
+                                            <input type="text" id="project_code" name="project_code" value="<?php echo htmlspecialchars($project['project_code'] ?? ''); ?>" required readonly data-project-editable>
                                         </div>
                                     <?php endif; ?>
 
                                     <?php if ($hasPoNumberColumn): ?>
                                         <div class="input-group">
-                                            <label for="po_number">P.O Number <span class="optional-indicator">(Optional)</span></label>
-                                            <input type="text" id="po_number" name="po_number" value="<?php echo htmlspecialchars($project['po_number'] ?? ''); ?>" readonly data-project-editable>
+                                            <label for="po_number">P.O Number <span class="required-indicator" aria-hidden="true">*</span></label>
+                                            <input type="text" id="po_number" name="po_number" value="<?php echo htmlspecialchars($project['po_number'] ?? ''); ?>" required readonly data-project-editable>
                                         </div>
                                     <?php endif; ?>
 
@@ -684,10 +685,10 @@ if ($projectId > 0) {
                                     </div>
 
                                     <div class="input-group">
-                                        <label for="engineer_id">Engineer</label>
-                                        <select id="engineer_id" name="engineer_id" required disabled data-project-editable>
+                                        <label for="engineer_ids">Assigned Engineer/s</label>
+                                        <select id="engineer_ids" name="engineer_ids[]" required multiple size="<?php echo min(6, max(3, count($engineers))); ?>" disabled data-project-editable>
                                             <?php foreach ($engineers as $engineer): ?>
-                                                <option value="<?php echo (int)$engineer['id']; ?>" <?php echo $currentEngineerId === (int)$engineer['id'] ? 'selected' : ''; ?>>
+                                                <option value="<?php echo (int)$engineer['id']; ?>" <?php echo in_array((int)$engineer['id'], $assignedEngineerIds, true) ? 'selected' : ''; ?>>
                                                     <?php echo htmlspecialchars($engineer['full_name']); ?>
                                                 </option>
                                             <?php endforeach; ?>
@@ -985,7 +986,7 @@ if ($projectId > 0) {
                                     <select id="assigned_to" name="assigned_to" required data-inline-editable>
                                         <option value="">Select engineer</option>
                                         <?php foreach ($engineers as $engineer): ?>
-                                            <option value="<?php echo (int)$engineer['id']; ?>" <?php echo $currentEngineerId === (int)$engineer['id'] ? 'selected' : ''; ?>>
+                                            <option value="<?php echo (int)$engineer['id']; ?>" <?php echo $defaultTaskEngineerId === (int)$engineer['id'] ? 'selected' : ''; ?>>
                                                 <?php echo htmlspecialchars($engineer['full_name']); ?>
                                             </option>
                                         <?php endforeach; ?>

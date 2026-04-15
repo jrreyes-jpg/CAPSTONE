@@ -34,7 +34,7 @@ $payload = array_map(
             'title' => (string)($project['project_name'] ?? 'Project'),
             'status' => (string)($project['status'] ?? ''),
             'client' => (string)($project['client_name'] ?? 'N/A'),
-            'engineer' => (string)($project['engineer_name'] ?? 'Not assigned'),
+            'engineer' => (string)($project['engineer_names'] ?? 'Not assigned'),
             'site' => (string)($project['project_address'] ?? ''),
             'link' => '/codesamplecaps/SUPERADMIN/sidebar/project_details.php?id=' . (int)($project['id'] ?? 0),
         ];
