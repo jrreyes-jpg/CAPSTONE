@@ -152,6 +152,12 @@ function pm_ensure_project_cost_entries_table(mysqli $conn): void {
     );
 }
 
+function pm_ensure_project_address_column(mysqli $conn): void {
+    if (!pm_table_has_column($conn, 'projects', 'project_address')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN project_address TEXT DEFAULT NULL AFTER client_id");
+    }
+}
+
 function pm_get_project_financial_snapshot(mysqli $conn, int $projectId): ?array {
     $stmt = $conn->prepare(
         'SELECT
@@ -210,6 +216,7 @@ function pm_fetch_project_cost_entries(mysqli $conn, int $projectId): array {
 $supportsDraftStatus = pm_enum_supports_value($conn, 'projects', 'status', 'draft');
 $supportsCancelledStatus = pm_enum_supports_value($conn, 'projects', 'status', 'cancelled');
 $supportsArchivedStatus = pm_enum_supports_value($conn, 'projects', 'status', 'archived');
+pm_ensure_project_address_column($conn);
 $hasProjectAddressColumn = pm_table_has_column($conn, 'projects', 'project_address');
 $statusOptions = [];
 if ($supportsDraftStatus) {
@@ -435,10 +442,6 @@ if ($projectId > 0) {
 
     <main class="main-content">
         <div class="page-stack">
-            <div class="form-actions">
-                <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="btn-secondary">Back to Projects</a>
-            </div>
-
             <?php if ($flash): ?>
                 <div class="alert <?php echo $flash['type'] === 'success' ? 'alert-success' : 'alert-error'; ?>">
                     <?php echo htmlspecialchars($flash['message']); ?>
@@ -467,8 +470,12 @@ if ($projectId > 0) {
                 <section class="form-panel project-details-shell">
                     <div class="project-details-hero">
                         <div class="project-details-hero__main">
-                            <div>
-                                <h2 class="section-title-inline"><?php echo htmlspecialchars($project['project_name']); ?></h2>
+                            <div class="project-details-hero__headline">
+                                <div class="project-details-hero__eyebrow-row">
+                                    <span class="project-details-hero__eyebrow">Project Overview</span>
+                                    <span class="project-details-hero__reference"><?php echo htmlspecialchars($projectReference); ?></span>
+                                </div>
+                                <h1 class="project-details-hero__title"><?php echo htmlspecialchars($project['project_name']); ?></h1>
                                 <div class="status-pill-wrap">
                                     <span class="status-pill status-<?php echo htmlspecialchars($project['status']); ?>">
                                         <?php echo htmlspecialchars(ucfirst($project['status'])); ?>
@@ -479,6 +486,19 @@ if ($projectId > 0) {
                             <?php if (!empty($project['description'])): ?>
                                 <div class="empty-state empty-state-solid project-details-hero__description"><?php echo nl2br(htmlspecialchars($project['description'])); ?></div>
                             <?php endif; ?>
+
+                            <div class="project-details-progress-card" aria-label="Project progress">
+                                <div class="project-details-progress-card__header">
+                                    <div>
+                                        <span class="project-details-progress-card__label">Project Progress</span>
+                                        <strong><?php echo $completionRate; ?>% complete</strong>
+                                    </div>
+                                    <small><?php echo (int)$project['completed_tasks']; ?> of <?php echo (int)$project['total_tasks']; ?> tasks finished</small>
+                                </div>
+                                <div class="project-details-progress-card__track" aria-hidden="true">
+                                    <span class="project-details-progress-card__fill" style="width: <?php echo $completionRate; ?>%;"></span>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="project-details-stats">
@@ -515,77 +535,120 @@ if ($projectId > 0) {
                     </div>
                 </section>
 
-                <nav class="project-details-tabs" aria-label="Project detail sections">
-                    <button type="button" class="project-details-tab is-active" data-project-tab="overview">Overview</button>
-                    <button type="button" class="project-details-tab" data-project-tab="finance">Budget / Cost</button>
-                    <button type="button" class="project-details-tab" data-project-tab="status">Status</button>
-                    <button type="button" class="project-details-tab" data-project-tab="tasks">Tasks</button>
-                    <button type="button" class="project-details-tab" data-project-tab="inventory">Inventory</button>
-                    <button type="button" class="project-details-tab" data-project-tab="history">History</button>
-                </nav>
+                <div class="project-details-sticky-bar">
+                    <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="btn-secondary btn-back-projects">Back to Projects</a>
+                    <nav class="project-details-tabs" aria-label="Project detail sections">
+                        <button type="button" class="project-details-tab is-active" data-project-tab="overview">Overview</button>
+                        <button type="button" class="project-details-tab" data-project-tab="finance">Budget / Cost</button>
+                        <button type="button" class="project-details-tab" data-project-tab="status">Status</button>
+                        <button type="button" class="project-details-tab" data-project-tab="tasks">Tasks</button>
+                        <button type="button" class="project-details-tab" data-project-tab="inventory">Inventory</button>
+                        <button type="button" class="project-details-tab" data-project-tab="history">History</button>
+                    </nav>
+                </div>
 
                 <div class="project-details-panels">
                 <section class="form-panel project-details-panel is-active" data-project-panel="overview">
-                    <h2 class="section-title-inline">Edit Project Details</h2>
-                    <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php">
+                    <div class="project-details-panel__header">
+                        <h2 class="section-title-inline">Project Details</h2>
+                        <?php if (!$isCompleted): ?>
+                            <div class="project-edit-actions">
+                                <button type="button" class="btn-secondary project-edit-toggle project-edit-toggle--edit" data-project-edit-toggle>Edit</button>
+                                <button type="submit" form="project-details-edit-form" class="btn-primary project-edit-toggle project-edit-toggle--update hidden" data-project-update-button>Update</button>
+                                <button type="button" class="btn-secondary project-edit-toggle project-edit-toggle--cancel hidden" data-project-cancel-button>Cancel</button>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" data-project-edit-form id="project-details-edit-form">
                         <input type="hidden" name="action" value="update_project_details">
                         <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                         <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
 
-                        <div class="form-grid">
-                            <div class="input-group">
-                                <label for="project_name">Project Name</label>
-                                <input type="text" id="project_name" name="project_name" value="<?php echo htmlspecialchars($project['project_name']); ?>" required>
-                            </div>
-
-                            <div class="input-group">
-                                <label for="client_id">Client</label>
-                                <select id="client_id" name="client_id" required>
-                                    <?php foreach ($clients as $client): ?>
-                                        <option value="<?php echo (int)$client['id']; ?>" <?php echo (int)$project['client_id'] === (int)$client['id'] ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($client['full_name']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-
-                            <div class="input-group">
-                                <label for="engineer_id">Engineer</label>
-                                <select id="engineer_id" name="engineer_id" required>
-                                    <?php foreach ($engineers as $engineer): ?>
-                                        <option value="<?php echo (int)$engineer['id']; ?>" <?php echo $currentEngineerId === (int)$engineer['id'] ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($engineer['full_name']); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-
-                            <?php if ($hasProjectAddressColumn): ?>
-                                <div class="input-group input-group-wide">
-                                    <label for="project_address">Project Address / Site Location</label>
-                                    <textarea id="project_address" name="project_address" rows="2"><?php echo htmlspecialchars($project['project_address'] ?? ''); ?></textarea>
+                        <div class="project-details-form-sections">
+                            <section class="project-form-section">
+                                <div class="project-form-section__header">
+                                    <span class="project-form-section__eyebrow">Project Info</span>
+                                    <h3>Core project details</h3>
                                 </div>
-                            <?php endif; ?>
+                                <div class="form-grid">
+                                    <div class="input-group">
+                                        <label for="project_name">Project Name</label>
+                                        <input type="text" id="project_name" name="project_name" value="<?php echo htmlspecialchars($project['project_name']); ?>" required readonly data-project-editable>
+                                    </div>
 
-                            <div class="input-group">
-                                <label for="start_date">P.O Date</label>
-                                <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($project['start_date'] ?? ''); ?>">
-                            </div>
+                                    <?php if ($hasProjectAddressColumn): ?>
+                                        <div class="input-group input-group-wide">
+                                            <label for="project_address">Project Address / Site Location</label>
+                                            <textarea id="project_address" name="project_address" rows="2" readonly data-project-editable><?php echo htmlspecialchars($project['project_address'] ?? ''); ?></textarea>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <div class="input-group input-group-wide input-group-spaced">
+                                        <label for="description">Description</label>
+                                        <textarea id="description" name="description" readonly data-project-editable><?php echo htmlspecialchars($project['description'] ?? ''); ?></textarea>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="project-form-section">
+                                <div class="project-form-section__header">
+                                    <span class="project-form-section__eyebrow">Timeline</span>
+                                    <h3>Key project dates</h3>
+                                </div>
+                                <div class="form-grid">
+                                    <div class="input-group">
+                                        <label for="start_date">P.O Date</label>
+                                        <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($project['start_date'] ?? ''); ?>" readonly data-project-editable>
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Completed On</label>
+                                        <div class="project-form-static-field"><?php echo htmlspecialchars(pm_format_date($project['end_date'] ?? null)); ?></div>
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Created On</label>
+                                        <div class="project-form-static-field"><?php echo htmlspecialchars(pm_format_date($project['created_at'] ?? null)); ?></div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="project-form-section">
+                                <div class="project-form-section__header">
+                                    <span class="project-form-section__eyebrow">Assignment</span>
+                                    <h3>People responsible</h3>
+                                </div>
+                                <div class="form-grid">
+                                    <div class="input-group">
+                                        <label for="client_id">Client</label>
+                                        <select id="client_id" name="client_id" required disabled data-project-editable>
+                                            <?php foreach ($clients as $client): ?>
+                                                <option value="<?php echo (int)$client['id']; ?>" <?php echo (int)$project['client_id'] === (int)$client['id'] ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($client['full_name']); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+
+                                    <div class="input-group">
+                                        <label for="engineer_id">Engineer</label>
+                                        <select id="engineer_id" name="engineer_id" required disabled data-project-editable>
+                                            <?php foreach ($engineers as $engineer): ?>
+                                                <option value="<?php echo (int)$engineer['id']; ?>" <?php echo $currentEngineerId === (int)$engineer['id'] ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($engineer['full_name']); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                </div>
+                            </section>
                         </div>
 
-                        <div class="input-group input-group-spaced">
-                            <label for="description">Description</label>
-                            <textarea id="description" name="description"><?php echo htmlspecialchars($project['description'] ?? ''); ?></textarea>
-                        </div>
-
-                        <div class="form-actions">
-                            <button type="submit" class="btn-primary" <?php echo $isCompleted ? 'disabled' : ''; ?>>Save Project Details</button>
-                        </div>
                     </form>
                 </section>
 
                 <section class="form-panel project-details-panel" data-project-panel="finance">
-                    <h2 class="section-title-inline">Budget / Cost Management</h2>
+                    <div class="project-details-panel__header">
+                        <h2 class="section-title-inline">Budget / Cost Management</h2>
+                    </div>
 
                     <section class="cost-note-panel" aria-label="Project costing note">
                         <div class="cost-note-panel__title-row">
@@ -688,58 +751,68 @@ if ($projectId > 0) {
                     </section>
 
                     <div class="project-finance-forms">
-                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form project-finance-form">
+                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form project-finance-form" data-inline-edit-form>
                             <input type="hidden" name="action" value="save_project_budget">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
-                            <h4 class="subheading">Update Budget</h4>
+                            <div class="project-inline-form__header">
+                                <h4 class="subheading">Update Budget</h4>
+                                <div class="project-inline-form__actions">
+                                    <button type="button" class="btn-secondary project-inline-action project-inline-action--edit" data-inline-edit>Edit</button>
+                                    <button type="submit" class="btn-primary project-inline-action project-inline-action--update hidden" data-inline-update>Update</button>
+                                    <button type="button" class="btn-secondary project-inline-action project-inline-action--cancel hidden" data-inline-cancel>Cancel</button>
+                                </div>
+                            </div>
                             <div class="form-grid">
                                 <div class="input-group">
                                     <label for="budget_amount">Budget Amount</label>
-                                    <input type="number" id="budget_amount" name="budget_amount" min="0" step="0.01" value="<?php echo htmlspecialchars(number_format($budgetAmount, 2, '.', '')); ?>" required>
+                                    <input type="number" id="budget_amount" name="budget_amount" min="0" step="0.01" value="<?php echo htmlspecialchars(number_format($budgetAmount, 2, '.', '')); ?>" required data-inline-editable>
                                 </div>
                                 <div class="input-group">
                                     <label for="budget_notes">Notes</label>
-                                    <input type="text" id="budget_notes" name="budget_notes" value="<?php echo htmlspecialchars($budgetNotes); ?>" placeholder="Approved budget notes">
+                                    <input type="text" id="budget_notes" name="budget_notes" value="<?php echo htmlspecialchars($budgetNotes); ?>" placeholder="Approved budget notes" data-inline-editable>
                                 </div>
-                            </div>
-                            <div class="form-actions">
-                                <button type="submit" class="btn-secondary">Save Budget</button>
                             </div>
                         </form>
 
-                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form project-finance-form">
+                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form project-finance-form" data-inline-edit-form>
                             <input type="hidden" name="action" value="add_project_cost_entry">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
-                            <h4 class="subheading">Log Cost</h4>
+                            <div class="project-inline-form__header">
+                                <h4 class="subheading">Log Cost</h4>
+                                <div class="project-inline-form__actions">
+                                    <button type="button" class="btn-secondary project-inline-action project-inline-action--edit" data-inline-edit>Edit</button>
+                                    <button type="submit" class="btn-primary project-inline-action project-inline-action--update hidden" data-inline-update>Update</button>
+                                    <button type="button" class="btn-secondary project-inline-action project-inline-action--cancel hidden" data-inline-cancel>Cancel</button>
+                                </div>
+                            </div>
                             <div class="form-grid">
                                 <div class="input-group">
                                     <label for="cost_date">Date</label>
-                                    <input type="date" id="cost_date" name="cost_date" value="<?php echo htmlspecialchars($todayDate); ?>" required>
+                                    <input type="date" id="cost_date" name="cost_date" value="<?php echo htmlspecialchars($todayDate); ?>" required data-inline-editable>
                                 </div>
                                 <div class="input-group">
                                     <label for="cost_category">Category</label>
-                                    <input type="text" id="cost_category" name="cost_category" placeholder="Labor, Materials, Permit" required>
+                                    <input type="text" id="cost_category" name="cost_category" placeholder="Labor, Materials, Permit" required data-inline-editable>
                                 </div>
                                 <div class="input-group">
                                     <label for="cost_amount">Amount</label>
-                                    <input type="number" id="cost_amount" name="cost_amount" min="0.01" step="0.01" placeholder="0.00" required>
+                                    <input type="number" id="cost_amount" name="cost_amount" min="0.01" step="0.01" placeholder="0.00" required data-inline-editable>
                                 </div>
                                 <div class="input-group">
                                     <label for="cost_description">Description</label>
-                                    <input type="text" id="cost_description" name="cost_description" placeholder="Supplier, PO, or work package">
+                                    <input type="text" id="cost_description" name="cost_description" placeholder="Supplier, PO, or work package" data-inline-editable>
                                 </div>
-                            </div>
-                            <div class="form-actions">
-                                <button type="submit" class="btn-secondary">Add Cost</button>
                             </div>
                         </form>
                     </div>
                 </section>
 
                 <section class="form-panel project-details-panel" data-project-panel="status">
-                    <h2 class="section-title-inline">Update Status</h2>
+                    <div class="project-details-panel__header">
+                        <h2 class="section-title-inline">Update Status</h2>
+                    </div>
                     <?php if (!$isCompleted): ?>
                         <div class="lock-note">The completion date is now recorded automatically when the project is marked as Completed.</div>
                     <?php endif; ?>
@@ -754,14 +827,22 @@ if ($projectId > 0) {
                             </div>
                         </form>
                     <?php else: ?>
-                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form">
+                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form" data-inline-edit-form>
                             <input type="hidden" name="action" value="update_project_status">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
+                            <div class="project-inline-form__header">
+                                <h4 class="subheading">Primary Status</h4>
+                                <div class="project-inline-form__actions">
+                                    <button type="button" class="btn-secondary project-inline-action project-inline-action--edit" data-inline-edit>Edit</button>
+                                    <button type="submit" class="btn-primary project-inline-action project-inline-action--update hidden" data-inline-update>Update</button>
+                                    <button type="button" class="btn-secondary project-inline-action project-inline-action--cancel hidden" data-inline-cancel>Cancel</button>
+                                </div>
+                            </div>
                             <div class="form-grid">
                                 <div class="input-group">
                                     <label for="status">Status</label>
-                                    <select id="status" name="status" required>
+                                    <select id="status" name="status" required data-inline-editable>
                                         <?php foreach ($statusOptions as $statusOption): ?>
                                             <?php if ($statusOption === 'pending' && !in_array(($project['status'] ?? ''), ['pending', 'draft'], true)) { continue; } ?>
                                             <option value="<?php echo htmlspecialchars($statusOption); ?>" <?php echo $project['status'] === $statusOption ? 'selected' : ''; ?>>
@@ -770,9 +851,6 @@ if ($projectId > 0) {
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-                            </div>
-                            <div class="form-actions">
-                                <button type="submit" class="btn-primary">Save Status</button>
                             </div>
                         </form>
 
@@ -803,7 +881,9 @@ if ($projectId > 0) {
                 </section>
 
                 <section class="form-panel project-details-panel" data-project-panel="tasks">
-                    <h2 class="section-title-inline">Tasks</h2>
+                    <div class="project-details-panel__header">
+                        <h2 class="section-title-inline">Tasks</h2>
+                    </div>
 
                     <?php if (empty($tasks)): ?>
                         <div class="empty-state">No tasks yet for this project.</div>
@@ -826,21 +906,28 @@ if ($projectId > 0) {
                     <?php elseif ($isDraft): ?>
                         <div class="empty-state">Task creation is disabled while this project is still in draft.</div>
                     <?php else: ?>
-                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form">
+                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form" data-inline-edit-form>
                             <input type="hidden" name="action" value="add_task">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
 
-                            <h4 class="subheading">Add Task</h4>
+                            <div class="project-inline-form__header">
+                                <h4 class="subheading">Add Task</h4>
+                                <div class="project-inline-form__actions">
+                                    <button type="button" class="btn-secondary project-inline-action project-inline-action--edit" data-inline-edit>Edit</button>
+                                    <button type="submit" class="btn-primary project-inline-action project-inline-action--update hidden" data-inline-update>Update</button>
+                                    <button type="button" class="btn-secondary project-inline-action project-inline-action--cancel hidden" data-inline-cancel>Cancel</button>
+                                </div>
+                            </div>
                             <div class="form-grid">
                                 <div class="input-group">
                                     <label for="task_name">Task Name</label>
-                                    <input type="text" id="task_name" name="task_name" required>
+                                    <input type="text" id="task_name" name="task_name" required data-inline-editable>
                                 </div>
 
                                 <div class="input-group">
                                     <label for="assigned_to">Assign To</label>
-                                    <select id="assigned_to" name="assigned_to" required>
+                                    <select id="assigned_to" name="assigned_to" required data-inline-editable>
                                         <option value="">Select engineer</option>
                                         <?php foreach ($engineers as $engineer): ?>
                                             <option value="<?php echo (int)$engineer['id']; ?>" <?php echo $currentEngineerId === (int)$engineer['id'] ? 'selected' : ''; ?>>
@@ -852,24 +939,22 @@ if ($projectId > 0) {
 
                                 <div class="input-group">
                                     <label for="deadline">Deadline</label>
-                                    <input type="date" id="deadline" name="deadline" min="<?php echo htmlspecialchars($todayDate); ?>">
+                                    <input type="date" id="deadline" name="deadline" min="<?php echo htmlspecialchars($todayDate); ?>" data-inline-editable>
                                 </div>
                             </div>
 
                             <div class="input-group">
                                 <label for="task_description">Task Description</label>
-                                <textarea id="task_description" name="task_description" placeholder="Task details"></textarea>
-                            </div>
-
-                            <div class="form-actions">
-                                <button type="submit" class="btn-primary">Add Task</button>
+                                <textarea id="task_description" name="task_description" placeholder="Task details" data-inline-editable></textarea>
                             </div>
                         </form>
                     <?php endif; ?>
                 </section>
 
                 <section class="form-panel project-details-panel" data-project-panel="inventory">
-                    <h2 class="section-title-inline">Deployed Inventory</h2>
+                    <div class="project-details-panel__header">
+                        <h2 class="section-title-inline">Deployed Inventory</h2>
+                    </div>
 
                     <?php if (empty($activeDeployments)): ?>
                         <div class="empty-state">No inventory deployed to this project yet.</div>
@@ -916,15 +1001,22 @@ if ($projectId > 0) {
                     <?php elseif (empty($availableInventory)): ?>
                         <div class="empty-state">No available inventory to deploy right now.</div>
                     <?php else: ?>
-                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form">
+                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form" data-inline-edit-form>
                             <input type="hidden" name="action" value="deploy_inventory_to_project">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
-                            <h4 class="subheading">Deploy Inventory</h4>
+                            <div class="project-inline-form__header">
+                                <h4 class="subheading">Deploy Inventory</h4>
+                                <div class="project-inline-form__actions">
+                                    <button type="button" class="btn-secondary project-inline-action project-inline-action--edit" data-inline-edit>Edit</button>
+                                    <button type="submit" class="btn-primary project-inline-action project-inline-action--update hidden" data-inline-update>Update</button>
+                                    <button type="button" class="btn-secondary project-inline-action project-inline-action--cancel hidden" data-inline-cancel>Cancel</button>
+                                </div>
+                            </div>
                             <div class="form-grid">
                                 <div class="input-group">
                                     <label for="inventory_id">Inventory Item</label>
-                                    <select id="inventory_id" name="inventory_id" required>
+                                    <select id="inventory_id" name="inventory_id" required data-inline-editable>
                                         <option value="">Select inventory item</option>
                                         <?php foreach ($availableInventory as $inventoryItem): ?>
                                             <option value="<?php echo (int)$inventoryItem['id']; ?>">
@@ -946,23 +1038,23 @@ if ($projectId > 0) {
 
                                 <div class="input-group">
                                     <label for="deployment_quantity">Quantity</label>
-                                    <input type="number" id="deployment_quantity" name="deployment_quantity" min="1" step="1" required>
+                                    <input type="number" id="deployment_quantity" name="deployment_quantity" min="1" step="1" required data-inline-editable>
                                 </div>
 
                                 <div class="input-group">
                                     <label for="deployment_notes">Notes</label>
-                                    <input type="text" id="deployment_notes" name="deployment_notes" placeholder="Optional deployment note">
+                                    <input type="text" id="deployment_notes" name="deployment_notes" placeholder="Optional deployment note" data-inline-editable>
                                 </div>
-                            </div>
-                            <div class="form-actions">
-                                <button type="submit" class="btn-primary">Deploy Inventory</button>
                             </div>
                         </form>
                     <?php endif; ?>
                 </section>
 
                 <section class="form-panel project-details-panel" data-project-panel="history">
-                    <h2 class="section-title-inline">Deployment History</h2>
+                    <div class="project-details-panel__header">
+                        <h2 class="section-title-inline">Deployment History</h2>
+                        <span class="project-readonly-badge">Read Only</span>
+                    </div>
 
                     <?php if (empty($deploymentHistory)): ?>
                         <div class="empty-state">No deployment history for this project yet.</div>
@@ -1023,6 +1115,113 @@ document.addEventListener('DOMContentLoaded', function () {
         tab.addEventListener('click', function () {
             const tabName = tab.getAttribute('data-project-tab') || 'overview';
             setActiveProjectTab(tabName);
+        });
+    });
+
+    const editForm = document.querySelector('[data-project-edit-form]');
+    const editToggle = document.querySelector('[data-project-edit-toggle]');
+    const updateButton = document.querySelector('[data-project-update-button]');
+    const cancelButton = document.querySelector('[data-project-cancel-button]');
+    const editableFields = Array.from(document.querySelectorAll('[data-project-editable]'));
+    const overviewPanel = document.querySelector('[data-project-panel="overview"]');
+
+    if (editForm && editToggle && updateButton && cancelButton && editableFields.length > 0) {
+        const fieldSnapshots = editableFields.map(function (field) {
+            return {
+                field: field,
+                value: field.value,
+            };
+        });
+
+        const setEditMode = function (isEditing) {
+            editableFields.forEach(function (field) {
+                if (field.tagName === 'SELECT') {
+                    field.disabled = !isEditing;
+                } else {
+                    if (isEditing) {
+                        field.removeAttribute('readonly');
+                    } else {
+                        field.setAttribute('readonly', 'readonly');
+                    }
+                }
+            });
+
+            editToggle.classList.toggle('hidden', isEditing);
+            updateButton.classList.toggle('hidden', !isEditing);
+            cancelButton.classList.toggle('hidden', !isEditing);
+
+            if (overviewPanel) {
+                overviewPanel.classList.toggle('is-editing', isEditing);
+            }
+        };
+
+        setEditMode(false);
+
+        editToggle.addEventListener('click', function () {
+            setEditMode(true);
+            const firstField = editableFields.find(function (field) {
+                return !field.disabled;
+            });
+
+            if (firstField && typeof firstField.focus === 'function') {
+                firstField.focus();
+            }
+        });
+
+        cancelButton.addEventListener('click', function () {
+            fieldSnapshots.forEach(function (snapshot) {
+                snapshot.field.value = snapshot.value;
+            });
+            setEditMode(false);
+        });
+    }
+
+    document.querySelectorAll('[data-inline-edit-form]').forEach(function (form) {
+        const editButton = form.querySelector('[data-inline-edit]');
+        const updateInlineButton = form.querySelector('[data-inline-update]');
+        const cancelInlineButton = form.querySelector('[data-inline-cancel]');
+        const fields = Array.from(form.querySelectorAll('[data-inline-editable]'));
+
+        if (!editButton || !updateInlineButton || !cancelInlineButton || fields.length === 0) {
+            return;
+        }
+
+        const fieldSnapshots = fields.map(function (field) {
+            return {
+                field: field,
+                value: field.value,
+            };
+        });
+
+        const setInlineEditMode = function (isEditing) {
+            fields.forEach(function (field) {
+                field.disabled = !isEditing;
+            });
+
+            form.classList.toggle('is-editing', isEditing);
+            editButton.classList.toggle('hidden', isEditing);
+            updateInlineButton.classList.toggle('hidden', !isEditing);
+            cancelInlineButton.classList.toggle('hidden', !isEditing);
+        };
+
+        setInlineEditMode(false);
+
+        editButton.addEventListener('click', function () {
+            setInlineEditMode(true);
+            const firstField = fields.find(function (field) {
+                return !field.disabled;
+            });
+
+            if (firstField && typeof firstField.focus === 'function') {
+                firstField.focus();
+            }
+        });
+
+        cancelInlineButton.addEventListener('click', function () {
+            fieldSnapshots.forEach(function (snapshot) {
+                snapshot.field.value = snapshot.value;
+            });
+            setInlineEditMode(false);
         });
     });
 });
