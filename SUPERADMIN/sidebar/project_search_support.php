@@ -198,6 +198,7 @@ if (!function_exists('project_search_fetch_page')) {
                 p.status,
                 p.created_at,
                 client.full_name AS client_name,
+                client.email AS client_email,
                 latest_assignment.engineer_id,
                 engineer.full_name AS engineer_name,
                 COALESCE(budget_profiles.budget_amount, 0) AS budget_amount,

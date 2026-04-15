@@ -155,6 +155,10 @@ function format_money($value): string {
     return 'PHP ' . number_format((float)$value, 2);
 }
 
+function format_project_reference(int $projectId): string {
+    return 'PRJ-' . str_pad((string)$projectId, 5, '0', STR_PAD_LEFT);
+}
+
 function build_budget_health(float $budgetAmount, float $totalCost): array {
     if ($budgetAmount <= 0) {
         return ['status' => 'unplanned', 'label' => 'No budget set'];
@@ -1663,6 +1667,8 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             $budgetUsage = $budgetAmount > 0 ? min(100, round(($totalCost / $budgetAmount) * 100)) : 0;
                             $budgetHealth = build_budget_health($budgetAmount, $totalCost);
                             $projectRecentCosts = $recentProjectCosts[(int)($project['id'] ?? 0)] ?? [];
+                            $projectReference = format_project_reference((int)($project['id'] ?? 0));
+                            $clientEmail = trim((string)($project['client_email'] ?? ''));
                             $searchText = strtolower(trim(implode(' ', [
                                 $project['project_name'] ?? '',
                                 $project['client_name'] ?? '',
@@ -1801,6 +1807,49 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                         </div>
                                     </form>
                                 </div>
+
+                                <section class="cost-note-panel" aria-label="Project costing note">
+                                    <div class="cost-note-panel__title-row">
+                                        <div>
+                                            <span class="cost-note-panel__eyebrow">Project Costing Note</span>
+                                            <h4>Budget / Cost Management Details</h4>
+                                        </div>
+                                        <span class="budget-health budget-health--<?php echo htmlspecialchars($budgetHealth['status']); ?>">
+                                            <?php echo htmlspecialchars($budgetHealth['label']); ?>
+                                        </span>
+                                    </div>
+
+                                    <div class="cost-note-grid">
+                                        <div class="cost-note-field">
+                                            <span>Client</span>
+                                            <strong><?php echo htmlspecialchars($project['client_name'] ?? 'N/A'); ?></strong>
+                                        </div>
+                                        <div class="cost-note-field">
+                                            <span>PO Number</span>
+                                            <strong>Not set</strong>
+                                        </div>
+                                        <div class="cost-note-field cost-note-field--wide">
+                                            <span>Project Title</span>
+                                            <strong><?php echo htmlspecialchars($project['project_name'] ?? 'Untitled project'); ?></strong>
+                                        </div>
+                                        <div class="cost-note-field">
+                                            <span>PO Date</span>
+                                            <strong>Not set</strong>
+                                        </div>
+                                        <div class="cost-note-field">
+                                            <span>Project Code</span>
+                                            <strong><?php echo htmlspecialchars($projectReference); ?></strong>
+                                        </div>
+                                        <div class="cost-note-field cost-note-field--wide">
+                                            <span>Address</span>
+                                            <strong><?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></strong>
+                                        </div>
+                                        <div class="cost-note-field cost-note-field--wide">
+                                            <span>Email Address</span>
+                                            <strong><?php echo htmlspecialchars($clientEmail !== '' ? $clientEmail : 'Not set'); ?></strong>
+                                        </div>
+                                    </div>
+                                </section>
 
                                 <div class="form-actions project-card__actions">
                                     <a href="<?php echo htmlspecialchars($detailsPath); ?>" class="btn-primary project-card__details-btn">View Details</a>

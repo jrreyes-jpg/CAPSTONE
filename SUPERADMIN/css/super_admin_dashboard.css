@@ -3848,6 +3848,72 @@ tbody tr:hover {
     background: #f8fafc;
 }
 
+.cost-note-panel {
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(37, 99, 235, 0.18);
+    background: linear-gradient(180deg, #ffffff, #eff6ff);
+}
+
+.cost-note-panel__title-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.cost-note-panel__eyebrow {
+    display: inline-block;
+    margin-bottom: 6px;
+    color: #1d4ed8;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.cost-note-panel__title-row h4 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 1rem;
+}
+
+.cost-note-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.cost-note-field {
+    display: grid;
+    gap: 4px;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px dashed rgba(37, 99, 235, 0.22);
+}
+
+.cost-note-field--wide {
+    grid-column: 1 / -1;
+}
+
+.cost-note-field span {
+    color: #64748b;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.cost-note-field strong {
+    color: #0f172a;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    word-break: break-word;
+}
+
 .project-card__actions {
     margin-top: auto;
 }
@@ -4179,8 +4245,13 @@ tbody tr:hover {
     }
 
     .budget-panel__header,
-    .budget-ledger__item {
+    .budget-ledger__item,
+    .cost-note-panel__title-row {
         flex-direction: column;
+    }
+
+    .cost-note-grid {
+        grid-template-columns: 1fr;
     }
 
     .project-details-shell,
