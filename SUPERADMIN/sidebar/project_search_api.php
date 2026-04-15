@@ -12,6 +12,8 @@ $statusFilter = trim((string)($_GET['status'] ?? ''));
 $limit = min(10, max(1, (int)($_GET['limit'] ?? 8)));
 $hasProjectAddressColumn = project_search_table_has_column($conn, 'projects', 'project_address');
 $hasProjectEmailColumn = project_search_table_has_column($conn, 'projects', 'project_email');
+$hasProjectCodeColumn = project_search_table_has_column($conn, 'projects', 'project_code');
+$hasPoNumberColumn = project_search_table_has_column($conn, 'projects', 'po_number');
 
 ensure_project_search_indexes($conn, $hasProjectAddressColumn);
 
@@ -24,7 +26,7 @@ if (mb_strlen($searchQuery) < 2) {
     exit();
 }
 
-$results = project_search_fetch_suggestions($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $searchQuery, $statusFilter, $limit);
+$results = project_search_fetch_suggestions($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $searchQuery, $statusFilter, $limit);
 $payload = array_map(
     static function (array $project): array {
         return [

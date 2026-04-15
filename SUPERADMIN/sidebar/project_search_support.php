@@ -112,7 +112,7 @@ if (!function_exists('project_search_latest_assignment_sql')) {
 }
 
 if (!function_exists('project_search_build_filter')) {
-    function project_search_build_filter(bool $hasProjectAddressColumn, bool $hasProjectEmailColumn, string $searchQuery, string $statusFilter): array {
+    function project_search_build_filter(bool $hasProjectAddressColumn, bool $hasProjectEmailColumn, bool $hasProjectCodeColumn, bool $hasPoNumberColumn, string $searchQuery, string $statusFilter): array {
         $conditions = [];
         $types = '';
         $params = [];
@@ -137,6 +137,16 @@ if (!function_exists('project_search_build_filter')) {
                 $searchParams[] = $likeValue;
             }
 
+            if ($hasProjectCodeColumn) {
+                $searchConditions[] = 'p.project_code LIKE ?';
+                $searchParams[] = $likeValue;
+            }
+
+            if ($hasPoNumberColumn) {
+                $searchConditions[] = 'p.po_number LIKE ?';
+                $searchParams[] = $likeValue;
+            }
+
             $conditions[] = '(' . implode(' OR ', $searchConditions) . ')';
             $types .= str_repeat('s', count($searchParams));
             array_push($params, ...$searchParams);
@@ -155,8 +165,8 @@ if (!function_exists('project_search_build_filter')) {
 }
 
 if (!function_exists('project_search_fetch_count')) {
-    function project_search_fetch_count(mysqli $conn, bool $hasProjectAddressColumn, bool $hasProjectEmailColumn, string $searchQuery, string $statusFilter): int {
-        [$whereSql, $types, $params] = project_search_build_filter($hasProjectAddressColumn, $hasProjectEmailColumn, $searchQuery, $statusFilter);
+    function project_search_fetch_count(mysqli $conn, bool $hasProjectAddressColumn, bool $hasProjectEmailColumn, bool $hasProjectCodeColumn, bool $hasPoNumberColumn, string $searchQuery, string $statusFilter): int {
+        [$whereSql, $types, $params] = project_search_build_filter($hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $searchQuery, $statusFilter);
 
         $sql = "
             SELECT COUNT(*) AS total
@@ -184,14 +194,18 @@ if (!function_exists('project_search_fetch_page')) {
         mysqli $conn,
         bool $hasProjectAddressColumn,
         bool $hasProjectEmailColumn,
+        bool $hasProjectCodeColumn,
+        bool $hasPoNumberColumn,
         string $searchQuery,
         string $statusFilter,
         int $limit,
         int $offset
     ): array {
-        [$whereSql, $types, $params] = project_search_build_filter($hasProjectAddressColumn, $hasProjectEmailColumn, $searchQuery, $statusFilter);
+        [$whereSql, $types, $params] = project_search_build_filter($hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $searchQuery, $statusFilter);
         $projectAddressSelect = $hasProjectAddressColumn ? 'p.project_address,' : 'NULL AS project_address,';
         $projectEmailSelect = $hasProjectEmailColumn ? 'p.project_email,' : 'NULL AS project_email,';
+        $projectCodeSelect = $hasProjectCodeColumn ? 'p.project_code,' : 'NULL AS project_code,';
+        $poNumberSelect = $hasPoNumberColumn ? 'p.po_number,' : 'NULL AS po_number,';
 
         $sql = "
             SELECT
@@ -200,6 +214,8 @@ if (!function_exists('project_search_fetch_page')) {
                 p.description,
                 {$projectAddressSelect}
                 {$projectEmailSelect}
+                {$projectCodeSelect}
+                {$poNumberSelect}
                 p.client_id,
                 p.start_date,
                 p.end_date,
@@ -266,13 +282,17 @@ if (!function_exists('project_search_fetch_suggestions')) {
         mysqli $conn,
         bool $hasProjectAddressColumn,
         bool $hasProjectEmailColumn,
+        bool $hasProjectCodeColumn,
+        bool $hasPoNumberColumn,
         string $searchQuery,
         string $statusFilter,
         int $limit = 8
     ): array {
-        [$whereSql, $types, $params] = project_search_build_filter($hasProjectAddressColumn, $hasProjectEmailColumn, $searchQuery, $statusFilter);
+        [$whereSql, $types, $params] = project_search_build_filter($hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $searchQuery, $statusFilter);
         $projectAddressSelect = $hasProjectAddressColumn ? 'p.project_address,' : 'NULL AS project_address,';
         $projectEmailSelect = $hasProjectEmailColumn ? 'p.project_email,' : 'NULL AS project_email,';
+        $projectCodeSelect = $hasProjectCodeColumn ? 'p.project_code,' : 'NULL AS project_code,';
+        $poNumberSelect = $hasPoNumberColumn ? 'p.po_number,' : 'NULL AS po_number,';
         $relevanceLike = $searchQuery . '%';
 
         $sql = "
@@ -282,6 +302,8 @@ if (!function_exists('project_search_fetch_suggestions')) {
                 p.status,
                 {$projectAddressSelect}
                 {$projectEmailSelect}
+                {$projectCodeSelect}
+                {$poNumberSelect}
                 client.full_name AS client_name,
                 engineer.full_name AS engineer_name
             FROM projects p
@@ -295,8 +317,10 @@ if (!function_exists('project_search_fetch_suggestions')) {
                     WHEN client.full_name LIKE ? THEN 1
                     WHEN engineer.full_name LIKE ? THEN 2
                     " . ($hasProjectAddressColumn ? "WHEN p.project_address LIKE ? THEN 3" : '') . "
-                    " . ($hasProjectEmailColumn ? "WHEN p.project_email LIKE ? THEN " . ($hasProjectAddressColumn ? '4' : '3') : '') . "
-                    ELSE " . ($hasProjectAddressColumn || $hasProjectEmailColumn ? ($hasProjectAddressColumn && $hasProjectEmailColumn ? '5' : '4') : '3') . "
+                    " . ($hasProjectEmailColumn ? "WHEN p.project_email LIKE ? THEN 4" : '') . "
+                    " . ($hasProjectCodeColumn ? "WHEN p.project_code LIKE ? THEN 5" : '') . "
+                    " . ($hasPoNumberColumn ? "WHEN p.po_number LIKE ? THEN 6" : '') . "
+                    ELSE 7
                 END,
                 p.created_at DESC,
                 p.id DESC
@@ -308,6 +332,12 @@ if (!function_exists('project_search_fetch_suggestions')) {
             $relevanceParams[] = $relevanceLike;
         }
         if ($hasProjectEmailColumn) {
+            $relevanceParams[] = $relevanceLike;
+        }
+        if ($hasProjectCodeColumn) {
+            $relevanceParams[] = $relevanceLike;
+        }
+        if ($hasPoNumberColumn) {
             $relevanceParams[] = $relevanceLike;
         }
 

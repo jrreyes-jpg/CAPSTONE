@@ -43,24 +43,6 @@ function pm_format_money($value): string {
     return 'PHP ' . number_format((float)$value, 2);
 }
 
-function pm_format_project_reference(int $projectId): string {
-    return 'PRJ-' . str_pad((string)$projectId, 5, '0', STR_PAD_LEFT);
-}
-
-function pm_format_project_po_number(int $projectId, ?string $poDate = null): string {
-    $year = date('Y');
-
-    if ($poDate !== null && trim($poDate) !== '') {
-        try {
-            $year = (new DateTimeImmutable($poDate))->format('Y');
-        } catch (Throwable $exception) {
-            $year = date('Y');
-        }
-    }
-
-    return 'PO-' . $year . '-' . str_pad((string)$projectId, 5, '0', STR_PAD_LEFT);
-}
-
 function pm_format_date(?string $value): string {
     $value = trim((string)$value);
     if ($value === '') {
@@ -178,6 +160,18 @@ function pm_ensure_project_email_column(mysqli $conn): void {
     }
 }
 
+function pm_ensure_project_code_column(mysqli $conn): void {
+    if (!pm_table_has_column($conn, 'projects', 'project_code')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN project_code VARCHAR(80) DEFAULT NULL AFTER project_email");
+    }
+}
+
+function pm_ensure_project_po_number_column(mysqli $conn): void {
+    if (!pm_table_has_column($conn, 'projects', 'po_number')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN po_number VARCHAR(80) DEFAULT NULL AFTER project_code");
+    }
+}
+
 function pm_get_project_financial_snapshot(mysqli $conn, int $projectId): ?array {
     $stmt = $conn->prepare(
         'SELECT
@@ -238,8 +232,12 @@ $supportsCancelledStatus = pm_enum_supports_value($conn, 'projects', 'status', '
 $supportsArchivedStatus = pm_enum_supports_value($conn, 'projects', 'status', 'archived');
 pm_ensure_project_address_column($conn);
 pm_ensure_project_email_column($conn);
+pm_ensure_project_code_column($conn);
+pm_ensure_project_po_number_column($conn);
 $hasProjectAddressColumn = pm_table_has_column($conn, 'projects', 'project_address');
 $hasProjectEmailColumn = pm_table_has_column($conn, 'projects', 'project_email');
+$hasProjectCodeColumn = pm_table_has_column($conn, 'projects', 'project_code');
+$hasPoNumberColumn = pm_table_has_column($conn, 'projects', 'po_number');
 $statusOptions = [];
 if ($supportsDraftStatus) {
     $statusOptions[] = 'draft';
@@ -286,6 +284,8 @@ if ($engineerResult) {
 if ($projectId > 0) {
     $projectAddressSelect = $hasProjectAddressColumn ? 'p.project_address,' : 'NULL AS project_address,';
     $projectEmailSelect = $hasProjectEmailColumn ? 'p.project_email,' : 'NULL AS project_email,';
+    $projectCodeSelect = $hasProjectCodeColumn ? 'p.project_code,' : 'NULL AS project_code,';
+    $poNumberSelect = $hasPoNumberColumn ? 'p.po_number,' : 'NULL AS po_number,';
 
     $projectStmt = $conn->prepare("
         SELECT
@@ -294,6 +294,8 @@ if ($projectId > 0) {
             p.description,
             {$projectAddressSelect}
             {$projectEmailSelect}
+            {$projectCodeSelect}
+            {$poNumberSelect}
             p.client_id,
             p.start_date,
             p.end_date,
@@ -487,8 +489,8 @@ if ($projectId > 0) {
                 $costEntryCount = (int)($projectFinancials['cost_entry_count'] ?? 0);
                 $budgetUsage = $budgetAmount > 0 ? min(100, round(($totalCost / $budgetAmount) * 100)) : 0;
                 $budgetHealth = pm_build_budget_health($budgetAmount, $totalCost);
-                $projectReference = pm_format_project_reference((int)($project['id'] ?? 0));
-                $projectPoNumber = pm_format_project_po_number((int)($project['id'] ?? 0), $project['start_date'] ?? null);
+                $projectCode = trim((string)($project['project_code'] ?? ''));
+                $projectPoNumber = trim((string)($project['po_number'] ?? ''));
                 $projectEmail = trim((string)($project['project_email'] ?? ''));
                 ?>
 
@@ -498,7 +500,9 @@ if ($projectId > 0) {
                             <div class="project-details-hero__headline">
                                 <div class="project-details-hero__eyebrow-row">
                                     <span class="project-details-hero__eyebrow">Project Overview</span>
-                                    <span class="project-details-hero__reference"><?php echo htmlspecialchars($projectReference); ?></span>
+                                    <?php if ($projectCode !== ''): ?>
+                                        <span class="project-details-hero__reference"><?php echo htmlspecialchars($projectCode); ?></span>
+                                    <?php endif; ?>
                                 </div>
                                 <h1 class="project-details-hero__title"><?php echo htmlspecialchars($project['project_name']); ?></h1>
                                 <div class="status-pill-wrap">
@@ -551,8 +555,8 @@ if ($projectId > 0) {
                     </div>
 
                     <div class="project-details-glance">
-                        <div><strong>Project Code:</strong> <?php echo htmlspecialchars($projectReference); ?></div>
-                        <div><strong>P.O Number:</strong> <?php echo htmlspecialchars($projectPoNumber); ?></div>
+                        <div><strong>Project Code:</strong> <?php echo htmlspecialchars($projectCode !== '' ? $projectCode : 'Not set'); ?></div>
+                        <div><strong>P.O Number:</strong> <?php echo htmlspecialchars($projectPoNumber !== '' ? $projectPoNumber : 'Not set'); ?></div>
                         <div><strong>P.O Date:</strong> <?php echo htmlspecialchars(pm_format_date($project['start_date'] ?? null)); ?></div>
                         <div><strong>Completed:</strong> <?php echo htmlspecialchars(pm_format_date($project['end_date'] ?? null)); ?></div>
                         <div><strong>Created:</strong> <?php echo htmlspecialchars($project['created_at'] ?? 'N/A'); ?></div>
@@ -610,6 +614,20 @@ if ($projectId > 0) {
                                         <div class="input-group">
                                             <label for="project_email">Email Address <span class="optional-indicator">(Optional)</span></label>
                                             <input type="email" id="project_email" name="project_email" value="<?php echo htmlspecialchars($project['project_email'] ?? ''); ?>" readonly data-project-editable>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <?php if ($hasProjectCodeColumn): ?>
+                                        <div class="input-group">
+                                            <label for="project_code">Project Code <span class="optional-indicator">(Optional)</span></label>
+                                            <input type="text" id="project_code" name="project_code" value="<?php echo htmlspecialchars($project['project_code'] ?? ''); ?>" readonly data-project-editable>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <?php if ($hasPoNumberColumn): ?>
+                                        <div class="input-group">
+                                            <label for="po_number">P.O Number <span class="optional-indicator">(Optional)</span></label>
+                                            <input type="text" id="po_number" name="po_number" value="<?php echo htmlspecialchars($project['po_number'] ?? ''); ?>" readonly data-project-editable>
                                         </div>
                                     <?php endif; ?>
 
@@ -705,7 +723,7 @@ if ($projectId > 0) {
                             </div>
                             <div class="cost-note-field">
                                 <span>PO Number</span>
-                                <strong>Not set</strong>
+                                <strong><?php echo htmlspecialchars($projectPoNumber !== '' ? $projectPoNumber : 'Not set'); ?></strong>
                             </div>
                             <div class="cost-note-field cost-note-field--wide">
                                 <span>Project Title</span>
@@ -717,7 +735,7 @@ if ($projectId > 0) {
                             </div>
                             <div class="cost-note-field">
                                 <span>Project Code</span>
-                                <strong><?php echo htmlspecialchars($projectReference); ?></strong>
+                                <strong><?php echo htmlspecialchars($projectCode !== '' ? $projectCode : 'Not set'); ?></strong>
                             </div>
                             <div class="cost-note-field cost-note-field--wide">
                                 <span>Address</span>
