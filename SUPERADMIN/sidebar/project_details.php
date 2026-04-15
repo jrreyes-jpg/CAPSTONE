@@ -73,6 +73,22 @@ function pm_build_budget_health(float $budgetAmount, float $totalCost): array {
     return ['status' => 'healthy', 'label' => 'On track'];
 }
 
+function pm_determine_payment_status(float $totalCost, float $amountPaid): array {
+    if ($amountPaid <= 0.0) {
+        return ['status' => 'unpaid', 'label' => 'Unpaid'];
+    }
+
+    if ($totalCost > 0 && $amountPaid + 0.00001 < $totalCost) {
+        return ['status' => 'partial', 'label' => 'Partial'];
+    }
+
+    if ($totalCost <= 0) {
+        return ['status' => 'partial', 'label' => 'Partial'];
+    }
+
+    return ['status' => 'paid', 'label' => 'Paid'];
+}
+
 function pm_ensure_project_inventory_deployments_table(mysqli $conn): void {
     $conn->query(
         "CREATE TABLE IF NOT EXISTS project_inventory_deployments (
@@ -148,6 +164,24 @@ function pm_ensure_project_cost_entries_table(mysqli $conn): void {
     );
 }
 
+function pm_ensure_project_payments_table(mysqli $conn): void {
+    $conn->query(
+        "CREATE TABLE IF NOT EXISTS project_payments (
+            id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            project_id INT(11) NOT NULL,
+            payment_date DATE NOT NULL,
+            amount DECIMAL(14,2) NOT NULL,
+            notes VARCHAR(255) DEFAULT NULL,
+            created_by INT(11) NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_project_payments_project_date (project_id, payment_date, id),
+            KEY idx_project_payments_created_by (created_by),
+            CONSTRAINT fk_project_payments_project FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+            CONSTRAINT fk_project_payments_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
 function pm_ensure_project_address_column(mysqli $conn): void {
     if (!pm_table_has_column($conn, 'projects', 'project_address')) {
         $conn->query("ALTER TABLE projects ADD COLUMN project_address TEXT DEFAULT NULL AFTER client_id");
@@ -202,6 +236,39 @@ function pm_get_project_financial_snapshot(mysqli $conn, int $projectId): ?array
     return $result ? $result->fetch_assoc() : null;
 }
 
+function pm_get_project_payment_snapshot(mysqli $conn, int $projectId): ?array {
+    $stmt = $conn->prepare(
+        'SELECT
+            p.id,
+            COALESCE(cost_totals.total_cost, 0) AS total_cost,
+            COALESCE(payment_totals.amount_paid, 0) AS amount_paid,
+            COALESCE(payment_totals.payment_entry_count, 0) AS payment_entry_count
+         FROM projects p
+         LEFT JOIN (
+             SELECT project_id, SUM(amount) AS total_cost
+             FROM project_cost_entries
+             GROUP BY project_id
+         ) cost_totals ON cost_totals.project_id = p.id
+         LEFT JOIN (
+             SELECT project_id, SUM(amount) AS amount_paid, COUNT(*) AS payment_entry_count
+             FROM project_payments
+             GROUP BY project_id
+         ) payment_totals ON payment_totals.project_id = p.id
+         WHERE p.id = ?
+         LIMIT 1'
+    );
+
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('i', $projectId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result ? $result->fetch_assoc() : null;
+}
+
 function pm_fetch_project_cost_entries(mysqli $conn, int $projectId): array {
     $stmt = $conn->prepare(
         'SELECT
@@ -214,6 +281,30 @@ function pm_fetch_project_cost_entries(mysqli $conn, int $projectId): array {
          LEFT JOIN users u ON u.id = pce.created_by
          WHERE pce.project_id = ?
          ORDER BY pce.cost_date DESC, pce.id DESC'
+    );
+
+    if (!$stmt) {
+        return [];
+    }
+
+    $stmt->bind_param('i', $projectId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+function pm_fetch_project_payment_entries(mysqli $conn, int $projectId): array {
+    $stmt = $conn->prepare(
+        'SELECT
+            pp.payment_date,
+            pp.amount,
+            pp.notes,
+            u.full_name AS created_by_name
+         FROM project_payments pp
+         LEFT JOIN users u ON u.id = pp.created_by
+         WHERE pp.project_id = ?
+         ORDER BY pp.payment_date DESC, pp.id DESC'
     );
 
     if (!$stmt) {
@@ -257,6 +348,7 @@ pm_ensure_project_inventory_deployments_table($conn);
 pm_ensure_project_inventory_return_logs_table($conn);
 pm_ensure_project_budget_profiles_table($conn);
 pm_ensure_project_cost_entries_table($conn);
+pm_ensure_project_payments_table($conn);
 
 $flash = $_SESSION['projects_flash'] ?? null;
 unset($_SESSION['projects_flash']);
@@ -270,6 +362,8 @@ $deploymentHistory = [];
 $availableInventory = [];
 $projectFinancials = null;
 $projectCostEntries = [];
+$projectPaymentSnapshot = null;
+$projectPaymentEntries = [];
 
 $clientResult = $conn->query("SELECT id, full_name FROM users WHERE role = 'client' AND status = 'active' ORDER BY full_name ASC");
 if ($clientResult) {
@@ -340,6 +434,8 @@ if ($projectId > 0) {
     if ($project) {
         $projectFinancials = pm_get_project_financial_snapshot($conn, $projectId);
         $projectCostEntries = pm_fetch_project_cost_entries($conn, $projectId);
+        $projectPaymentSnapshot = pm_get_project_payment_snapshot($conn, $projectId);
+        $projectPaymentEntries = pm_fetch_project_payment_entries($conn, $projectId);
     }
 
     $tasksStmt = $conn->prepare("
@@ -490,6 +586,20 @@ if ($projectId > 0) {
                 $costEntryCount = (int)($projectFinancials['cost_entry_count'] ?? 0);
                 $budgetUsage = $budgetAmount > 0 ? min(100, round(($totalCost / $budgetAmount) * 100)) : 0;
                 $budgetHealth = pm_build_budget_health($budgetAmount, $totalCost);
+                $amountPaid = (float)($projectPaymentSnapshot['amount_paid'] ?? 0);
+                $paymentEntryCount = (int)($projectPaymentSnapshot['payment_entry_count'] ?? 0);
+                $remainingBalance = max(0, $totalCost - $amountPaid);
+                $paymentUsage = $totalCost > 0 ? min(100, round(($amountPaid / $totalCost) * 100)) : 0;
+                $paymentStatus = pm_determine_payment_status($totalCost, $amountPaid);
+                if ($totalCost <= 0) {
+                    $paymentStatusDetail = 'No project cost logged yet';
+                } elseif ($paymentStatus['status'] === 'paid') {
+                    $paymentStatusDetail = 'Client is fully paid';
+                } elseif ($paymentStatus['status'] === 'partial') {
+                    $paymentStatusDetail = 'Remaining: ' . pm_format_money($remainingBalance);
+                } else {
+                    $paymentStatusDetail = 'No payment recorded yet';
+                }
                 $projectCode = trim((string)($project['project_code'] ?? ''));
                 $projectPoNumber = trim((string)($project['po_number'] ?? ''));
                 $projectEmail = trim((string)($project['project_email'] ?? ''));
@@ -552,6 +662,16 @@ if ($projectId > 0) {
                                 <strong><?php echo htmlspecialchars(pm_format_date($project['end_date'] ?? null)); ?></strong>
                                 <small><?php echo $isCompleted ? 'Saved when marked completed' : 'Pending until project completion'; ?></small>
                             </div>
+                            <div class="project-details-stat project-details-stat--payment">
+                                <span>Customer Payment</span>
+                                <strong><?php echo htmlspecialchars($paymentStatus['label']); ?></strong>
+                                <small><?php echo htmlspecialchars($paymentStatusDetail); ?></small>
+                            </div>
+                            <div class="project-details-stat project-details-stat--payment">
+                                <span>Balance To Collect</span>
+                                <strong><?php echo htmlspecialchars(pm_format_money($remainingBalance)); ?></strong>
+                                <small><?php echo $paymentEntryCount > 0 ? htmlspecialchars($paymentEntryCount . ' payment record' . ($paymentEntryCount > 1 ? 's' : '')) : 'No payment entries yet'; ?></small>
+                            </div>
                         </div>
                     </div>
 
@@ -574,7 +694,7 @@ if ($projectId > 0) {
                     <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="btn-secondary btn-back-projects">Back to Projects</a>
                     <nav class="project-details-tabs" aria-label="Project detail sections">
                         <button type="button" class="project-details-tab is-active" data-project-tab="overview">Overview</button>
-                        <button type="button" class="project-details-tab" data-project-tab="finance">Budget / Cost</button>
+                        <button type="button" class="project-details-tab" data-project-tab="finance">Budget / Cost / Payment</button>
                         <button type="button" class="project-details-tab" data-project-tab="status">Status</button>
                         <button type="button" class="project-details-tab" data-project-tab="tasks">Tasks</button>
                         <button type="button" class="project-details-tab" data-project-tab="inventory">Inventory</button>
@@ -703,7 +823,7 @@ if ($projectId > 0) {
 
                 <section class="form-panel project-details-panel" data-project-panel="finance">
                     <div class="project-details-panel__header">
-                        <h2 class="section-title-inline">Budget / Cost Management</h2>
+                        <h2 class="section-title-inline">Budget / Cost / Payment Management</h2>
                     </div>
 
                     <section class="cost-note-panel" aria-label="Project costing note">
@@ -806,6 +926,63 @@ if ($projectId > 0) {
                         <?php endif; ?>
                     </section>
 
+                    <section class="budget-panel payment-panel payment-panel--<?php echo htmlspecialchars($paymentStatus['status']); ?>">
+                        <div class="budget-panel__header">
+                            <div>
+                                <h4>Payment Summary</h4>
+                                <span class="payment-status payment-status--<?php echo htmlspecialchars($paymentStatus['status']); ?>">
+                                    <?php echo htmlspecialchars($paymentStatus['label']); ?>
+                                </span>
+                            </div>
+                            <strong><?php echo htmlspecialchars(pm_format_money($remainingBalance)); ?></strong>
+                        </div>
+
+                        <div class="budget-stats">
+                            <div>
+                                <span>Total Cost</span>
+                                <strong><?php echo htmlspecialchars(pm_format_money($totalCost)); ?></strong>
+                            </div>
+                            <div>
+                                <span>Amount Paid</span>
+                                <strong><?php echo htmlspecialchars(pm_format_money($amountPaid)); ?></strong>
+                            </div>
+                            <div>
+                                <span>Remaining Balance</span>
+                                <strong><?php echo htmlspecialchars(pm_format_money($remainingBalance)); ?></strong>
+                            </div>
+                            <div>
+                                <span>Payments</span>
+                                <strong><?php echo $paymentEntryCount; ?></strong>
+                            </div>
+                        </div>
+
+                        <div class="budget-progress">
+                            <div class="budget-progress__track">
+                                <span class="budget-progress__fill payment-progress__fill payment-progress__fill--<?php echo htmlspecialchars($paymentStatus['status']); ?>" style="width: <?php echo $paymentUsage; ?>%;"></span>
+                            </div>
+                            <small><?php echo $totalCost > 0 ? $paymentUsage . '% paid' : 'Add a project cost first to start tracking payments'; ?></small>
+                        </div>
+
+                        <?php if (!empty($projectPaymentEntries)): ?>
+                            <div class="budget-ledger">
+                                <?php foreach ($projectPaymentEntries as $paymentEntry): ?>
+                                    <div class="budget-ledger__item">
+                                        <div>
+                                            <strong>Payment Received</strong>
+                                            <span><?php echo htmlspecialchars($paymentEntry['payment_date'] ?? ''); ?><?php echo !empty($paymentEntry['created_by_name']) ? ' - ' . htmlspecialchars($paymentEntry['created_by_name']) : ''; ?></span>
+                                            <?php if (!empty($paymentEntry['notes'])): ?>
+                                                <small><?php echo htmlspecialchars($paymentEntry['notes']); ?></small>
+                                            <?php endif; ?>
+                                        </div>
+                                        <strong><?php echo htmlspecialchars(pm_format_money((float)($paymentEntry['amount'] ?? 0))); ?></strong>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else: ?>
+                            <div class="empty-state">No payments recorded yet.</div>
+                        <?php endif; ?>
+                    </section>
+
                     <div class="project-finance-forms">
                         <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form project-finance-form" data-inline-edit-form>
                             <input type="hidden" name="action" value="save_project_budget">
@@ -862,6 +1039,40 @@ if ($projectId > 0) {
                                 </div>
                             </div>
                         </form>
+
+                        <?php if ($totalCost <= 0): ?>
+                            <div class="empty-state">Add a project cost first before recording payments.</div>
+                        <?php elseif ($remainingBalance <= 0): ?>
+                            <div class="empty-state">This project is already fully paid.</div>
+                        <?php else: ?>
+                            <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form project-finance-form" data-inline-edit-form>
+                                <input type="hidden" name="action" value="add_project_payment">
+                                <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
+                                <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
+                                <div class="project-inline-form__header">
+                                    <h4 class="subheading">Add Payment</h4>
+                                    <div class="project-inline-form__actions">
+                                        <button type="button" class="btn-secondary project-inline-action project-inline-action--edit" data-inline-edit>Edit</button>
+                                        <button type="submit" class="btn-primary project-inline-action project-inline-action--update hidden" data-inline-update>Update</button>
+                                        <button type="button" class="btn-secondary project-inline-action project-inline-action--cancel hidden" data-inline-cancel>Cancel</button>
+                                    </div>
+                                </div>
+                                <div class="form-grid">
+                                    <div class="input-group">
+                                        <label for="payment_date">Payment Date</label>
+                                        <input type="date" id="payment_date" name="payment_date" value="<?php echo htmlspecialchars($todayDate); ?>" required data-inline-editable>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="payment_amount">Amount</label>
+                                        <input type="number" id="payment_amount" name="payment_amount" min="0.01" step="0.01" max="<?php echo htmlspecialchars(number_format($remainingBalance, 2, '.', '')); ?>" placeholder="0.00" required data-inline-editable>
+                                    </div>
+                                    <div class="input-group input-group-wide">
+                                        <label for="payment_notes">Notes</label>
+                                        <input type="text" id="payment_notes" name="payment_notes" placeholder="Receipt, reference, or short note" data-inline-editable>
+                                    </div>
+                                </div>
+                            </form>
+                        <?php endif; ?>
                     </div>
                 </section>
 

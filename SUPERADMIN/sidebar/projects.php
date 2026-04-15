@@ -132,6 +132,24 @@ function ensure_project_cost_entries_table(mysqli $conn): void {
     );
 }
 
+function ensure_project_payments_table(mysqli $conn): void {
+    $conn->query(
+        "CREATE TABLE IF NOT EXISTS project_payments (
+            id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            project_id INT(11) NOT NULL,
+            payment_date DATE NOT NULL,
+            amount DECIMAL(14,2) NOT NULL,
+            notes VARCHAR(255) DEFAULT NULL,
+            created_by INT(11) NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_project_payments_project_date (project_id, payment_date, id),
+            KEY idx_project_payments_created_by (created_by),
+            CONSTRAINT fk_project_payments_project FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE,
+            CONSTRAINT fk_project_payments_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
 function ensure_project_address_column(mysqli $conn): void {
     if (!table_has_column($conn, 'projects', 'project_address')) {
         $conn->query("ALTER TABLE projects ADD COLUMN project_address TEXT DEFAULT NULL AFTER client_id");
@@ -200,6 +218,22 @@ function build_budget_health(float $budgetAmount, float $totalCost): array {
     return ['status' => 'healthy', 'label' => 'On track'];
 }
 
+function determine_payment_status(float $totalCost, float $amountPaid): array {
+    if ($amountPaid <= 0.0) {
+        return ['status' => 'unpaid', 'label' => 'Unpaid'];
+    }
+
+    if ($totalCost > 0 && $amountPaid + 0.00001 < $totalCost) {
+        return ['status' => 'partial', 'label' => 'Partial'];
+    }
+
+    if ($totalCost <= 0) {
+        return ['status' => 'partial', 'label' => 'Partial'];
+    }
+
+    return ['status' => 'paid', 'label' => 'Paid'];
+}
+
 function determine_inventory_status(int $quantity, ?int $minStock): string {
     if ($quantity <= 0) {
         return 'out-of-stock';
@@ -244,6 +278,7 @@ ensure_project_inventory_deployments_table($conn);
 ensure_project_inventory_return_logs_table($conn);
 ensure_project_budget_profiles_table($conn);
 ensure_project_cost_entries_table($conn);
+ensure_project_payments_table($conn);
 
 function get_projects_redirect_target(): string {
     $redirectTo = $_POST['redirect_to'] ?? $_GET['redirect_to'] ?? '';
@@ -316,6 +351,40 @@ function getProjectFinancialSnapshot(mysqli $conn, int $projectId): ?array {
              FROM project_cost_entries
              GROUP BY project_id
          ) cost_totals ON cost_totals.project_id = p.id
+         WHERE p.id = ?
+         LIMIT 1'
+    );
+
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('i', $projectId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result ? $result->fetch_assoc() : null;
+}
+
+function getProjectPaymentSnapshot(mysqli $conn, int $projectId): ?array {
+    $stmt = $conn->prepare(
+        'SELECT
+            p.id,
+            p.project_name,
+            COALESCE(cost_totals.total_cost, 0) AS total_cost,
+            COALESCE(payment_totals.amount_paid, 0) AS amount_paid,
+            COALESCE(payment_totals.payment_entry_count, 0) AS payment_entry_count
+         FROM projects p
+         LEFT JOIN (
+             SELECT project_id, SUM(amount) AS total_cost
+             FROM project_cost_entries
+             GROUP BY project_id
+         ) cost_totals ON cost_totals.project_id = p.id
+         LEFT JOIN (
+             SELECT project_id, SUM(amount) AS amount_paid, COUNT(*) AS payment_entry_count
+             FROM project_payments
+             GROUP BY project_id
+         ) payment_totals ON payment_totals.project_id = p.id
          WHERE p.id = ?
          LIMIT 1'
     );
@@ -981,6 +1050,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_projects_flash('success', 'Project cost entry added.');
         } else {
             set_projects_flash('error', 'Failed to save project cost entry.');
+        }
+
+        redirect_projects_page();
+    }
+
+    if ($action === 'add_project_payment') {
+        $projectId = (int)($_POST['project_id'] ?? 0);
+        $paymentDate = normalize_date_or_null($_POST['payment_date'] ?? null);
+        $paymentNotes = normalize_text_or_null($_POST['payment_notes'] ?? null);
+        $amountInput = $_POST['payment_amount'] ?? '';
+        $paymentAmount = normalize_money_or_null($amountInput);
+        $createdBy = (int)($_SESSION['user_id'] ?? 0);
+        $paymentSnapshot = $projectId > 0 ? getProjectPaymentSnapshot($conn, $projectId) : null;
+
+        if ($projectId <= 0 || !$paymentSnapshot) {
+            set_projects_flash('error', 'Project not found.');
+            redirect_projects_page();
+        }
+
+        if ($paymentDate === null) {
+            set_projects_flash('error', 'Payment date is required.');
+            redirect_projects_page();
+        }
+
+        if ($amountInput === '' || $paymentAmount === null || $paymentAmount <= 0) {
+            set_projects_flash('error', 'Payment amount must be greater than zero.');
+            redirect_projects_page();
+        }
+
+        $totalCost = (float)($paymentSnapshot['total_cost'] ?? 0);
+        $amountPaid = (float)($paymentSnapshot['amount_paid'] ?? 0);
+        $remainingBalance = max(0, $totalCost - $amountPaid);
+
+        if ($totalCost <= 0) {
+            set_projects_flash('error', 'Log a project cost first before recording payments.');
+            redirect_projects_page();
+        }
+
+        if ($paymentAmount > $remainingBalance + 0.00001) {
+            set_projects_flash('error', 'Payment amount cannot exceed the remaining balance.');
+            redirect_projects_page();
+        }
+
+        $insertPayment = $conn->prepare(
+            'INSERT INTO project_payments (project_id, payment_date, amount, notes, created_by)
+             VALUES (?, ?, ?, ?, ?)'
+        );
+
+        if (
+            $insertPayment &&
+            $insertPayment->bind_param('isdsi', $projectId, $paymentDate, $paymentAmount, $paymentNotes, $createdBy) &&
+            $insertPayment->execute()
+        ) {
+            $updatedAmountPaid = $amountPaid + $paymentAmount;
+            $paymentStatus = determine_payment_status($totalCost, $updatedAmountPaid);
+
+            audit_log_event(
+                $conn,
+                $createdBy,
+                'add_project_payment',
+                'project',
+                $projectId,
+                null,
+                [
+                    'project_name' => $paymentSnapshot['project_name'] ?? null,
+                    'payment_date' => $paymentDate,
+                    'payment_amount' => $paymentAmount,
+                    'payment_notes' => $paymentNotes,
+                    'amount_paid' => $updatedAmountPaid,
+                    'remaining_balance' => max(0, $totalCost - $updatedAmountPaid),
+                    'payment_status' => $paymentStatus['label'],
+                ]
+            );
+            set_projects_flash('success', 'Project payment added.');
+        } else {
+            set_projects_flash('error', 'Failed to save project payment.');
         }
 
         redirect_projects_page();
