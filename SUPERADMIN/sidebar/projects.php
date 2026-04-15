@@ -467,7 +467,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $engineerId = (int)($_POST['engineer_id'] ?? 0);
         $status = normalize_text($_POST['status'] ?? 'pending');
         $startDate = normalize_date_or_null($_POST['start_date'] ?? null);
-        $endDate = normalize_date_or_null($_POST['end_date'] ?? null);
+        $endDate = null;
         $budgetAmount = normalize_money_or_null($_POST['budget_amount'] ?? null);
         $budgetNotes = normalize_text_or_null($_POST['budget_notes'] ?? null);
         $createdBy = (int)($_SESSION['user_id'] ?? 0);
@@ -494,31 +494,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($hasProjectAddressColumn && $status !== 'draft' && $projectAddress === null) {
             set_projects_flash('error', 'Project address is required unless the project stays in Draft.');
-            redirect_projects_page();
-        }
-
-        if ($status === 'ongoing' && $startDate === null) {
-            set_projects_flash('error', 'Start date is required when creating an ongoing project.');
-            redirect_projects_page();
-        }
-
-        if ($startDate !== null && $startDate < $todayDate) {
-            set_projects_flash('error', 'Start date cannot be earlier than today.');
-            redirect_projects_page();
-        }
-
-        if ($status === 'ongoing' && $startDate !== $todayDate) {
-            set_projects_flash('error', 'An ongoing project must start today.');
-            redirect_projects_page();
-        }
-
-        if ($startDate !== null && $endDate !== null && $endDate < $startDate) {
-            set_projects_flash('error', 'End date cannot be earlier than start date.');
-            redirect_projects_page();
-        }
-
-        if ($startDate === null && $endDate !== null && $endDate < $todayDate) {
-            set_projects_flash('error', 'End date cannot be earlier than today.');
             redirect_projects_page();
         }
 
@@ -765,6 +740,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $projectId = (int)($_POST['project_id'] ?? 0);
         $status = normalize_text($_POST['status'] ?? '');
         $project = $projectId > 0 ? getProjectSnapshot($conn, $projectId) : null;
+        $completedAt = $status === 'completed' ? $todayDate : null;
 
         if ($projectId <= 0 || !in_array($status, $statusOptions, true)) {
             set_projects_flash('error', 'Invalid project status update.');
@@ -820,9 +796,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        $updateStatus = $conn->prepare('UPDATE projects SET status = ? WHERE id = ?');
+        $updateStatus = $conn->prepare('UPDATE projects SET status = ?, end_date = ? WHERE id = ?');
 
-        if ($updateStatus && $updateStatus->bind_param('si', $status, $projectId) && $updateStatus->execute()) {
+        if ($updateStatus && $updateStatus->bind_param('ssi', $status, $completedAt, $projectId) && $updateStatus->execute()) {
             audit_log_event(
                 $conn,
                 (int)($_SESSION['user_id'] ?? 0),
@@ -836,6 +812,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 [
                     'project_name' => $project['project_name'] ?? null,
                     'status' => $status,
+                    'end_date' => $completedAt,
                 ]
             );
             set_projects_flash('success', 'Project status updated.');
@@ -854,7 +831,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $clientId = (int)($_POST['client_id'] ?? 0);
         $engineerId = (int)($_POST['engineer_id'] ?? 0);
         $startDate = normalize_date_or_null($_POST['start_date'] ?? null);
-        $endDate = normalize_date_or_null($_POST['end_date'] ?? null);
+        $endDate = null;
         $project = $projectId > 0 ? getProjectSnapshot($conn, $projectId) : null;
         $updatedBy = (int)($_SESSION['user_id'] ?? 0);
 
@@ -880,31 +857,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($hasProjectAddressColumn && ($project['status'] ?? '') !== 'draft' && $projectAddress === null) {
             set_projects_flash('error', 'Project address is required unless the project stays in Draft.');
-            redirect_projects_page();
-        }
-
-        if ($startDate !== null && $startDate < $todayDate) {
-            set_projects_flash('error', 'Start date cannot be earlier than today.');
-            redirect_projects_page();
-        }
-
-        if (($project['status'] ?? '') === 'ongoing' && $startDate === null) {
-            set_projects_flash('error', 'Ongoing projects must have a start date.');
-            redirect_projects_page();
-        }
-
-        if (($project['status'] ?? '') === 'ongoing' && $startDate !== $todayDate) {
-            set_projects_flash('error', 'Ongoing projects must start today when updating details.');
-            redirect_projects_page();
-        }
-
-        if ($startDate !== null && $endDate !== null && $endDate < $startDate) {
-            set_projects_flash('error', 'End date cannot be earlier than start date.');
-            redirect_projects_page();
-        }
-
-        if ($startDate === null && $endDate !== null && $endDate < $todayDate) {
-            set_projects_flash('error', 'End date cannot be earlier than today.');
             redirect_projects_page();
         }
 
@@ -1023,11 +975,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
-        if (!empty($project['start_date']) && $deadline !== null && $deadline < $project['start_date']) {
-            set_projects_flash('error', 'Task deadline cannot be earlier than the project start date.');
-            redirect_projects_page();
-        }
-
         $insertTask = $conn->prepare(
             'INSERT INTO tasks (project_id, assigned_to, task_name, description, deadline, created_by)
              VALUES (?, ?, ?, ?, ?, ?)'
@@ -1074,7 +1021,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
-        $reopenProject = $conn->prepare("UPDATE projects SET status = 'ongoing' WHERE id = ?");
+        $reopenProject = $conn->prepare("UPDATE projects SET status = 'ongoing', end_date = NULL WHERE id = ?");
 
         if ($reopenProject && $reopenProject->bind_param('i', $projectId) && $reopenProject->execute()) {
             audit_log_event(
@@ -1090,6 +1037,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 [
                     'project_name' => $project['project_name'] ?? null,
                     'status' => 'ongoing',
+                    'end_date' => null,
                 ]
             );
             set_projects_flash('success', 'Project reopened successfully.');
@@ -1504,9 +1452,9 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                     <span class="field-tip__icon" aria-hidden="true">i</span>
                                     <span class="field-tip__bubble">
                                         <?php if ($supportsDraftStatus): ?>
-                                            Use Draft for incomplete or possibly wrong project entries. Use Pending for approved work, and choose Ongoing only when work starts today.
+                                            Use Draft for incomplete or possibly wrong project entries. Use Pending for approved work, and choose Ongoing when work is already active.
                                         <?php else: ?>
-                                            Use Pending for approved work. Choose Ongoing only when work starts today.
+                                            Use Pending for approved work. Choose Ongoing when work is already active.
                                         <?php endif; ?>
                                     </span>
                                 </button>
@@ -1535,24 +1483,13 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
 
                         <div class="input-group">
                             <div class="field-label-row">
-                                <label for="start_date">Start Date</label>
-                                <button type="button" class="field-tip" aria-label="Start date reminder">
+                                <label for="start_date">P.O Date</label>
+                                <button type="button" class="field-tip" aria-label="P.O date reminder">
                                     <span class="field-tip__icon" aria-hidden="true">i</span>
-                                    <span class="field-tip__bubble">Start Date cannot be in the past. If Initial Status is Ongoing, Start Date must be today.</span>
+                                    <span class="field-tip__bubble">Use the purchase order date here. This stays editable while the project is not yet completed.</span>
                                 </button>
                             </div>
-                            <input type="date" id="start_date" name="start_date" min="<?php echo htmlspecialchars($todayDate); ?>">
-                        </div>
-
-                        <div class="input-group">
-                            <div class="field-label-row">
-                                <label for="end_date">End Date</label>
-                                <button type="button" class="field-tip" aria-label="End date reminder">
-                                    <span class="field-tip__icon" aria-hidden="true">i</span>
-                                    <span class="field-tip__bubble">End Date can be the same day as Start Date or any later day, but it can never be earlier than Start Date.</span>
-                                </button>
-                            </div>
-                            <input type="date" id="end_date" name="end_date" min="<?php echo htmlspecialchars($todayDate); ?>">
+                            <input type="date" id="start_date" name="start_date">
                         </div>
 
                         <div class="input-group">
@@ -1695,8 +1632,8 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                         <?php if ($hasProjectAddressColumn): ?>
                                             <div><strong>Project Site:</strong> <?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></div>
                                         <?php endif; ?>
-                                        <div><strong>Start:</strong> <?php echo htmlspecialchars($project['start_date'] ?? 'N/A'); ?></div>
-                                        <div><strong>End:</strong> <?php echo htmlspecialchars($project['end_date'] ?? 'N/A'); ?></div>
+                                        <div><strong>P.O Date:</strong> <?php echo htmlspecialchars($project['start_date'] ?? 'N/A'); ?></div>
+                                        <div><strong>Completed:</strong> <?php echo htmlspecialchars($project['end_date'] ?? 'N/A'); ?></div>
                                         <div><strong>Tasks:</strong> <?php echo (int)$project['completed_tasks']; ?> / <?php echo (int)$project['total_tasks']; ?> completed</div>
                                     </div>
                                 </div>

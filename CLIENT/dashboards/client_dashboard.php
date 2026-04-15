@@ -27,6 +27,17 @@ function client_format_date(?string $value): string
     }
 }
 
+function client_project_timeline(?string $poDate, ?string $completedDate, string $status): string
+{
+    $parts = ['P.O Date: ' . client_format_date($poDate)];
+
+    if ($status === 'completed') {
+        $parts[] = 'Completed: ' . client_format_date($completedDate);
+    }
+
+    return implode(' | ', $parts);
+}
+
 function client_status_label(string $status): string
 {
     $labels = [
@@ -506,7 +517,7 @@ $notificationItems = [
                                 data-title="<?php echo htmlspecialchars((string)($project['project_name'] ?? 'Untitled Project')); ?>"
                                 data-engineer="<?php echo htmlspecialchars((string)($project['engineer_name'] ?? 'Not assigned')); ?>"
                                 data-status="<?php echo htmlspecialchars($projectStatus); ?>"
-                                data-timeline="<?php echo htmlspecialchars(client_format_date($project['start_date'] ?? null) . ' - ' . client_format_date($project['end_date'] ?? null)); ?>"
+                                data-timeline="<?php echo htmlspecialchars(client_project_timeline($project['start_date'] ?? null, $project['end_date'] ?? null, $projectStatus)); ?>"
                             >
                                 <div class="project-card__header">
                                     <div>
@@ -526,8 +537,8 @@ $notificationItems = [
                                         <strong><?php echo htmlspecialchars((string)($project['engineer_name'] ?? 'Not assigned')); ?></strong>
                                     </div>
                                     <div class="project-meta">
-                                        <span>Timeline</span>
-                                        <strong><?php echo htmlspecialchars(client_format_date($project['start_date'] ?? null)); ?> - <?php echo htmlspecialchars(client_format_date($project['end_date'] ?? null)); ?></strong>
+                                        <span>Project Dates</span>
+                                        <strong><?php echo htmlspecialchars(client_project_timeline($project['start_date'] ?? null, $project['end_date'] ?? null, $projectStatus)); ?></strong>
                                     </div>
                                 </div>
 

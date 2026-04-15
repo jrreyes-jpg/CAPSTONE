@@ -47,6 +47,19 @@ function pm_format_project_reference(int $projectId): string {
     return 'PRJ-' . str_pad((string)$projectId, 5, '0', STR_PAD_LEFT);
 }
 
+function pm_format_date(?string $value): string {
+    $value = trim((string)$value);
+    if ($value === '') {
+        return 'N/A';
+    }
+
+    try {
+        return (new DateTimeImmutable($value))->format('M j, Y');
+    } catch (Throwable $exception) {
+        return $value;
+    }
+}
+
 function pm_build_budget_health(float $budgetAmount, float $totalCost): array {
     if ($budgetAmount <= 0) {
         return ['status' => 'unplanned', 'label' => 'No budget set'];
@@ -485,15 +498,16 @@ if ($projectId > 0) {
                                 <small>Current lead</small>
                             </div>
                             <div class="project-details-stat">
-                                <span>Target End</span>
-                                <strong><?php echo htmlspecialchars($project['end_date'] ?? 'N/A'); ?></strong>
-                                <small>Planned completion</small>
+                                <span>Completed On</span>
+                                <strong><?php echo htmlspecialchars(pm_format_date($project['end_date'] ?? null)); ?></strong>
+                                <small><?php echo $isCompleted ? 'Saved when marked completed' : 'Pending until project completion'; ?></small>
                             </div>
                         </div>
                     </div>
 
                     <div class="project-details-glance">
-                        <div><strong>Start:</strong> <?php echo htmlspecialchars($project['start_date'] ?? 'N/A'); ?></div>
+                        <div><strong>P.O Date:</strong> <?php echo htmlspecialchars(pm_format_date($project['start_date'] ?? null)); ?></div>
+                        <div><strong>Completed:</strong> <?php echo htmlspecialchars(pm_format_date($project['end_date'] ?? null)); ?></div>
                         <div><strong>Created:</strong> <?php echo htmlspecialchars($project['created_at'] ?? 'N/A'); ?></div>
                         <?php if ($hasProjectAddressColumn): ?>
                             <div><strong>Project Site:</strong> <?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></div>
@@ -554,13 +568,8 @@ if ($projectId > 0) {
                             <?php endif; ?>
 
                             <div class="input-group">
-                                <label for="start_date">Start Date</label>
-                                <input type="date" id="start_date" name="start_date" min="<?php echo htmlspecialchars($todayDate); ?>" value="<?php echo htmlspecialchars($project['start_date'] ?? ''); ?>">
-                            </div>
-
-                            <div class="input-group">
-                                <label for="end_date">End Date</label>
-                                <input type="date" id="end_date" name="end_date" min="<?php echo htmlspecialchars($todayDate); ?>" value="<?php echo htmlspecialchars($project['end_date'] ?? ''); ?>">
+                                <label for="start_date">P.O Date</label>
+                                <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($project['start_date'] ?? ''); ?>">
                             </div>
                         </div>
 
@@ -604,7 +613,7 @@ if ($projectId > 0) {
                             </div>
                             <div class="cost-note-field">
                                 <span>PO Date</span>
-                                <strong>Not set</strong>
+                                <strong><?php echo htmlspecialchars(pm_format_date($project['start_date'] ?? null)); ?></strong>
                             </div>
                             <div class="cost-note-field">
                                 <span>Project Code</span>
@@ -731,6 +740,9 @@ if ($projectId > 0) {
 
                 <section class="form-panel project-details-panel" data-project-panel="status">
                     <h2 class="section-title-inline">Update Status</h2>
+                    <?php if (!$isCompleted): ?>
+                        <div class="lock-note">The completion date is now recorded automatically when the project is marked as Completed.</div>
+                    <?php endif; ?>
                     <?php if ($isCompleted): ?>
                         <div class="lock-note">This project is locked because it is already completed.</div>
                         <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form">

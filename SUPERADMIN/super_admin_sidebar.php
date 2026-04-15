@@ -152,10 +152,7 @@ if (!function_exists('super_admin_fetch_notification_data')) {
                  GROUP BY project_id
              ) task_totals ON task_totals.project_id = p.id
              WHERE p.status IN ('pending', 'ongoing', 'on-hold')
-             AND (
-                 COALESCE(task_totals.delayed_tasks, 0) > 0
-                 OR (p.end_date IS NOT NULL AND p.end_date < CURDATE())
-             )"
+             AND COALESCE(task_totals.delayed_tasks, 0) > 0"
         );
         if ($projectRiskCountResult) {
             $projectRiskCount = (int)(($projectRiskCountResult->fetch_assoc()['total'] ?? 0));
@@ -166,7 +163,6 @@ if (!function_exists('super_admin_fetch_notification_data')) {
                 p.id,
                 p.project_name,
                 p.status,
-                p.end_date,
                 COALESCE(task_totals.delayed_tasks, 0) AS delayed_tasks
              FROM projects p
              LEFT JOIN (
@@ -177,11 +173,8 @@ if (!function_exists('super_admin_fetch_notification_data')) {
                  GROUP BY project_id
              ) task_totals ON task_totals.project_id = p.id
              WHERE p.status IN ('pending', 'ongoing', 'on-hold')
-             AND (
-                 COALESCE(task_totals.delayed_tasks, 0) > 0
-                 OR (p.end_date IS NOT NULL AND p.end_date < CURDATE())
-             )
-             ORDER BY COALESCE(task_totals.delayed_tasks, 0) DESC, p.end_date ASC, p.updated_at DESC
+             AND COALESCE(task_totals.delayed_tasks, 0) > 0
+             ORDER BY COALESCE(task_totals.delayed_tasks, 0) DESC, p.updated_at DESC
              LIMIT 4"
         );
         if ($projectRiskResult) {
@@ -616,9 +609,6 @@ $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName
                                         $parts = [];
                                         if ((int)($projectAlert['delayed_tasks'] ?? 0) > 0) {
                                             $parts[] = (int)$projectAlert['delayed_tasks'] . ' delayed task(s)';
-                                        }
-                                        if (!empty($projectAlert['end_date']) && $projectAlert['end_date'] < date('Y-m-d')) {
-                                            $parts[] = 'Late end date';
                                         }
                                         echo htmlspecialchars(implode(' | ', $parts) ?: 'Needs checking');
                                         ?>

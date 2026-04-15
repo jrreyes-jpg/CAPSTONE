@@ -74,6 +74,19 @@ function build_deadline_meta(?string $deadline, string $status): array {
     ];
 }
 
+function format_project_date(?string $value): string {
+    $value = trim((string)$value);
+    if ($value === '') {
+        return 'N/A';
+    }
+
+    try {
+        return (new DateTimeImmutable($value))->format('M j, Y');
+    } catch (Throwable $exception) {
+        return $value;
+    }
+}
+
 function redirect_engineer_dashboard(string $hash = 'tasks-tab'): void {
     header('Location: /codesamplecaps/ENGINEER/dashboards/engineer_dashboard.php#' . $hash);
     exit();
@@ -582,8 +595,8 @@ $priorityCards = [
                         </div>
                         <p><strong>Client:</strong> <?php echo htmlspecialchars((string)($project['client_name'] ?? 'N/A')); ?></p>
                         <p><strong>Project Owner:</strong> <?php echo htmlspecialchars((string)($project['project_owner_name'] ?? 'N/A')); ?></p>
-                        <p><strong>Start:</strong> <?php echo htmlspecialchars((string)($project['start_date'] ?? 'N/A')); ?></p>
-                        <p><strong>End:</strong> <?php echo htmlspecialchars((string)($project['end_date'] ?? 'N/A')); ?></p>
+                        <p><strong>P.O Date:</strong> <?php echo htmlspecialchars(format_project_date($project['start_date'] ?? null)); ?></p>
+                        <p><strong>Completed:</strong> <?php echo htmlspecialchars(format_project_date($project['end_date'] ?? null)); ?></p>
                         <p class="project-description">
                             <?php echo htmlspecialchars(substr((string)($project['description'] ?? ''), 0, 100)); ?>
                         </p>
