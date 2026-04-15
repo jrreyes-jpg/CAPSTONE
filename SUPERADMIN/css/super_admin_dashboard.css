@@ -3027,6 +3027,12 @@ tbody tr:hover {
     font-weight: 800;
 }
 
+.optional-indicator {
+    color: #64748b;
+    font-weight: 600;
+    font-size: 0.85em;
+}
+
 .password-input-wrap {
     position: relative;
 }
@@ -3656,6 +3662,47 @@ tbody tr:hover {
     border: 1px solid rgba(15, 23, 42, 0.08);
     box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
     height: 100%;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.project-card:hover,
+.project-card:focus-visible {
+    transform: translateY(-2px);
+    border-color: rgba(15, 118, 110, 0.24);
+    box-shadow: 0 20px 38px rgba(15, 23, 42, 0.12);
+    outline: none;
+}
+
+.project-card__eyebrow-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.project-card__eyebrow,
+.project-card__reference {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.project-card__eyebrow {
+    background: rgba(15, 118, 110, 0.1);
+    color: #0f766e;
+}
+
+.project-card__reference {
+    background: rgba(15, 23, 42, 0.06);
+    color: #334155;
 }
 
 .project-card__summary {

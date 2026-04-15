@@ -47,6 +47,20 @@ function pm_format_project_reference(int $projectId): string {
     return 'PRJ-' . str_pad((string)$projectId, 5, '0', STR_PAD_LEFT);
 }
 
+function pm_format_project_po_number(int $projectId, ?string $poDate = null): string {
+    $year = date('Y');
+
+    if ($poDate !== null && trim($poDate) !== '') {
+        try {
+            $year = (new DateTimeImmutable($poDate))->format('Y');
+        } catch (Throwable $exception) {
+            $year = date('Y');
+        }
+    }
+
+    return 'PO-' . $year . '-' . str_pad((string)$projectId, 5, '0', STR_PAD_LEFT);
+}
+
 function pm_format_date(?string $value): string {
     $value = trim((string)$value);
     if ($value === '') {
@@ -158,6 +172,12 @@ function pm_ensure_project_address_column(mysqli $conn): void {
     }
 }
 
+function pm_ensure_project_email_column(mysqli $conn): void {
+    if (!pm_table_has_column($conn, 'projects', 'project_email')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN project_email VARCHAR(190) DEFAULT NULL AFTER project_address");
+    }
+}
+
 function pm_get_project_financial_snapshot(mysqli $conn, int $projectId): ?array {
     $stmt = $conn->prepare(
         'SELECT
@@ -217,7 +237,9 @@ $supportsDraftStatus = pm_enum_supports_value($conn, 'projects', 'status', 'draf
 $supportsCancelledStatus = pm_enum_supports_value($conn, 'projects', 'status', 'cancelled');
 $supportsArchivedStatus = pm_enum_supports_value($conn, 'projects', 'status', 'archived');
 pm_ensure_project_address_column($conn);
+pm_ensure_project_email_column($conn);
 $hasProjectAddressColumn = pm_table_has_column($conn, 'projects', 'project_address');
+$hasProjectEmailColumn = pm_table_has_column($conn, 'projects', 'project_email');
 $statusOptions = [];
 if ($supportsDraftStatus) {
     $statusOptions[] = 'draft';
@@ -263,6 +285,7 @@ if ($engineerResult) {
 
 if ($projectId > 0) {
     $projectAddressSelect = $hasProjectAddressColumn ? 'p.project_address,' : 'NULL AS project_address,';
+    $projectEmailSelect = $hasProjectEmailColumn ? 'p.project_email,' : 'NULL AS project_email,';
 
     $projectStmt = $conn->prepare("
         SELECT
@@ -270,6 +293,7 @@ if ($projectId > 0) {
             p.project_name,
             p.description,
             {$projectAddressSelect}
+            {$projectEmailSelect}
             p.client_id,
             p.start_date,
             p.end_date,
@@ -464,7 +488,8 @@ if ($projectId > 0) {
                 $budgetUsage = $budgetAmount > 0 ? min(100, round(($totalCost / $budgetAmount) * 100)) : 0;
                 $budgetHealth = pm_build_budget_health($budgetAmount, $totalCost);
                 $projectReference = pm_format_project_reference((int)($project['id'] ?? 0));
-                $clientEmail = trim((string)($project['client_email'] ?? ''));
+                $projectPoNumber = pm_format_project_po_number((int)($project['id'] ?? 0), $project['start_date'] ?? null);
+                $projectEmail = trim((string)($project['project_email'] ?? ''));
                 ?>
 
                 <section class="form-panel project-details-shell">
@@ -526,9 +551,14 @@ if ($projectId > 0) {
                     </div>
 
                     <div class="project-details-glance">
+                        <div><strong>Project Code:</strong> <?php echo htmlspecialchars($projectReference); ?></div>
+                        <div><strong>P.O Number:</strong> <?php echo htmlspecialchars($projectPoNumber); ?></div>
                         <div><strong>P.O Date:</strong> <?php echo htmlspecialchars(pm_format_date($project['start_date'] ?? null)); ?></div>
                         <div><strong>Completed:</strong> <?php echo htmlspecialchars(pm_format_date($project['end_date'] ?? null)); ?></div>
                         <div><strong>Created:</strong> <?php echo htmlspecialchars($project['created_at'] ?? 'N/A'); ?></div>
+                        <?php if ($projectEmail !== ''): ?>
+                            <div><strong>Email Address:</strong> <?php echo htmlspecialchars($projectEmail); ?></div>
+                        <?php endif; ?>
                         <?php if ($hasProjectAddressColumn): ?>
                             <div><strong>Project Site:</strong> <?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></div>
                         <?php endif; ?>
@@ -572,9 +602,16 @@ if ($projectId > 0) {
                                 </div>
                                 <div class="form-grid">
                                     <div class="input-group">
-                                        <label for="project_name">Project Name</label>
+                                        <label for="project_name">Project Title</label>
                                         <input type="text" id="project_name" name="project_name" value="<?php echo htmlspecialchars($project['project_name']); ?>" required readonly data-project-editable>
                                     </div>
+
+                                    <?php if ($hasProjectEmailColumn): ?>
+                                        <div class="input-group">
+                                            <label for="project_email">Email Address <span class="optional-indicator">(Optional)</span></label>
+                                            <input type="email" id="project_email" name="project_email" value="<?php echo htmlspecialchars($project['project_email'] ?? ''); ?>" readonly data-project-editable>
+                                        </div>
+                                    <?php endif; ?>
 
                                     <?php if ($hasProjectAddressColumn): ?>
                                         <div class="input-group input-group-wide">
@@ -584,7 +621,7 @@ if ($projectId > 0) {
                                     <?php endif; ?>
 
                                     <div class="input-group input-group-wide input-group-spaced">
-                                        <label for="description">Description</label>
+                                        <label for="description">Comment <span class="optional-indicator">(Optional)</span></label>
                                         <textarea id="description" name="description" readonly data-project-editable><?php echo htmlspecialchars($project['description'] ?? ''); ?></textarea>
                                     </div>
                                 </div>
@@ -598,7 +635,7 @@ if ($projectId > 0) {
                                 <div class="form-grid">
                                     <div class="input-group">
                                         <label for="start_date">P.O Date</label>
-                                        <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($project['start_date'] ?? ''); ?>" readonly data-project-editable>
+                                        <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($project['start_date'] ?? ''); ?>" max="<?php echo htmlspecialchars($todayDate); ?>" readonly data-project-editable>
                                     </div>
                                     <div class="input-group">
                                         <label>Completed On</label>
@@ -688,7 +725,7 @@ if ($projectId > 0) {
                             </div>
                             <div class="cost-note-field cost-note-field--wide">
                                 <span>Email Address</span>
-                                <strong><?php echo htmlspecialchars($clientEmail !== '' ? $clientEmail : 'Not set'); ?></strong>
+                                <strong><?php echo htmlspecialchars($projectEmail !== '' ? $projectEmail : (trim((string)($project['client_email'] ?? '')) !== '' ? trim((string)($project['client_email'] ?? '')) : 'Not set')); ?></strong>
                             </div>
                         </div>
                     </section>
