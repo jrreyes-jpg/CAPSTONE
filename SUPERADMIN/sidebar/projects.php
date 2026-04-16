@@ -1975,15 +1975,46 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                 <label for="engineer_ids">Assigned Engineer/s <span class="required-indicator" aria-hidden="true">*</span></label>
                                 <button type="button" class="field-tip" aria-label="Assigned engineers help">
                                     <span class="field-tip__icon" aria-hidden="true">i</span>
-                                    <span class="field-tip__bubble">Click an engineer name once to assign it. Click the same name again to remove it from the project.</span>
+                                    <span class="field-tip__bubble">Pick an engineer from the dropdown, then press the plus button to add. Press the same button again to remove the selected engineer.</span>
                                 </button>
                             </div>
-                            <select id="engineer_ids" name="engineer_ids[]" class="engineer-multi-select" multiple required size="<?php echo min(5, max(3, count($engineers))); ?>">
-                                <?php foreach ($engineers as $engineer): ?>
-                                    <option value="<?php echo (int)$engineer['id']; ?>" <?php echo in_array((string)$engineer['id'], $createProjectValues['engineer_ids'], true) ? 'selected' : ''; ?>><?php echo htmlspecialchars($engineer['full_name']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                            <small>Select one or more engineers depending on the project workload.</small>
+                            <div class="engineer-picker" data-engineer-picker>
+                                <div class="engineer-picker__controls">
+                                    <select id="engineer_ids" class="engineer-picker__select" data-engineer-select>
+                                        <option value="">Select engineer</option>
+                                        <?php foreach ($engineers as $engineer): ?>
+                                            <option value="<?php echo (int)$engineer['id']; ?>"><?php echo htmlspecialchars($engineer['full_name']); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <button type="button" class="engineer-picker__toggle" data-engineer-toggle aria-label="Add selected engineer">
+                                        <span class="engineer-picker__toggle-icon" aria-hidden="true">+</span>
+                                        <span class="engineer-picker__toggle-text">Add</span>
+                                    </button>
+                                </div>
+                                <div class="engineer-picker__selected" data-engineer-selected>
+                                    <?php foreach ($engineers as $engineer): ?>
+                                        <?php if (in_array((string)$engineer['id'], $createProjectValues['engineer_ids'], true)): ?>
+                                            <button
+                                                type="button"
+                                                class="engineer-chip"
+                                                data-engineer-chip
+                                                data-engineer-id="<?php echo (int)$engineer['id']; ?>"
+                                                data-engineer-name="<?php echo htmlspecialchars($engineer['full_name'], ENT_QUOTES); ?>"
+                                                aria-pressed="true"
+                                            >
+                                                <span><?php echo htmlspecialchars($engineer['full_name']); ?></span>
+                                                <span class="engineer-chip__remove" aria-hidden="true">&times;</span>
+                                            </button>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="engineer-picker__inputs" data-engineer-inputs>
+                                    <?php foreach ($createProjectValues['engineer_ids'] as $engineerId): ?>
+                                        <input type="hidden" name="engineer_ids[]" value="<?php echo (int)$engineerId; ?>" data-engineer-input>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                            <small>Add one or more engineers depending on the project workload.</small>
                         </div>
 
                         <div class="input-group">
@@ -2648,32 +2679,175 @@ function initCreateProjectForm() {
     }
 }
 
-function initEngineerMultiSelectToggle() {
-    const engineerSelect = document.getElementById('engineer_ids');
+function initEngineerAssignmentPicker() {
+    const picker = document.querySelector('[data-engineer-picker]');
 
-    if (!engineerSelect || engineerSelect.dataset.toggleBound === 'true') {
+    if (!picker || picker.dataset.toggleBound === 'true') {
         return;
     }
 
-    engineerSelect.addEventListener('mousedown', function (event) {
-        const option = event.target;
+    const engineerSelect = picker.querySelector('[data-engineer-select]');
+    const toggleButton = picker.querySelector('[data-engineer-toggle]');
+    const toggleButtonIcon = picker.querySelector('.engineer-picker__toggle-icon');
+    const toggleButtonText = picker.querySelector('.engineer-picker__toggle-text');
+    const selectedContainer = picker.querySelector('[data-engineer-selected]');
+    const inputsContainer = picker.querySelector('[data-engineer-inputs]');
+    const createProjectForm = document.getElementById('create-project-form');
 
-        if (!(option instanceof HTMLOptionElement)) {
+    if (!engineerSelect || !toggleButton || !selectedContainer || !inputsContainer || !createProjectForm) {
+        return;
+    }
+
+    function getSelectedEngineerIds() {
+        return Array.from(inputsContainer.querySelectorAll('[data-engineer-input]')).map(function (input) {
+            return String(input.value);
+        });
+    }
+
+    function syncValidation() {
+        const hasSelectedEngineers = getSelectedEngineerIds().length > 0;
+        if (hasSelectedEngineers) {
+            engineerSelect.setCustomValidity('');
+        }
+    }
+
+    function syncToggleButton() {
+        const selectedValue = engineerSelect.value;
+        const hasSelectedValue = selectedValue !== '';
+        const isAlreadyAdded = hasSelectedValue && getSelectedEngineerIds().includes(selectedValue);
+
+        toggleButton.disabled = !hasSelectedValue;
+        toggleButton.classList.toggle('is-remove', Boolean(isAlreadyAdded));
+        toggleButton.setAttribute('aria-label', isAlreadyAdded ? 'Remove selected engineer' : 'Add selected engineer');
+        toggleButtonIcon.textContent = isAlreadyAdded ? '\u2212' : '+';
+        toggleButtonText.textContent = isAlreadyAdded ? 'Remove' : 'Add';
+    }
+
+    function renderEmptyState() {
+        const hasChip = selectedContainer.querySelector('[data-engineer-chip]');
+        selectedContainer.classList.toggle('is-empty', !hasChip);
+
+        if (!hasChip) {
+            selectedContainer.innerHTML = '<span class="engineer-picker__empty">No engineers added yet.</span>';
+        }
+    }
+
+    function addEngineer(engineerId, engineerName) {
+        const existingInput = inputsContainer.querySelector('[data-engineer-input][value="' + CSS.escape(engineerId) + '"]');
+
+        if (existingInput) {
             return;
         }
 
-        event.preventDefault();
-        option.selected = !option.selected;
-        engineerSelect.focus();
-        engineerSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        const emptyState = selectedContainer.querySelector('.engineer-picker__empty');
+        if (emptyState) {
+            emptyState.remove();
+        }
+
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'engineer-chip';
+        chip.setAttribute('data-engineer-chip', '');
+        chip.setAttribute('data-engineer-id', engineerId);
+        chip.setAttribute('data-engineer-name', engineerName);
+        chip.setAttribute('aria-pressed', 'true');
+        chip.innerHTML = '<span></span><span class="engineer-chip__remove" aria-hidden="true">&times;</span>';
+        chip.querySelector('span').textContent = engineerName;
+        selectedContainer.appendChild(chip);
+
+        const hiddenInput = document.createElement('input');
+        hiddenInput.type = 'hidden';
+        hiddenInput.name = 'engineer_ids[]';
+        hiddenInput.value = engineerId;
+        hiddenInput.setAttribute('data-engineer-input', '');
+        inputsContainer.appendChild(hiddenInput);
+
+        syncValidation();
+        syncToggleButton();
+    }
+
+    function removeEngineer(engineerId) {
+        const hiddenInput = inputsContainer.querySelector('[data-engineer-input][value="' + CSS.escape(engineerId) + '"]');
+        const chip = selectedContainer.querySelector('[data-engineer-chip][data-engineer-id="' + CSS.escape(engineerId) + '"]');
+
+        if (hiddenInput) {
+            hiddenInput.remove();
+        }
+
+        if (chip) {
+            chip.remove();
+        }
+
+        renderEmptyState();
+        syncValidation();
+        syncToggleButton();
+    }
+
+    engineerSelect.addEventListener('change', function () {
+        engineerSelect.setCustomValidity('');
+        syncToggleButton();
     });
 
-    engineerSelect.dataset.toggleBound = 'true';
+    toggleButton.addEventListener('click', function () {
+        const engineerId = engineerSelect.value;
+        const engineerName = engineerSelect.options[engineerSelect.selectedIndex]?.text || '';
+
+        if (engineerId === '') {
+            engineerSelect.setCustomValidity('Assigned engineer is required.');
+            engineerSelect.reportValidity();
+            return;
+        }
+
+        if (getSelectedEngineerIds().includes(engineerId)) {
+            removeEngineer(engineerId);
+        } else {
+            addEngineer(engineerId, engineerName);
+        }
+
+        engineerSelect.setCustomValidity('');
+        engineerSelect.focus();
+    });
+
+    selectedContainer.addEventListener('click', function (event) {
+        const chip = event.target.closest('[data-engineer-chip]');
+
+        if (!chip) {
+            return;
+        }
+
+        const engineerId = chip.getAttribute('data-engineer-id') || '';
+        if (engineerId === '') {
+            return;
+        }
+
+        engineerSelect.value = engineerId;
+        removeEngineer(engineerId);
+        engineerSelect.focus();
+    });
+
+    createProjectForm.addEventListener('submit', function (event) {
+        syncValidation();
+
+        if (getSelectedEngineerIds().length === 0) {
+            event.preventDefault();
+            engineerSelect.setCustomValidity('Assigned engineer is required.');
+            engineerSelect.reportValidity();
+            engineerSelect.focus();
+            return;
+        }
+
+        engineerSelect.setCustomValidity('');
+    });
+
+    renderEmptyState();
+    syncValidation();
+    syncToggleButton();
+    picker.dataset.toggleBound = 'true';
 }
 
 document.addEventListener('DOMContentLoaded', initProjectSearchUI);
 document.addEventListener('DOMContentLoaded', initCreateProjectForm);
-document.addEventListener('DOMContentLoaded', initEngineerMultiSelectToggle);
+document.addEventListener('DOMContentLoaded', initEngineerAssignmentPicker);
 </script>
 </body>
 </html>
