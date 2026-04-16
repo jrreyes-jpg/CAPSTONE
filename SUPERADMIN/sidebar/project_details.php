@@ -188,6 +188,12 @@ function pm_ensure_project_address_column(mysqli $conn): void {
     }
 }
 
+function pm_ensure_project_site_column(mysqli $conn): void {
+    if (!pm_table_has_column($conn, 'projects', 'project_site')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN project_site VARCHAR(190) DEFAULT NULL AFTER client_id");
+    }
+}
+
 function pm_ensure_project_email_column(mysqli $conn): void {
     if (!pm_table_has_column($conn, 'projects', 'project_email')) {
         $conn->query("ALTER TABLE projects ADD COLUMN project_email VARCHAR(190) DEFAULT NULL AFTER project_address");
@@ -322,9 +328,11 @@ $supportsDraftStatus = pm_enum_supports_value($conn, 'projects', 'status', 'draf
 $supportsCancelledStatus = pm_enum_supports_value($conn, 'projects', 'status', 'cancelled');
 $supportsArchivedStatus = pm_enum_supports_value($conn, 'projects', 'status', 'archived');
 pm_ensure_project_address_column($conn);
+pm_ensure_project_site_column($conn);
 pm_ensure_project_email_column($conn);
 pm_ensure_project_code_column($conn);
 pm_ensure_project_po_number_column($conn);
+$hasProjectSiteColumn = pm_table_has_column($conn, 'projects', 'project_site');
 $hasProjectAddressColumn = pm_table_has_column($conn, 'projects', 'project_address');
 $hasProjectEmailColumn = pm_table_has_column($conn, 'projects', 'project_email');
 $hasProjectCodeColumn = pm_table_has_column($conn, 'projects', 'project_code');
@@ -376,6 +384,7 @@ if ($engineerResult) {
 }
 
 if ($projectId > 0) {
+    $projectSiteSelect = $hasProjectSiteColumn ? 'p.project_site,' : 'NULL AS project_site,';
     $projectAddressSelect = $hasProjectAddressColumn ? 'p.project_address,' : 'NULL AS project_address,';
     $projectEmailSelect = $hasProjectEmailColumn ? 'p.project_email,' : 'NULL AS project_email,';
     $projectCodeSelect = $hasProjectCodeColumn ? 'p.project_code,' : 'NULL AS project_code,';
@@ -386,6 +395,7 @@ if ($projectId > 0) {
             p.id,
             p.project_name,
             p.description,
+            {$projectSiteSelect}
             {$projectAddressSelect}
             {$projectEmailSelect}
             {$projectCodeSelect}
@@ -685,7 +695,10 @@ if ($projectId > 0) {
                             <div><strong>Email Address:</strong> <?php echo htmlspecialchars($projectEmail); ?></div>
                         <?php endif; ?>
                         <?php if ($hasProjectAddressColumn): ?>
-                            <div><strong>Project Site:</strong> <?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></div>
+                            <?php if ($hasProjectSiteColumn): ?>
+                                <div><strong>Project Site:</strong> <?php echo htmlspecialchars($project['project_site'] ?? 'Not set'); ?></div>
+                            <?php endif; ?>
+                            <div><strong>Address:</strong> <?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></div>
                         <?php endif; ?>
                     </div>
                 </section>
@@ -747,14 +760,21 @@ if ($projectId > 0) {
 
                                     <?php if ($hasPoNumberColumn): ?>
                                         <div class="input-group">
-                                            <label for="po_number">P.O Number <span class="required-indicator" aria-hidden="true">*</span></label>
-                                            <input type="text" id="po_number" name="po_number" value="<?php echo htmlspecialchars($project['po_number'] ?? ''); ?>" required readonly data-project-editable>
+                                            <label for="po_number">P.O Number <span class="optional-indicator">(Required for Pending/Ongoing)</span></label>
+                                            <input type="text" id="po_number" name="po_number" value="<?php echo htmlspecialchars($project['po_number'] ?? ''); ?>" readonly data-project-editable>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <?php if ($hasProjectSiteColumn): ?>
+                                        <div class="input-group">
+                                            <label for="project_site">Project Site <span class="required-indicator" aria-hidden="true">*</span></label>
+                                            <input type="text" id="project_site" name="project_site" value="<?php echo htmlspecialchars($project['project_site'] ?? ''); ?>" readonly data-project-editable>
                                         </div>
                                     <?php endif; ?>
 
                                     <?php if ($hasProjectAddressColumn): ?>
                                         <div class="input-group input-group-wide">
-                                            <label for="project_address">Project Address / Site Location</label>
+                                            <label for="project_address">Address</label>
                                             <textarea id="project_address" name="project_address" rows="2" readonly data-project-editable><?php echo htmlspecialchars($project['project_address'] ?? ''); ?></textarea>
                                         </div>
                                     <?php endif; ?>
@@ -858,6 +878,12 @@ if ($projectId > 0) {
                                 <span>Project Code</span>
                                 <strong><?php echo htmlspecialchars($projectCode !== '' ? $projectCode : 'Not set'); ?></strong>
                             </div>
+                            <?php if ($hasProjectSiteColumn): ?>
+                                <div class="cost-note-field">
+                                    <span>Project Site</span>
+                                    <strong><?php echo htmlspecialchars($project['project_site'] ?? 'Not set'); ?></strong>
+                                </div>
+                            <?php endif; ?>
                             <div class="cost-note-field cost-note-field--wide">
                                 <span>Address</span>
                                 <strong><?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></strong>

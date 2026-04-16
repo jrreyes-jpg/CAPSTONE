@@ -10,12 +10,13 @@ header('Content-Type: application/json; charset=UTF-8');
 $searchQuery = trim((string)($_GET['q'] ?? ''));
 $statusFilter = trim((string)($_GET['status'] ?? ''));
 $limit = min(10, max(1, (int)($_GET['limit'] ?? 8)));
+$hasProjectSiteColumn = project_search_table_has_column($conn, 'projects', 'project_site');
 $hasProjectAddressColumn = project_search_table_has_column($conn, 'projects', 'project_address');
 $hasProjectEmailColumn = project_search_table_has_column($conn, 'projects', 'project_email');
 $hasProjectCodeColumn = project_search_table_has_column($conn, 'projects', 'project_code');
 $hasPoNumberColumn = project_search_table_has_column($conn, 'projects', 'po_number');
 
-ensure_project_search_indexes($conn, $hasProjectAddressColumn);
+ensure_project_search_indexes($conn, $hasProjectAddressColumn, $hasProjectSiteColumn);
 
 if (mb_strlen($searchQuery) < 2) {
     echo json_encode([
@@ -26,7 +27,7 @@ if (mb_strlen($searchQuery) < 2) {
     exit();
 }
 
-$results = project_search_fetch_suggestions($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $searchQuery, $statusFilter, $limit);
+$results = project_search_fetch_suggestions($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $searchQuery, $statusFilter, $limit);
 $payload = array_map(
     static function (array $project): array {
         return [
@@ -35,7 +36,7 @@ $payload = array_map(
             'status' => (string)($project['status'] ?? ''),
             'client' => (string)($project['client_name'] ?? 'N/A'),
             'engineer' => (string)($project['engineer_names'] ?? 'Not assigned'),
-            'site' => (string)($project['project_address'] ?? ''),
+            'site' => (string)($project['project_site'] ?? ($project['project_address'] ?? '')),
             'link' => '/codesamplecaps/SUPERADMIN/sidebar/project_details.php?id=' . (int)($project['id'] ?? 0),
         ];
     },

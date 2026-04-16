@@ -156,6 +156,12 @@ function ensure_project_address_column(mysqli $conn): void {
     }
 }
 
+function ensure_project_site_column(mysqli $conn): void {
+    if (!table_has_column($conn, 'projects', 'project_site')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN project_site VARCHAR(190) DEFAULT NULL AFTER client_id");
+    }
+}
+
 function ensure_project_email_column(mysqli $conn): void {
     if (!table_has_column($conn, 'projects', 'project_email')) {
         $conn->query("ALTER TABLE projects ADD COLUMN project_email VARCHAR(190) DEFAULT NULL AFTER project_address");
@@ -250,14 +256,16 @@ $supportsDraftStatus = enum_supports_value($conn, 'projects', 'status', 'draft')
 $supportsCancelledStatus = enum_supports_value($conn, 'projects', 'status', 'cancelled');
 $supportsArchivedStatus = enum_supports_value($conn, 'projects', 'status', 'archived');
 ensure_project_address_column($conn);
+ensure_project_site_column($conn);
 ensure_project_email_column($conn);
 ensure_project_code_column($conn);
 ensure_project_po_number_column($conn);
+$hasProjectSiteColumn = table_has_column($conn, 'projects', 'project_site');
 $hasProjectAddressColumn = table_has_column($conn, 'projects', 'project_address');
 $hasProjectEmailColumn = table_has_column($conn, 'projects', 'project_email');
 $hasProjectCodeColumn = table_has_column($conn, 'projects', 'project_code');
 $hasPoNumberColumn = table_has_column($conn, 'projects', 'po_number');
-ensure_project_search_indexes($conn, $hasProjectAddressColumn);
+ensure_project_search_indexes($conn, $hasProjectAddressColumn, $hasProjectSiteColumn);
 $statusOptions = [];
 if ($supportsDraftStatus) {
     $statusOptions[] = 'draft';
@@ -307,6 +315,7 @@ function set_projects_old_input(array $input, ?string $focusField = null): void 
     $_SESSION['projects_old_input'] = [
         'project_name' => trim((string)($input['project_name'] ?? '')),
         'description' => trim((string)($input['description'] ?? '')),
+        'project_site' => trim((string)($input['project_site'] ?? '')),
         'project_address' => trim((string)($input['project_address'] ?? '')),
         'project_email' => trim((string)($input['project_email'] ?? '')),
         'project_code' => trim((string)($input['project_code'] ?? '')),
@@ -640,6 +649,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'create_project') {
         $projectName = normalize_text($_POST['project_name'] ?? '');
         $description = normalize_text($_POST['description'] ?? '');
+        $projectSite = $hasProjectSiteColumn ? normalize_text_or_null($_POST['project_site'] ?? null) : null;
         $projectAddress = $hasProjectAddressColumn ? normalize_text_or_null($_POST['project_address'] ?? null) : null;
         $projectEmail = $hasProjectEmailColumn ? normalize_text_or_null($_POST['project_email'] ?? null) : null;
         $projectCode = $hasProjectCodeColumn ? normalize_text_or_null($_POST['project_code'] ?? null) : null;
@@ -655,6 +665,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $createProjectInput = [
             'project_name' => $_POST['project_name'] ?? '',
             'description' => $_POST['description'] ?? '',
+            'project_site' => $_POST['project_site'] ?? '',
             'project_address' => $_POST['project_address'] ?? '',
             'project_email' => $_POST['project_email'] ?? '',
             'project_code' => $_POST['project_code'] ?? '',
@@ -702,6 +713,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
+        if ($hasProjectSiteColumn && $status !== 'draft' && $projectSite === null) {
+            set_projects_old_input($createProjectInput, 'project_site');
+            set_projects_flash('error', 'Project site is required unless the project stays in Draft.');
+            redirect_projects_page();
+        }
+
         if ($hasProjectAddressColumn && $status !== 'draft' && $projectAddress === null) {
             set_projects_old_input($createProjectInput, 'project_address');
             set_projects_flash('error', 'Project address is required unless the project stays in Draft.');
@@ -720,9 +737,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
-        if ($poNumber === null) {
+        if (project_requires_po_date($status) && $poNumber === null) {
             set_projects_old_input($createProjectInput, 'po_number');
-            set_projects_flash('error', 'P.O Number is required.');
+            set_projects_flash('error', 'P.O Number is required when the project starts as Pending or Ongoing.');
             redirect_projects_page();
         }
 
@@ -732,7 +749,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
-        if (projectFieldValueExists($conn, 'po_number', $poNumber)) {
+        if ($poNumber !== null && projectFieldValueExists($conn, 'po_number', $poNumber)) {
             set_projects_old_input($createProjectInput, 'po_number');
             set_projects_flash('error', 'P.O Number already exists.');
             redirect_projects_page();
@@ -769,19 +786,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($hasProjectEmailColumn) {
                     if ($hasProjectCodeColumn && $hasPoNumberColumn) {
                         $createProject = $conn->prepare(
-                            'INSERT INTO projects (project_name, description, client_id, project_address, project_email, project_code, po_number, start_date, end_date, status, created_by)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                            'INSERT INTO projects (project_name, description, client_id, project_site, project_address, project_email, project_code, po_number, start_date, end_date, status, created_by)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
                         );
                     } else {
                         $createProject = $conn->prepare(
-                            'INSERT INTO projects (project_name, description, client_id, project_address, project_email, start_date, end_date, status, created_by)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                            'INSERT INTO projects (project_name, description, client_id, project_site, project_address, project_email, start_date, end_date, status, created_by)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
                         );
                     }
                 } else {
                     $createProject = $conn->prepare(
-                        'INSERT INTO projects (project_name, description, client_id, project_address, start_date, end_date, status, created_by)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+                        'INSERT INTO projects (project_name, description, client_id, project_site, project_address, start_date, end_date, status, created_by)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
                     );
                 }
             } else {
@@ -799,10 +816,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($hasProjectEmailColumn) {
                     if ($hasProjectCodeColumn && $hasPoNumberColumn) {
                         $createProject->bind_param(
-                            'ssisssssssi',
+                            'ssissssssssi',
                             $projectName,
                             $description,
                             $clientId,
+                            $projectSite,
                             $projectAddress,
                             $projectEmail,
                             $projectCode,
@@ -814,10 +832,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         );
                     } else {
                         $createProject->bind_param(
-                            'ssisssssi',
+                            'ssissssssi',
                             $projectName,
                             $description,
                             $clientId,
+                            $projectSite,
                             $projectAddress,
                             $projectEmail,
                             $startDate,
@@ -828,10 +847,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 } else {
                     $createProject->bind_param(
-                        'ssissssi',
+                        'ssisssssi',
                         $projectName,
                         $description,
                         $clientId,
+                        $projectSite,
                         $projectAddress,
                         $startDate,
                         $endDate,
@@ -1227,6 +1247,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $projectId = (int)($_POST['project_id'] ?? 0);
         $projectName = normalize_text($_POST['project_name'] ?? '');
         $description = normalize_text($_POST['description'] ?? '');
+        $projectSite = $hasProjectSiteColumn ? normalize_text_or_null($_POST['project_site'] ?? null) : null;
         $projectAddress = $hasProjectAddressColumn ? normalize_text_or_null($_POST['project_address'] ?? null) : null;
         $projectEmail = $hasProjectEmailColumn ? normalize_text_or_null($_POST['project_email'] ?? null) : null;
         $projectCode = $hasProjectCodeColumn ? normalize_text_or_null($_POST['project_code'] ?? null) : null;
@@ -1258,6 +1279,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
+        if ($hasProjectSiteColumn && ($project['status'] ?? '') !== 'draft' && $projectSite === null) {
+            set_projects_flash('error', 'Project site is required unless the project stays in Draft.');
+            redirect_projects_page();
+        }
+
         if ($projectEmail !== null && !filter_var($projectEmail, FILTER_VALIDATE_EMAIL)) {
             set_projects_flash('error', 'Project email must be a valid email address.');
             redirect_projects_page();
@@ -1268,8 +1294,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
-        if ($poNumber === null) {
-            set_projects_flash('error', 'P.O Number is required.');
+        if (project_requires_po_date((string)($project['status'] ?? '')) && $poNumber === null) {
+            set_projects_flash('error', 'P.O Number is required while the project is Pending or Ongoing.');
             redirect_projects_page();
         }
 
@@ -1278,7 +1304,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
-        if (projectFieldValueExists($conn, 'po_number', $poNumber, $projectId)) {
+        if ($poNumber !== null && projectFieldValueExists($conn, 'po_number', $poNumber, $projectId)) {
             set_projects_flash('error', 'P.O Number already exists.');
             redirect_projects_page();
         }
@@ -1306,20 +1332,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($hasProjectCodeColumn && $hasPoNumberColumn) {
                         $updateProject = $conn->prepare(
                             'UPDATE projects
-                             SET project_name = ?, description = ?, client_id = ?, project_address = ?, project_email = ?, project_code = ?, po_number = ?, start_date = ?, end_date = ?
+                             SET project_name = ?, description = ?, client_id = ?, project_site = ?, project_address = ?, project_email = ?, project_code = ?, po_number = ?, start_date = ?, end_date = ?
                              WHERE id = ?'
                         );
                     } else {
                         $updateProject = $conn->prepare(
                             'UPDATE projects
-                             SET project_name = ?, description = ?, client_id = ?, project_address = ?, project_email = ?, start_date = ?, end_date = ?
+                             SET project_name = ?, description = ?, client_id = ?, project_site = ?, project_address = ?, project_email = ?, start_date = ?, end_date = ?
                              WHERE id = ?'
                         );
                     }
                 } else {
                     $updateProject = $conn->prepare(
                         'UPDATE projects
-                         SET project_name = ?, description = ?, client_id = ?, project_address = ?, start_date = ?, end_date = ?
+                         SET project_name = ?, description = ?, client_id = ?, project_site = ?, project_address = ?, start_date = ?, end_date = ?
                          WHERE id = ?'
                     );
                 }
@@ -1339,19 +1365,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($hasProjectEmailColumn) {
                     if ($hasProjectCodeColumn && $hasPoNumberColumn) {
                         if (
-                            !$updateProject->bind_param('ssissssssi', $projectName, $description, $clientId, $projectAddress, $projectEmail, $projectCode, $poNumber, $startDate, $endDate, $projectId) ||
+                            !$updateProject->bind_param('ssisssssssi', $projectName, $description, $clientId, $projectSite, $projectAddress, $projectEmail, $projectCode, $poNumber, $startDate, $endDate, $projectId) ||
                             !$updateProject->execute()
                         ) {
                             throw new RuntimeException('Failed to update project details.');
                         }
                     } elseif (
-                        !$updateProject->bind_param('ssissssi', $projectName, $description, $clientId, $projectAddress, $projectEmail, $startDate, $endDate, $projectId) ||
+                        !$updateProject->bind_param('ssisssssi', $projectName, $description, $clientId, $projectSite, $projectAddress, $projectEmail, $startDate, $endDate, $projectId) ||
                         !$updateProject->execute()
                     ) {
                         throw new RuntimeException('Failed to update project details.');
                     }
                 } elseif (
-                    !$updateProject->bind_param('ssisssi', $projectName, $description, $clientId, $projectAddress, $startDate, $endDate, $projectId) ||
+                    !$updateProject->bind_param('ssissssi', $projectName, $description, $clientId, $projectSite, $projectAddress, $startDate, $endDate, $projectId) ||
                     !$updateProject->execute()
                 ) {
                     throw new RuntimeException('Failed to update project details.');
@@ -1795,6 +1821,7 @@ $createProjectFocusField = trim((string)($createProjectOldInput['focus_field'] ?
 $createProjectValues = [
     'project_name' => (string)($createProjectOldInput['project_name'] ?? ''),
     'description' => (string)($createProjectOldInput['description'] ?? ''),
+    'project_site' => (string)($createProjectOldInput['project_site'] ?? ''),
     'project_address' => (string)($createProjectOldInput['project_address'] ?? ''),
     'project_email' => (string)($createProjectOldInput['project_email'] ?? ''),
     'project_code' => (string)($createProjectOldInput['project_code'] ?? ''),
@@ -1865,7 +1892,7 @@ if ($statusCountsResult) {
     }
 }
 
-$filteredProjects = project_search_fetch_count($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $searchQuery, $statusFilter);
+$filteredProjects = project_search_fetch_count($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $searchQuery, $statusFilter);
 
 $totalPages = max(1, (int)ceil($filteredProjects / $perPage));
 if ($currentPage > $totalPages) {
@@ -1873,7 +1900,7 @@ if ($currentPage > $totalPages) {
     $offset = ($currentPage - 1) * $perPage;
 }
 
-$projects = project_search_fetch_page($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $searchQuery, $statusFilter, $perPage, $offset);
+$projects = project_search_fetch_page($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $searchQuery, $statusFilter, $perPage, $offset);
 $projectIds = array_map(static fn(array $project): int => (int)($project['id'] ?? 0), $projects);
 $recentProjectCosts = fetchRecentProjectCostEntries($conn, $projectIds);
 $financialSummaryResult = $conn->query(
@@ -1952,8 +1979,8 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
 
                         <?php if ($hasPoNumberColumn): ?>
                             <div class="input-group">
-                                <label for="po_number">P.O Number <span class="required-indicator" aria-hidden="true">*</span></label>
-                                <input type="text" id="po_number" name="po_number" value="<?php echo htmlspecialchars($createProjectValues['po_number']); ?>" placeholder="Enter P.O number" required>
+                                <label for="po_number">P.O Number <span class="optional-indicator">(Required for Pending/Ongoing)</span></label>
+                                <input type="text" id="po_number" name="po_number" value="<?php echo htmlspecialchars($createProjectValues['po_number']); ?>" placeholder="Enter P.O number">
                             </div>
                         <?php endif; ?>
 
@@ -2058,6 +2085,13 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             </div>
                         <?php endif; ?>
 
+                        <?php if ($hasProjectSiteColumn): ?>
+                            <div class="input-group">
+                                <label for="project_site">Project Site <span class="required-indicator" aria-hidden="true">*</span> <span class="optional-indicator">(Required unless Draft)</span></label>
+                                <input type="text" id="project_site" name="project_site" value="<?php echo htmlspecialchars($createProjectValues['project_site']); ?>" placeholder="Site name, branch, building, or location code">
+                            </div>
+                        <?php endif; ?>
+
                         <div class="input-group">
                             <label for="budget_amount">Project Budget</label>
                             <input type="number" id="budget_amount" name="budget_amount" min="0" step="0.01" placeholder="0.00" value="<?php echo htmlspecialchars($createProjectValues['budget_amount']); ?>">
@@ -2077,7 +2111,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                         <?php if ($hasProjectAddressColumn): ?>
                             <div class="input-group input-group-spaced">
                                 <label for="project_address">Address <span class="required-indicator" aria-hidden="true">*</span> <span class="optional-indicator">(Required unless Draft)</span></label>
-                                <textarea id="project_address" name="project_address" rows="3" placeholder="Street, barangay, city, landmark, or full project site address"><?php echo htmlspecialchars($createProjectValues['project_address']); ?></textarea>
+                                <textarea id="project_address" name="project_address" rows="3" placeholder="Full street address, barangay, city, landmark, or delivery address"><?php echo htmlspecialchars($createProjectValues['project_address']); ?></textarea>
                             </div>
                         <?php endif; ?>
 
@@ -2179,12 +2213,14 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             $projectRecentCosts = $recentProjectCosts[(int)($project['id'] ?? 0)] ?? [];
                             $projectCode = trim((string)($project['project_code'] ?? ''));
                             $projectPoNumber = trim((string)($project['po_number'] ?? ''));
+                            $projectSite = trim((string)($project['project_site'] ?? ''));
                             $projectEmail = trim((string)($project['project_email'] ?? ''));
                             $assignedEngineerNames = trim((string)($project['engineer_names'] ?? ''));
                             $searchText = strtolower(trim(implode(' ', [
                                 $project['project_name'] ?? '',
                                 $projectCode,
                                 $projectPoNumber,
+                                $projectSite,
                                 $project['client_name'] ?? '',
                                 $assignedEngineerNames,
                                 $project['project_address'] ?? '',
@@ -2210,14 +2246,17 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                         </div>
                                     </div>
 
-                                    <div class="project-meta">
-                                        <div><strong>Client:</strong> <?php echo htmlspecialchars($project['client_name'] ?? 'N/A'); ?></div>
-                                        <div><strong>Project Code:</strong> <?php echo htmlspecialchars($projectCode !== '' ? $projectCode : 'Not set'); ?></div>
-                                        <div><strong>P.O Number:</strong> <?php echo htmlspecialchars($projectPoNumber !== '' ? $projectPoNumber : 'Not set'); ?></div>
-                                        <div><strong>P.O Date:</strong> <?php echo htmlspecialchars($project['start_date'] ?? 'N/A'); ?></div>
-                                        <div><strong>Assigned Engineer/s:</strong> <?php echo htmlspecialchars($assignedEngineerNames !== '' ? $assignedEngineerNames : 'Not assigned'); ?></div>
-                                        <?php if ($hasProjectAddressColumn): ?>
-                                            <div><strong>Project Site:</strong> <?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></div>
+                                        <div class="project-meta">
+                                            <div><strong>Client:</strong> <?php echo htmlspecialchars($project['client_name'] ?? 'N/A'); ?></div>
+                                            <div><strong>Project Code:</strong> <?php echo htmlspecialchars($projectCode !== '' ? $projectCode : 'Not set'); ?></div>
+                                            <div><strong>P.O Number:</strong> <?php echo htmlspecialchars($projectPoNumber !== '' ? $projectPoNumber : 'Not set'); ?></div>
+                                            <div><strong>P.O Date:</strong> <?php echo htmlspecialchars($project['start_date'] ?? 'N/A'); ?></div>
+                                            <div><strong>Assigned Engineer/s:</strong> <?php echo htmlspecialchars($assignedEngineerNames !== '' ? $assignedEngineerNames : 'Not assigned'); ?></div>
+                                            <?php if ($hasProjectSiteColumn): ?>
+                                                <div><strong>Project Site:</strong> <?php echo htmlspecialchars($projectSite !== '' ? $projectSite : 'Not set'); ?></div>
+                                            <?php endif; ?>
+                                            <?php if ($hasProjectAddressColumn): ?>
+                                            <div><strong>Address:</strong> <?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></div>
                                         <?php endif; ?>
                                         <?php if ($projectEmail !== ''): ?>
                                             <div><strong>Email Address:</strong> <?php echo htmlspecialchars($projectEmail); ?></div>
