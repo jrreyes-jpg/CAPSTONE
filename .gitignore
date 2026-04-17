@@ -2,27 +2,23 @@
 vendor/
 *.log
 DB/project_payments_setup.sql
+DB/*.sql.bak
+DB/*_local.sql
+DB/*_backup.sql
+DB/*.sqlite
+DB/*.sqlite3
+DB/*.db
 
-hi
+sa assigned engineer dapat dropdown tas lagyan nalang ng add button o plus
 
-client
-project code
-po number
-po date
-asiigned engineer/s pag malaki projects pede 2 o tatlo o more na engineer
-
-
-
-
-
-
-
-
-
-
+sa project site ay iba sa address
+lagyan mo ng dropdown dun sa project site, code
 
 
 
 
 
 address papalitan ba ser bern
+
+project site code dropdown
+

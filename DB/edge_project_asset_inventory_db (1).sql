@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 12, 2026 at 09:47 AM
+-- Generation Time: Apr 17, 2026 at 04:59 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -188,7 +188,16 @@ INSERT INTO `audit_logs` (`id`, `user_id`, `action`, `entity_type`, `entity_id`,
 (38, 5, 'update_user_profile', 'user', 5, '{\"full_name\":\"adminedge\",\"email\":\"jeshowap@gmail.com\",\"phone\":\"\",\"profile_photo_path\":\"uploads/profile_photos/super-admin-5-1775915336.jpg\"}', '{\"full_name\":\"adminedge\",\"email\":\"jeshowap@gmail.com\",\"phone\":\"\",\"profile_photo_path\":\"uploads/profile_photos/super-admin-5-1775915384.jpg\"}', '::1', '2026-04-11 13:49:44'),
 (39, 5, 'update_user_profile', 'user', 5, '{\"full_name\":\"adminedge\",\"email\":\"jeshowap@gmail.com\",\"phone\":\"\",\"profile_photo_path\":\"uploads/profile_photos/super-admin-5-1775915384.jpg\"}', '{\"full_name\":\"adminedge\",\"email\":\"jeshowap@gmail.com\",\"phone\":\"\",\"profile_photo_path\":\"uploads/profile_photos/super-admin-5-1775915387.jpg\"}', '::1', '2026-04-11 13:49:47'),
 (40, 5, 'update_user_profile', 'user', 5, '{\"full_name\":\"adminedge\",\"email\":\"jeshowap@gmail.com\",\"phone\":\"\",\"profile_photo_path\":\"uploads/profile_photos/super-admin-5-1775915387.jpg\"}', '{\"full_name\":\"adminedge\",\"email\":\"jeshowap@gmail.com\",\"phone\":\"\",\"profile_photo_path\":\"uploads/profile_photos/super-admin-5-1775915394.jpg\"}', '::1', '2026-04-11 13:49:54'),
-(41, 5, 'create_user', 'user', 17, NULL, '{\"full_name\":\"Johnny Reyes\",\"email\":\"johnny@gmail.com\",\"phone\":\"09338268806\",\"role\":\"foreman\",\"status\":\"active\"}', '::1', '2026-04-12 03:56:06');
+(41, 5, 'create_user', 'user', 17, NULL, '{\"full_name\":\"Johnny Reyes\",\"email\":\"johnny@gmail.com\",\"phone\":\"09338268806\",\"role\":\"foreman\",\"status\":\"active\"}', '::1', '2026-04-12 03:56:06'),
+(42, 5, 'update_user_profile', 'user', 15, '{\"full_name\":\"Rhose Anne Reyes\",\"email\":\"rhose@gmail.com\",\"phone\":\"09123456782\"}', '{\"full_name\":\"Rhose engineer\",\"email\":\"rhose@gmail.com\",\"phone\":\"09123456782\"}', '::1', '2026-04-13 01:37:57'),
+(43, 5, 'update_user_profile', 'user', 15, '{\"full_name\":\"Rhose engineer\",\"email\":\"rhose@gmail.com\",\"phone\":\"09123456782\"}', '{\"full_name\":\"Rhose engineer\",\"email\":\"rhosengineer@gmail.com\",\"phone\":\"09123456782\"}', '::1', '2026-04-13 01:38:26'),
+(44, 5, 'update_user_profile', 'user', 17, '{\"full_name\":\"Johnny Reyes\",\"email\":\"johnny@gmail.com\",\"phone\":\"09338268806\"}', '{\"full_name\":\"Johnny Reyes\",\"email\":\"johnnyforeman@gmail.com\",\"phone\":\"09338268806\"}', '::1', '2026-04-13 01:38:39'),
+(45, 5, 'update_user_profile', 'user', 16, '{\"full_name\":\"Jomarie Reyes\",\"email\":\"jomarie@gmail.com\",\"phone\":\"09123456781\"}', '{\"full_name\":\"Jomarie Reyes\",\"email\":\"jomarieclient@gmail.com\",\"phone\":\"09123456781\"}', '::1', '2026-04-13 01:38:51'),
+(46, 5, 'create_project', 'project', 11, NULL, '{\"project_name\":\"try\",\"status\":\"pending\",\"client_id\":16,\"engineer_id\":15}', '::1', '2026-04-13 15:11:47'),
+(47, 5, 'update_project_budget', 'project', 11, '{\"project_name\":\"try\",\"budget_amount\":0,\"budget_notes\":null}', '{\"project_name\":\"try\",\"budget_amount\":100,\"budget_notes\":null}', '::1', '2026-04-15 00:38:35'),
+(48, 5, 'add_task', 'task', 4, NULL, '{\"project_name\":\"try\",\"task_name\":\"All Around\",\"assigned_to\":15,\"deadline\":\"2026-04-15\"}', '::1', '2026-04-15 14:26:49'),
+(49, 5, 'create_project', 'project', 12, NULL, '{\"project_name\":\"Cleaning Ventilation\",\"status\":\"pending\",\"client_id\":16,\"engineer_id\":15,\"budget_amount\":0}', '::1', '2026-04-15 14:36:40'),
+(50, 5, 'create_project', 'project', 13, NULL, '{\"project_name\":\"Airconditioning\",\"status\":\"ongoing\",\"client_id\":16,\"engineer_ids\":[15],\"project_email\":null,\"project_code\":\"4-16-01\",\"po_number\":\"EA-01\",\"budget_amount\":0}', '::1', '2026-04-16 01:50:17');
 
 -- --------------------------------------------------------
 
@@ -279,6 +288,11 @@ CREATE TABLE `projects` (
   `project_name` varchar(200) NOT NULL,
   `description` text DEFAULT NULL,
   `client_id` int(11) NOT NULL,
+  `project_site` varchar(190) DEFAULT NULL,
+  `project_address` text DEFAULT NULL,
+  `project_email` varchar(190) DEFAULT NULL,
+  `project_code` varchar(80) DEFAULT NULL,
+  `po_number` varchar(80) DEFAULT NULL,
   `start_date` date DEFAULT NULL,
   `end_date` date DEFAULT NULL,
   `status` enum('draft','pending','ongoing','completed','on-hold','cancelled','archived') DEFAULT 'pending',
@@ -291,16 +305,9 @@ CREATE TABLE `projects` (
 -- Dumping data for table `projects`
 --
 
-INSERT INTO `projects` (`id`, `project_name`, `description`, `client_id`, `start_date`, `end_date`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
-(2, 'Vendo Machine', '', 7, '2026-03-30', '2026-03-31', 'ongoing', 5, '2026-03-30 01:30:58', '2026-03-31 15:13:30'),
-(3, 'Working machine', '', 10, '2026-03-30', '2026-03-30', 'ongoing', 5, '2026-03-30 01:37:01', '2026-03-31 14:52:31'),
-(4, 'Wirings', '', 9, '2026-03-31', '2026-03-31', 'ongoing', 5, '2026-03-31 01:37:12', '2026-03-31 01:37:12'),
-(5, 'Mechanical', '', 7, '2026-03-31', '2026-03-31', 'completed', 5, '2026-03-31 14:54:42', '2026-03-31 14:54:55'),
-(6, 'Washing Machine', '', 16, '2026-04-01', '2026-04-01', 'pending', 5, '2026-04-01 14:54:15', '2026-04-01 14:54:15'),
-(7, 'washing machine', '', 16, '2026-04-05', '2026-04-05', 'ongoing', 5, '2026-04-05 09:37:05', '2026-04-11 13:23:45'),
-(8, 'washing machine', '', 16, '2026-04-05', '2026-04-05', 'cancelled', 5, '2026-04-05 09:37:30', '2026-04-05 09:50:33'),
-(9, 'Motor welding', 'Hanggang bukas dapat tapos na.', 16, '2026-04-07', '2026-04-07', 'pending', 5, '2026-04-07 13:47:42', '2026-04-07 13:47:42'),
-(10, 'new', '', 16, '2026-04-11', '2026-04-11', 'completed', 5, '2026-04-11 13:25:51', '2026-04-11 13:26:09');
+INSERT INTO `projects` (`id`, `project_name`, `description`, `client_id`, `project_site`, `project_address`, `project_email`, `project_code`, `po_number`, `start_date`, `end_date`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
+(12, 'Cleaning Ventilation', '', 16, NULL, 'Brgy. Banadero', NULL, NULL, NULL, '2026-04-15', NULL, 'pending', 5, '2026-04-15 14:36:40', '2026-04-15 14:36:40'),
+(13, 'Airconditioning', '', 16, NULL, 'banadero, calamba, laguna', NULL, '4-16-01', 'EA-01', '2026-04-16', NULL, 'ongoing', 5, '2026-04-16 01:50:17', '2026-04-16 01:50:17');
 
 -- --------------------------------------------------------
 
@@ -337,15 +344,49 @@ CREATE TABLE `project_assignments` (
 --
 
 INSERT INTO `project_assignments` (`id`, `project_id`, `engineer_id`, `assigned_by`, `assigned_at`) VALUES
-(1, 2, 6, 5, '2026-03-30 01:30:58'),
-(2, 3, 6, 5, '2026-03-30 01:37:01'),
-(3, 4, 14, 5, '2026-03-31 01:37:12'),
-(4, 5, 6, 5, '2026-03-31 14:54:42'),
-(5, 6, 15, 5, '2026-04-01 14:54:15'),
-(6, 7, 15, 5, '2026-04-05 09:37:05'),
-(7, 8, 15, 5, '2026-04-05 09:37:30'),
-(8, 9, 15, 5, '2026-04-07 13:47:42'),
-(9, 10, 15, 5, '2026-04-11 13:25:51');
+(11, 12, 15, 5, '2026-04-15 14:36:40'),
+(12, 13, 15, 5, '2026-04-16 01:50:17');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `project_budget_profiles`
+--
+
+CREATE TABLE `project_budget_profiles` (
+  `project_id` int(11) NOT NULL,
+  `budget_amount` decimal(14,2) NOT NULL DEFAULT 0.00,
+  `budget_notes` text DEFAULT NULL,
+  `created_by` int(11) NOT NULL,
+  `updated_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `project_budget_profiles`
+--
+
+INSERT INTO `project_budget_profiles` (`project_id`, `budget_amount`, `budget_notes`, `created_by`, `updated_by`, `created_at`, `updated_at`) VALUES
+(12, 0.00, NULL, 5, 5, '2026-04-15 14:36:40', '2026-04-15 14:36:40'),
+(13, 0.00, NULL, 5, 5, '2026-04-16 01:50:17', '2026-04-16 01:50:17');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `project_cost_entries`
+--
+
+CREATE TABLE `project_cost_entries` (
+  `id` int(11) NOT NULL,
+  `project_id` int(11) NOT NULL,
+  `cost_date` date NOT NULL,
+  `cost_category` varchar(80) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `amount` decimal(14,2) NOT NULL,
+  `created_by` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -364,17 +405,6 @@ CREATE TABLE `project_inventory_deployments` (
   `notes` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `project_inventory_deployments`
---
-
-INSERT INTO `project_inventory_deployments` (`id`, `project_id`, `inventory_id`, `quantity`, `deployed_by`, `deployed_at`, `returned_at`, `notes`) VALUES
-(1, 4, 1, 1, 5, '2026-03-31 15:13:10', NULL, NULL),
-(2, 4, 1, 1, 5, '2026-04-01 14:45:44', NULL, NULL),
-(3, 6, 1, 1, 5, '2026-04-01 14:56:15', NULL, NULL),
-(4, 7, 2, 1, 5, '2026-04-06 00:56:46', NULL, NULL),
-(5, 9, 1, 1, 5, '2026-04-07 14:14:06', NULL, 'nyah');
-
 -- --------------------------------------------------------
 
 --
@@ -388,6 +418,22 @@ CREATE TABLE `project_inventory_return_logs` (
   `returned_by` int(11) NOT NULL,
   `returned_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `notes` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `project_payments`
+--
+
+CREATE TABLE `project_payments` (
+  `id` int(11) NOT NULL,
+  `project_id` int(11) NOT NULL,
+  `payment_date` date NOT NULL,
+  `amount` decimal(14,2) NOT NULL,
+  `notes` varchar(255) DEFAULT NULL,
+  `created_by` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -408,15 +454,6 @@ CREATE TABLE `tasks` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `tasks`
---
-
-INSERT INTO `tasks` (`id`, `project_id`, `assigned_to`, `task_name`, `description`, `deadline`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
-(1, 2, 6, 'Cleaning', '', '2026-03-31', 'completed', 5, '2026-03-30 01:36:24', '2026-03-30 16:06:09'),
-(2, 4, 6, 'Checking wires', '', '2026-04-01', 'pending', 5, '2026-04-01 14:44:57', '2026-04-01 14:44:57'),
-(3, 7, 15, 'Cleaning Debris', '', '2026-04-06', 'completed', 5, '2026-04-06 00:56:21', '2026-04-11 13:24:36');
 
 -- --------------------------------------------------------
 
@@ -451,15 +488,13 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`id`, `full_name`, `email`, `phone`, `password`, `role`, `status`, `failed_attempts`, `last_failed_login`, `created_at`, `updated_at`, `created_by`, `reset_token`, `token_expiry`, `profile_photo_path`, `profile_photo_data`, `profile_photo_mime`) VALUES
 (5, 'adminedge', 'jeshowap@gmail.com', '', '$2y$10$pwI94G4xmgpb8xCqN36zCehqij7csJ5qTajN7V1J1VAdikJR2F2Jq', 'super_admin', 'active', 0, NULL, '2026-03-04 09:22:06', '2026-04-11 14:39:18', NULL, '656319f981aac380183420bb1673f056cf51adb6f27c2f96b502584645a092fb33727868c84d828832e339d6a889235c29fd', '2026-04-02 00:31:09', 'system-profile:user-5.jpg', NULL, NULL),
 (6, 'Engineer1', 'jhayreyes825@gmail.com', '09070782535', '$2y$10$krcZHjowKX5T385itOfSIuF00j6jr5pCNRjrCzpsM197lIPxxyrEe', 'engineer', 'active', 0, NULL, '2026-03-06 03:25:58', '2026-03-25 07:06:46', NULL, NULL, NULL, NULL, NULL, NULL),
-(7, 'Client1', 'jhayandriereyes@gmail.com', '09070782533', '$2y$10$4N2cH6onWgAfxs/ERpK9O.gIDfyzJ/lkG.GkPZ/caqpHuriAlt9/S', 'client', 'active', 0, NULL, '2026-03-06 04:45:00', '2026-03-06 11:10:23', 5, NULL, NULL, NULL, NULL, NULL),
 (9, 'Client2', 'Client2@gmail.com', '09070782534', '$2y$10$M5/21OQMCvZw99er8W2.2.AlFw2PYkoe41ixb7qMngfBayCI8hFx.', 'client', 'active', 0, NULL, '2026-03-06 12:04:17', '2026-03-06 12:04:17', 5, NULL, NULL, NULL, NULL, NULL),
 (10, 'Client3', 'C3@gmail.com', '09070782536', '$2y$10$OX08NbDxuxpllNOYEE2P4eaNzDxG8H7aheHYdb6j2X.G13ZYsFx4G', 'client', 'active', 0, NULL, '2026-03-09 23:16:00', '2026-03-09 23:16:00', 5, NULL, NULL, NULL, NULL, NULL),
 (11, 'Foreman1', 'foreman1@gmail.com', '09070782531', '$2y$10$jMvpZeC5ELve.b/tB4OFbeVnxMs7BIFWu2CpJpxWGcOgFE4TF.wgS', 'foreman', 'active', 0, NULL, '2026-03-10 02:53:28', '2026-03-10 02:53:28', 5, NULL, NULL, NULL, NULL, NULL),
 (13, 'Super Admin', 'superadmin@edge.com', '09123456789', '$2y$10$MPyqNCvB2OwODVqCgWLI.eIMNKrr9deUup5c9zeSNQrwOA0A8zWU.', 'super_admin', 'active', 0, NULL, '2026-03-13 14:54:38', '2026-03-13 14:59:06', NULL, NULL, NULL, NULL, NULL, NULL),
-(14, 'Engineer2', 'Engineer2@gmail.com', '09070782511', '$2y$10$6n9a2JhT./x3UAawlr5kce.sLNAtiRHYKpzpJScEQNF4Ccuo9LGhC', 'engineer', 'active', 0, NULL, '2026-03-14 02:53:41', '2026-03-30 13:49:15', 5, NULL, NULL, NULL, NULL, NULL),
-(15, 'Rhose Anne Reyes', 'rhose@gmail.com', '09123456782', '$2y$10$Lph93qCtXudrvgtk3bZr3OwPH.hyvvJnjYa3lJuCl6JFfhb/Jb.lS', 'engineer', 'active', 0, NULL, '2026-04-01 14:51:56', '2026-04-01 14:51:56', 5, NULL, NULL, NULL, NULL, NULL),
-(16, 'Jomarie Reyes', 'jomarie@gmail.com', '09123456781', '$2y$10$Wt0uqRK4h7h5uP5fnQt4dunq3PHbAIZXq6V5a2onbQdL/kfz28d8q', 'client', 'active', 0, NULL, '2026-04-01 14:53:40', '2026-04-01 14:53:40', 5, NULL, NULL, NULL, NULL, NULL),
-(17, 'Johnny Reyes', 'johnny@gmail.com', '09338268806', '$2y$10$goXbpMushPu03Ya31T0xbuNXtXsoX41LNm1Uw2AceXbek8vdlhNFa', 'foreman', 'active', 0, NULL, '2026-04-12 03:56:06', '2026-04-12 03:56:06', 5, NULL, NULL, NULL, NULL, NULL);
+(15, 'Rhose engineer', 'rhosengineer@gmail.com', '09123456782', '$2y$10$Lph93qCtXudrvgtk3bZr3OwPH.hyvvJnjYa3lJuCl6JFfhb/Jb.lS', 'engineer', 'active', 0, NULL, '2026-04-01 14:51:56', '2026-04-13 01:38:26', 5, NULL, NULL, NULL, NULL, NULL),
+(16, 'Jomarie Reyes', 'jomarieclient@gmail.com', '09123456781', '$2y$10$Wt0uqRK4h7h5uP5fnQt4dunq3PHbAIZXq6V5a2onbQdL/kfz28d8q', 'client', 'active', 0, NULL, '2026-04-01 14:53:40', '2026-04-13 01:38:51', 5, NULL, NULL, NULL, NULL, NULL),
+(17, 'Johnny Reyes', 'johnnyforeman@gmail.com', '09338268806', '$2y$10$goXbpMushPu03Ya31T0xbuNXtXsoX41LNm1Uw2AceXbek8vdlhNFa', 'foreman', 'active', 0, NULL, '2026-04-12 03:56:06', '2026-04-13 01:38:39', 5, NULL, NULL, NULL, NULL, NULL);
 
 --
 -- Indexes for dumped tables
@@ -551,7 +586,9 @@ ALTER TABLE `projects`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_client` (`client_id`),
   ADD KEY `idx_status` (`status`),
-  ADD KEY `idx_projects_search_name_status_created` (`project_name`,`status`,`created_at`,`id`);
+  ADD KEY `idx_projects_search_name_status_created` (`project_name`,`status`,`created_at`,`id`),
+  ADD KEY `idx_projects_search_address` (`project_address`(120)),
+  ADD KEY `idx_projects_search_site` (`project_site`);
 
 --
 -- Indexes for table `project_asset_deployments`
@@ -574,6 +611,23 @@ ALTER TABLE `project_assignments`
   ADD KEY `idx_project_assignments_project_latest` (`project_id`,`id`,`engineer_id`);
 
 --
+-- Indexes for table `project_budget_profiles`
+--
+ALTER TABLE `project_budget_profiles`
+  ADD PRIMARY KEY (`project_id`),
+  ADD KEY `idx_project_budget_profiles_updated_at` (`updated_at`),
+  ADD KEY `fk_project_budget_profiles_created_by` (`created_by`),
+  ADD KEY `fk_project_budget_profiles_updated_by` (`updated_by`);
+
+--
+-- Indexes for table `project_cost_entries`
+--
+ALTER TABLE `project_cost_entries`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_project_cost_entries_project_date` (`project_id`,`cost_date`,`id`),
+  ADD KEY `idx_project_cost_entries_created_by` (`created_by`);
+
+--
 -- Indexes for table `project_inventory_deployments`
 --
 ALTER TABLE `project_inventory_deployments`
@@ -591,6 +645,14 @@ ALTER TABLE `project_inventory_return_logs`
   ADD KEY `idx_project_inventory_return_logs_deployment` (`deployment_id`),
   ADD KEY `idx_project_inventory_return_logs_returned_at` (`returned_at`),
   ADD KEY `fk_project_inventory_return_logs_user` (`returned_by`);
+
+--
+-- Indexes for table `project_payments`
+--
+ALTER TABLE `project_payments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_project_payments_project_date` (`project_id`,`payment_date`,`id`),
+  ADD KEY `idx_project_payments_created_by` (`created_by`);
 
 --
 -- Indexes for table `tasks`
@@ -655,7 +717,7 @@ ALTER TABLE `asset_usage_logs`
 -- AUTO_INCREMENT for table `audit_logs`
 --
 ALTER TABLE `audit_logs`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=42;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=51;
 
 --
 -- AUTO_INCREMENT for table `engineer_task_updates`
@@ -673,7 +735,7 @@ ALTER TABLE `inventory`
 -- AUTO_INCREMENT for table `login_attempts`
 --
 ALTER TABLE `login_attempts`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
 
 --
 -- AUTO_INCREMENT for table `password_reset_tokens`
@@ -685,7 +747,7 @@ ALTER TABLE `password_reset_tokens`
 -- AUTO_INCREMENT for table `projects`
 --
 ALTER TABLE `projects`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `project_asset_deployments`
@@ -697,7 +759,13 @@ ALTER TABLE `project_asset_deployments`
 -- AUTO_INCREMENT for table `project_assignments`
 --
 ALTER TABLE `project_assignments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+
+--
+-- AUTO_INCREMENT for table `project_cost_entries`
+--
+ALTER TABLE `project_cost_entries`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `project_inventory_deployments`
@@ -712,10 +780,16 @@ ALTER TABLE `project_inventory_return_logs`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `project_payments`
+--
+ALTER TABLE `project_payments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `tasks`
 --
 ALTER TABLE `tasks`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `users`
@@ -775,6 +849,21 @@ ALTER TABLE `project_assignments`
   ADD CONSTRAINT `fk_assignment_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE;
 
 --
+-- Constraints for table `project_budget_profiles`
+--
+ALTER TABLE `project_budget_profiles`
+  ADD CONSTRAINT `fk_project_budget_profiles_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_project_budget_profiles_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_project_budget_profiles_updated_by` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `project_cost_entries`
+--
+ALTER TABLE `project_cost_entries`
+  ADD CONSTRAINT `fk_project_cost_entries_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_project_cost_entries_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `project_inventory_deployments`
 --
 ALTER TABLE `project_inventory_deployments`
@@ -788,6 +877,13 @@ ALTER TABLE `project_inventory_deployments`
 ALTER TABLE `project_inventory_return_logs`
   ADD CONSTRAINT `fk_project_inventory_return_logs_deployment` FOREIGN KEY (`deployment_id`) REFERENCES `project_inventory_deployments` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_project_inventory_return_logs_user` FOREIGN KEY (`returned_by`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `project_payments`
+--
+ALTER TABLE `project_payments`
+  ADD CONSTRAINT `fk_project_payments_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_project_payments_project` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `tasks`
