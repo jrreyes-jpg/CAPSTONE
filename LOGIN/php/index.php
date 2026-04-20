@@ -72,6 +72,9 @@ session_start();
     <section id="services" class="services">
         <div class="container">
             <h2 class="section-title">Our Services</h2>
+            <p class="services-intro">
+                We engineer field-ready systems that reduce downtime, improve plant visibility, and keep critical operations running with confidence.
+            </p>
             <div class="services-grid">
                 <!-- Mechanical Engineering -->
                 <div class="service-card">
@@ -112,6 +115,45 @@ session_start();
                         <li>Structured Cabling</li>
                         <li>Fire Detection & Alarms</li>
                         <li>Production Machine Integration</li>
+                    </ul>
+                </div>
+
+                <div class="service-card">
+                    <div class="service-icon">&#128187;</div>
+                    <h3>PLC, SCADA & Controls</h3>
+                    <ul class="service-list">
+                        <li>PLC Programming & Commissioning</li>
+                        <li>HMI and SCADA Development</li>
+                        <li>Control Panel Design & Assembly</li>
+                        <li>Motor Control Center Integration</li>
+                        <li>Instrumentation Calibration Support</li>
+                        <li>Remote Monitoring Dashboards</li>
+                    </ul>
+                </div>
+
+                <div class="service-card">
+                    <div class="service-icon">&#9728;</div>
+                    <h3>Energy & Solar Solutions</h3>
+                    <ul class="service-list">
+                        <li>Solar PV System Design</li>
+                        <li>On-Grid and Hybrid Installations</li>
+                        <li>Energy Audits & Load Profiling</li>
+                        <li>Power Quality Improvement</li>
+                        <li>Preventive Solar Maintenance</li>
+                        <li>Backup Power Optimization</li>
+                    </ul>
+                </div>
+
+                <div class="service-card service-card-highlight">
+                    <div class="service-icon">&#128295;</div>
+                    <h3>Technical Support & Modernization</h3>
+                    <ul class="service-list">
+                        <li>Machine Retrofits and Upgrades</li>
+                        <li>Troubleshooting of Critical Systems</li>
+                        <li>Plant Expansion Technical Support</li>
+                        <li>Documentation, Testing & Turnover</li>
+                        <li>Preventive and Corrective Maintenance</li>
+                        <li>End-to-End Project Execution</li>
                     </ul>
                 </div>
             </div>
@@ -200,8 +242,13 @@ session_start();
     <p>
         <strong>Company:</strong> Edge Automation Technology Services, Co.<br>
         <strong>Company Location:</strong> Blk 4 Lot 16 Camella Dos Rios, Brgy. Pittland, Cabuyao, Laguna<br>
-        <strong>Specialization:</strong> Industrial Automation & Engineering
-    </p>
+        <strong>Specialization:</strong> Industrial Automation & Engineering<br>
+        <strong>FB Page:</strong> <a href="https://www.facebook.com/edgeautomationtsc" target="_blank">Edge Automation Technology Services, Co.</a><br>
+        <strong>Contact Number:</strong> 0917 878 9571<br>
+        <strong>Email:</strong> <a href="https://mail.google.com/mail/?view=cm&fs=1&to=ejimenez.edge@gmail.com" target="_blank">
+        ejimenez.edge@gmail.com
+        <hr>
+</a>    </p>
 
   <div class="social-links" id="socialLinks">
 
