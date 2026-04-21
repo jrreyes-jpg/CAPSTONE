@@ -1,36 +1,3 @@
-const activateTab = (tabId) => {
-    const targetPanel = document.getElementById(tabId);
-
-    if (!targetPanel) {
-        return;
-    }
-
-    document.querySelectorAll('.tab-content').forEach((panel) => {
-        panel.classList.remove('active');
-    });
-
-    document.querySelectorAll('[data-tab-target]').forEach((button) => {
-        button.classList.remove('active');
-    });
-
-    targetPanel.classList.add('active');
-    document.querySelector(`[data-tab-target="${tabId}"]`)?.classList.add('active');
-
-    document.querySelectorAll('[data-section-link]').forEach((link) => {
-        const isActive = link.dataset.sectionLink === tabId;
-        link.classList.toggle('active-link', isActive);
-        link.setAttribute('aria-current', isActive ? 'page' : 'false');
-    });
-};
-
-const replaceHash = (tabId) => {
-    if (window.history && window.history.replaceState) {
-        window.history.replaceState(null, '', `#${tabId}`);
-    } else {
-        window.location.hash = tabId;
-    }
-};
-
 const setSidebarState = (isShrink) => {
     const sidebar = document.querySelector('.sidebar');
     const mainContent = document.querySelector('.main-content');
@@ -84,13 +51,13 @@ const initTaskFilters = () => {
     const deadlineFilter = document.querySelector('[data-task-deadline-filter]');
     const taskItems = Array.from(document.querySelectorAll('[data-task-item]'));
     const quickButtons = Array.from(document.querySelectorAll('[data-task-quick-filter]'));
-    const taskJumpButtons = Array.from(document.querySelectorAll('[data-open-task-id]'));
+    const defaultQuickFilter = document.querySelector('[data-default-quick-filter]')?.value ?? '';
 
-    if (!searchInput || !statusFilter || !deadlineFilter) {
+    if (!searchInput || !statusFilter || !deadlineFilter || taskItems.length === 0) {
         return;
     }
 
-    let quickFilterValue = '';
+    let quickFilterValue = defaultQuickFilter;
 
     const setQuickFilter = (value) => {
         quickFilterValue = value;
@@ -99,17 +66,6 @@ const initTaskFilters = () => {
             const buttonFilter = button.dataset.taskQuickFilter ?? '';
             button.classList.toggle('active', value !== '' && buttonFilter === value);
         });
-    };
-
-    const openTasksTab = () => {
-        activateTab('tasks-tab');
-        replaceHash('tasks-tab');
-    };
-
-    const resetStandardFilters = () => {
-        searchInput.value = '';
-        statusFilter.value = '';
-        deadlineFilter.value = '';
     };
 
     const applyFilters = () => {
@@ -151,26 +107,11 @@ const initTaskFilters = () => {
             const nextQuickFilter = button.dataset.taskQuickFilter ?? '';
             const isResetButton = button.hasAttribute('data-reset-task-filters');
 
-            resetStandardFilters();
+            searchInput.value = '';
+            statusFilter.value = '';
+            deadlineFilter.value = '';
             setQuickFilter(isResetButton ? '' : nextQuickFilter);
             applyFilters();
-            openTasksTab();
-            document.getElementById('tasks-tab')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-    });
-
-    taskJumpButtons.forEach((button) => {
-        button.addEventListener('click', () => {
-            const taskId = button.dataset.openTaskId ?? '';
-
-            resetStandardFilters();
-            setQuickFilter('');
-            applyFilters();
-            openTasksTab();
-
-            window.setTimeout(() => {
-                spotlightTask(taskId);
-            }, 120);
         });
     });
 
@@ -178,6 +119,7 @@ const initTaskFilters = () => {
     statusFilter.addEventListener('change', applyFilters);
     deadlineFilter.addEventListener('change', applyFilters);
 
+    setQuickFilter(defaultQuickFilter);
     applyFilters();
 };
 
@@ -185,35 +127,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidebarToggle = document.querySelector('[data-sidebar-toggle]');
     const mobileToggle = document.querySelector('[data-sidebar-mobile-toggle]');
     const overlay = document.querySelector('[data-sidebar-overlay]');
-
-    document.querySelectorAll('[data-tab-target]').forEach((button) => {
-        button.addEventListener('click', () => {
-            const tabId = button.dataset.tabTarget;
-
-            if (!tabId) {
-                return;
-            }
-
-            activateTab(tabId);
-            replaceHash(tabId);
-        });
-    });
-
-    document.querySelectorAll('[data-section-link]').forEach((link) => {
-        link.addEventListener('click', () => {
-            if (window.innerWidth <= 768) {
-                closeMobileSidebar();
-            }
-        });
-    });
-
-    window.addEventListener('hashchange', () => {
-        const hashTabId = window.location.hash.replace('#', '');
-
-        if (hashTabId) {
-            activateTab(hashTabId);
-        }
-    });
 
     sidebarToggle?.addEventListener('click', () => {
         const sidebar = document.querySelector('.sidebar');
@@ -236,16 +149,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    const hashTabId = window.location.hash.replace('#', '');
-    const activeTabButton = document.querySelector('[data-tab-target].active');
-    const firstTabButton = document.querySelector('[data-tab-target]');
-    const defaultTabId =
-        hashTabId ||
-        activeTabButton?.dataset.tabTarget ||
-        firstTabButton?.dataset.tabTarget ||
-        'dashboard-tab';
+    document.querySelectorAll('.menu-link').forEach((link) => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                closeMobileSidebar();
+            }
+        });
+    });
 
-    activateTab(defaultTabId);
+    const taskFromQuery = new URLSearchParams(window.location.search).get('task');
     initTaskFilters();
     setSidebarState(false);
+
+    if (taskFromQuery) {
+        window.setTimeout(() => {
+            spotlightTask(taskFromQuery);
+        }, 120);
+    }
 });

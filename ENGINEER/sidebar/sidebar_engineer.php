@@ -1,3 +1,13 @@
+<?php
+$currentPath = str_replace('\\', '/', parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '');
+$currentFile = basename($currentPath);
+
+$isOverview = $currentFile === 'engineer_dashboard.php';
+$isProjects = $currentFile === 'projects.php';
+$isTasks = $currentFile === 'tasks.php';
+$isUpdates = $currentFile === 'progress_updates.php';
+$isProfile = $currentFile === 'profile.php';
+?>
 <div class="sidebar">
     <button
         class="sidebar-toggle"
@@ -13,10 +23,10 @@
         </span>
     </button>
     <div class="brand-block">
-        <span class="brand-title">Engineer Dashboard</span>
+        <span class="brand-title">Engineer Overview</span>
     </div>
     <div class="nav-divider"></div>
-    <a href="../dashboards/engineer_dashboard.php#dashboard-tab" class="menu-link" data-section-link="dashboard-tab">
+    <a href="../dashboards/engineer_dashboard.php" class="menu-link<?php echo $isOverview ? ' active-link' : ''; ?>">
         <span class="menu-visual" aria-hidden="true">
             <span class="menu-icon">
                 <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
@@ -26,23 +36,11 @@
                     <rect x="3" y="12" width="7" height="9" rx="2"></rect>
                 </svg>
             </span>
-            <span class="menu-mini-label">Dashboard</span>
+            <span class="menu-mini-label">Overview</span>
         </span>
-        <span class="menu-text">Dashboard</span>
+        <span class="menu-text">Overview</span>
     </a>
-    <a href="../dashboards/engineer_dashboard.php#projects-tab" class="menu-link" data-section-link="projects-tab">
-        <span class="menu-visual" aria-hidden="true">
-            <span class="menu-icon">
-                <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                    <path d="M3.5 7.5a2 2 0 0 1 2-2h4l1.6 1.8H18.5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"></path>
-                    <path d="M3.5 10.5h17"></path>
-                </svg>
-            </span>
-            <span class="menu-mini-label">Projects</span>
-        </span>
-        <span class="menu-text">My Projects</span>
-    </a>
-    <a href="../dashboards/engineer_dashboard.php#tasks-tab" class="menu-link" data-section-link="tasks-tab">
+    <a href="../dashboards/tasks.php" class="menu-link<?php echo $isTasks ? ' active-link' : ''; ?>">
         <span class="menu-visual" aria-hidden="true">
             <span class="menu-icon">
                 <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
@@ -58,7 +56,31 @@
         </span>
         <span class="menu-text">My Tasks</span>
     </a>
-    <a href="../dashboards/engineer_dashboard.php#profile-tab" class="menu-link" data-section-link="profile-tab">
+    <a href="../dashboards/projects.php" class="menu-link<?php echo $isProjects ? ' active-link' : ''; ?>">
+        <span class="menu-visual" aria-hidden="true">
+            <span class="menu-icon">
+                <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                    <path d="M3.5 7.5a2 2 0 0 1 2-2h4l1.6 1.8H18.5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"></path>
+                    <path d="M3.5 10.5h17"></path>
+                </svg>
+            </span>
+            <span class="menu-mini-label">Projects</span>
+        </span>
+        <span class="menu-text">My Projects</span>
+    </a>
+    <a href="../dashboards/progress_updates.php" class="menu-link<?php echo $isUpdates ? ' active-link' : ''; ?>">
+        <span class="menu-visual" aria-hidden="true">
+            <span class="menu-icon">
+                <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                    <path d="M12 6v6l4 2"></path>
+                    <path d="M21 12a9 9 0 1 1-3-6.7"></path>
+                </svg>
+            </span>
+            <span class="menu-mini-label">Updates</span>
+        </span>
+        <span class="menu-text">Progress Updates</span>
+    </a>
+    <a href="../dashboards/profile.php" class="menu-link<?php echo $isProfile ? ' active-link' : ''; ?>">
         <span class="menu-visual" aria-hidden="true">
             <span class="menu-icon">
                 <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
