@@ -2149,9 +2149,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                    </div>
 
-                    <div class="form-grid form-grid--project-create">
                         <div class="input-group">
                             <label for="budget_amount">Project Budget</label>
                             <div style="position: relative;">
@@ -2169,7 +2167,9 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                 >
                             </div>
                         </div>
+                    </div>
 
+                    <div class="form-grid form-grid--project-create">
                         <div class="input-group input-group-wide">
                             <div class="field-label-row">
                                 <label for="engineer_ids">Assigned Engineer/s <span class="required-indicator" aria-hidden="true">*</span></label>
