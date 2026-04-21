@@ -242,8 +242,11 @@ session_start();
     <p>
         <strong>Company:</strong> Edge Automation Technology Services, Co.<br>
         <strong>Company Location:</strong> Blk 4 Lot 16 Camella Dos Rios, Brgy. Pittland, Cabuyao, Laguna<br>
-        <strong>Specialization:</strong> Industrial Automation & Engineering<br>
-        <strong>FB Page:</strong> <a href="https://www.facebook.com/edgeautomationtsc" target="_blank">Edge Automation Technology Services, Co.</a><br>
+        <strong>Specialization:</strong> Industrial Automation & Engineering<br></div></p>
+
+                   <div class="contact-card" >
+
+        <p><strong>FB Page:</strong> <a href="https://www.facebook.com/edgeautomationtsc" target="_blank">Edge Automation Technology Services, Co.</a><br>
         <strong>Contact Number:</strong> 0917 878 9571<br>
         <strong>Email:</strong> <a href="https://mail.google.com/mail/?view=cm&fs=1&to=ejimenez.edge@gmail.com" target="_blank">
         ejimenez.edge@gmail.com

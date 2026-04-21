@@ -26,7 +26,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 18px;
-    background: #2d3a56;
+    background: #1f3a5f;
     color: #fff;
 }
 
@@ -105,13 +105,13 @@
 }
 
 .qr-actions .btn-primary {
-    background: #2d3a56;
-    color: #fff;
+    background: #f59e0b;
+    color: #0f172a;
 }
 
 .qr-actions .btn-secondary {
     background: #f0f0f0;
-    color: #2d3a56;
+    color: #1f3a5f;
 }
 
 .qr-error {

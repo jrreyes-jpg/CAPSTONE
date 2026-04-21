@@ -1,8 +1,8 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const scanTrigger = document.querySelector('#qrScannerBtn');
+    const scanTriggers = Array.from(document.querySelectorAll('#qrScannerBtn, [data-open-qr-scanner]'));
     const modal = document.querySelector('#qrScannerModal');
 
-    if (!scanTrigger || !modal) {
+    if (scanTriggers.length === 0 || !modal) {
         return;
     }
     const closeButtons = Array.from(document.querySelectorAll('.qr-close'));
@@ -23,18 +23,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const trimmed = decodedText.trim();
 
-        // support structured text
         if (trimmed.startsWith('asset_id=')) {
             return parseInt(trimmed.split('=')[1], 10) || null;
         }
 
-        // support URL like https://.../asset/23
         const assetMatch = trimmed.match(/\/(?:asset|assets)\/(\d+)/i);
         if (assetMatch) {
             return parseInt(assetMatch[1], 10);
         }
 
-        // fallback: numeric only
         const numeric = parseInt(trimmed, 10);
         return Number.isNaN(numeric) ? null : numeric;
     };
@@ -49,7 +46,6 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 await html5QrCode.stop();
             } catch (err) {
-                // ignore stops when already stopped
             }
             html5QrCode.clear();
             html5QrCode = null;
@@ -58,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const openModal = () => {
         modal.classList.add('active');
+        modal.setAttribute('aria-hidden', 'false');
         setStatus('Starting scanner...');
         workerInput.value = '';
         notesInput.value = '';
@@ -82,7 +79,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (assetId === lastScannedAssetId) {
-                    // ignore repeated scans
                     return;
                 }
 
@@ -90,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setStatus('QR scanned. Fetching asset...');
 
                 try {
-                    const res = await fetch(`/codesamplecaps/public/api/get_asset.php?asset_id=${assetId}`);
+                    const res = await fetch(`/codesamplecaps/get_asset.php?asset_id=${assetId}`);
                     const json = await res.json();
                     if (json.status !== 'success') {
                         throw new Error(json.message || 'Failed to load asset');
@@ -108,7 +104,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             },
             (errorMessage) => {
-                // Ignore frequent scan failures; only show if no asset scanned yet
                 if (!lastScannedAssetId) {
                     scannerError.textContent = errorMessage;
                 }
@@ -120,10 +115,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const closeModal = async () => {
         modal.classList.remove('active');
+        modal.setAttribute('aria-hidden', 'true');
         await stopScanner();
     };
 
-    scanTrigger.addEventListener('click', openModal);
+    scanTriggers.forEach((trigger) => {
+        trigger.addEventListener('click', openModal);
+    });
     closeButtons.forEach((btn) => btn.addEventListener('click', closeModal));
     if (closeSecondary) {
         closeSecondary.addEventListener('click', closeModal);
@@ -146,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setStatus('Logging usage...');
 
         try {
-            const res = await fetch('/codesamplecaps/public/api/log_asset_usage.php', {
+            const res = await fetch('/codesamplecaps/log_asset_usage.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -163,6 +161,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             setStatus('Usage logged successfully.', false);
+            window.setTimeout(() => {
+                window.location.reload();
+            }, 700);
         } catch (err) {
             setStatus(err.message || 'Could not log usage.', true);
         }

@@ -670,13 +670,11 @@ p {
 }
 
 .contact-content {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 3rem;
-    max-width: 1000px;
-    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap; /* para responsive */
 }
-
 .contact-form {
     display: flex;
     flex-direction: column;
