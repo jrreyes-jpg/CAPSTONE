@@ -53,6 +53,58 @@ function generateQRDataUri(string $value): string {
     return (new QRCode($options))->render($value);
 }
 
+function buildAssetSerialNumber(int $assetId, string $assetType = ''): string {
+    $cleanType = preg_replace('/[^A-Za-z0-9]+/', '', strtoupper($assetType));
+    $typePrefix = $cleanType !== '' ? substr($cleanType, 0, 3) : 'AST';
+
+    return sprintf('%s-%s-%04d', $typePrefix, date('Y'), $assetId);
+}
+
+function buildAssetQrValue(int $assetId, string $serialNumber = ''): string {
+    $parts = ['asset_id=' . $assetId];
+
+    if ($serialNumber !== '') {
+        $parts[] = 'sn=' . $serialNumber;
+    }
+
+    return implode('|', $parts);
+}
+
+function syncAssetIdentity(mysqli $conn, array $asset): array {
+    $assetId = (int)($asset['id'] ?? 0);
+    if ($assetId <= 0) {
+        return $asset;
+    }
+
+    $assetType = trim((string)($asset['asset_type'] ?? ''));
+    $serialNumber = trim((string)($asset['serial_number'] ?? ''));
+
+    if ($serialNumber === '') {
+        $serialNumber = buildAssetSerialNumber($assetId, $assetType);
+        $serialStmt = $conn->prepare('UPDATE assets SET serial_number = ? WHERE id = ?');
+        if ($serialStmt) {
+            $serialStmt->bind_param('si', $serialNumber, $assetId);
+            $serialStmt->execute();
+            $serialStmt->close();
+        }
+        $asset['serial_number'] = $serialNumber;
+    }
+
+    $qrValue = trim((string)($asset['qr_code_value'] ?? ''));
+    if ($qrValue === '') {
+        $qrValue = buildAssetQrValue($assetId, $serialNumber);
+        $qrStmt = $conn->prepare('INSERT INTO asset_qr_codes (asset_id, qr_code_value) VALUES (?, ?)');
+        if ($qrStmt) {
+            $qrStmt->bind_param('is', $assetId, $qrValue);
+            $qrStmt->execute();
+            $qrStmt->close();
+        }
+        $asset['qr_code_value'] = $qrValue;
+    }
+
+    return $asset;
+}
+
 function getAssetSnapshot(mysqli $conn, int $assetId): ?array {
     $stmt = $conn->prepare(
         'SELECT a.id, a.asset_name, a.asset_type, a.serial_number, a.asset_status, q.id AS qr_id
@@ -79,21 +131,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'create_asset') {
         $assetName = trim($_POST['asset_name'] ?? '');
         $assetType = trim($_POST['asset_type'] ?? '');
-        $serial = trim($_POST['serial_number'] ?? '');
 
         if ($assetName === '') {
             $_SESSION['assets_error'] = 'Asset name is required.';
         } else {
+            $emptySerial = '';
             $stmt = $conn->prepare('INSERT INTO assets (asset_name, asset_type, serial_number) VALUES (?, ?, ?)');
-            $stmt->bind_param('sss', $assetName, $assetType, $serial);
+            $stmt->bind_param('sss', $assetName, $assetType, $emptySerial);
 
             if ($stmt->execute()) {
                 $assetId = $stmt->insert_id;
-                $qrValue = 'asset_id=' . $assetId;
+                $serial = buildAssetSerialNumber($assetId, $assetType);
+                $qrValue = buildAssetQrValue($assetId, $serial);
+
+                $serialStmt = $conn->prepare('UPDATE assets SET serial_number = ? WHERE id = ?');
+                if ($serialStmt) {
+                    $serialStmt->bind_param('si', $serial, $assetId);
+                    $serialStmt->execute();
+                    $serialStmt->close();
+                }
 
                 $qrStmt = $conn->prepare('INSERT INTO asset_qr_codes (asset_id, qr_code_value) VALUES (?, ?)');
-                $qrStmt->bind_param('is', $assetId, $qrValue);
-                $qrStmt->execute();
+                if ($qrStmt) {
+                    $qrStmt->bind_param('is', $assetId, $qrValue);
+                    $qrStmt->execute();
+                    $qrStmt->close();
+                }
 
                 audit_log_event(
                     $conn,
@@ -208,14 +271,23 @@ if (isset($_SESSION['assets_created_asset_id'])) {
 }
 
 $assets = [];
-$assetQuery = 'SELECT a.*, q.qr_code_value
-    FROM assets a
-    LEFT JOIN asset_qr_codes q ON a.id = q.asset_id';
+$assetQuery = 'SELECT a.*,
+    (
+        SELECT q.qr_code_value
+        FROM asset_qr_codes q
+        WHERE q.asset_id = a.id
+        ORDER BY q.id DESC
+        LIMIT 1
+    ) AS qr_code_value
+    FROM assets a';
 $assetQuery .= ' ORDER BY a.created_at DESC';
 $result = $conn->query($assetQuery);
 
 if ($result) {
     $assets = $result->fetch_all(MYSQLI_ASSOC);
+    foreach ($assets as $index => $asset) {
+        $assets[$index] = syncAssetIdentity($conn, $asset);
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -271,10 +343,6 @@ if ($result) {
                         <label for="asset_type">Asset Type</label>
                         <input type="text" id="asset_type" name="asset_type">
                     </div>
-                    <div class="form-group">
-                        <label for="serial_number">Serial Number</label>
-                        <input type="text" id="serial_number" name="serial_number">
-                    </div>
                 </div>
                 <button type="submit" class="btn-primary">Create Asset + Generate QR</button>
             </form>
@@ -297,7 +365,7 @@ if ($result) {
                             <th>Asset</th>
                             <th>Status</th>
                             <th>QR Code</th>
-                            <th>Created</th>
+                            <th>Created On</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -312,8 +380,8 @@ if ($result) {
                                     <td data-label="ID"><?php echo htmlspecialchars($asset['id']); ?></td>
                                     <td data-label="Asset">
                                         <strong><?php echo htmlspecialchars($asset['asset_name']); ?></strong><br>
-                                        <small><?php echo htmlspecialchars($asset['asset_type']); ?></small><br>
-                                        <small>SN: <?php echo htmlspecialchars($asset['serial_number']); ?></small>
+                                        <small><?php echo htmlspecialchars($asset['asset_type'] ?: 'No type'); ?></small><br>
+                                        <small>SN: <?php echo htmlspecialchars($asset['serial_number'] ?: 'Generating...'); ?></small>
                                     </td>
                                     <td data-label="Status">
                                         <span class="asset-status asset-status--<?php echo htmlspecialchars($asset['asset_status']); ?>">
@@ -325,7 +393,7 @@ if ($result) {
                                             <?php if (!empty($asset['qr_code_value'])): ?>
                                                 <?php if ($qrLibraryReady): ?>
                                                     <?php
-                                                    $qrValue = $asset['qr_code_value'] ?: 'asset_id=' . $asset['id'];
+                                                    $qrValue = $asset['qr_code_value'] ?: buildAssetQrValue((int)$asset['id'], (string)($asset['serial_number'] ?? ''));
                                                     $qrDataUri = generateQRDataUri($qrValue);
                                                     ?>
                                                     <button type="button" onclick="showQR('<?php echo $qrDataUri; ?>')" class="btn-secondary">Preview</button>
@@ -344,17 +412,17 @@ if ($result) {
                                             <form method="POST" class="asset-inline-form" onsubmit="return confirm('Delete this asset?');">
                                                 <input type="hidden" name="action" value="delete_asset">
                                                 <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
-                                                <button type="submit" class="btn-danger">Delete</button>
+                                                <button type="submit" class="btn-danger">Delete Asset</button>
                                             </form>
 
                                             <?php if ($asset['asset_status'] === 'in_use'): ?>
                                                 <form method="POST" class="asset-inline-form">
                                                     <input type="hidden" name="action" value="return_asset">
                                                     <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
-                                                    <button type="submit" class="btn-secondary">Return</button>
+                                                    <button type="submit" class="btn-secondary">Mark Returned</button>
                                                 </form>
                                             <?php else: ?>
-                                                <span class="asset-inline-note">No return needed</span>
+                                                <span class="asset-inline-note">Ready to use</span>
                                             <?php endif; ?>
                                         </div>
                                     </td>

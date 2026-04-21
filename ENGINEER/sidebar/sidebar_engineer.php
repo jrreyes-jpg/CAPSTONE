@@ -92,20 +92,6 @@ $isProfile = $currentFile === 'profile.php';
         </span>
         <span class="menu-text">Profile</span>
     </a>
-    <div class="nav-divider nav-divider--light"></div>
-    <a href="/codesamplecaps/LOGIN/php/forgot.php" class="menu-link">
-        <span class="menu-visual" aria-hidden="true">
-            <span class="menu-icon">
-                <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                    <path d="M6 10V8.75a6 6 0 1 1 10.24 4.22"></path>
-                    <path d="M6 10h5v5"></path>
-                    <path d="M9 19h6"></path>
-                </svg>
-            </span>
-            <span class="menu-mini-label">Reset</span>
-        </span>
-        <span class="menu-text">Reset Password</span>
-    </a>
     <a href="../../LOGIN/php/logout.php" class="menu-link logout">
         <span class="menu-visual" aria-hidden="true">
             <span class="menu-icon">

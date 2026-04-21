@@ -42,18 +42,35 @@ function generateQRDataUri(string $value): string {
     ]);
 
     return (new QRCode($options))->render($value);
-}   
+}
+
+function buildAssetQrValue(int $assetId, string $serialNumber = ''): string {
+    $parts = ['asset_id=' . $assetId];
+
+    if ($serialNumber !== '') {
+        $parts[] = 'sn=' . $serialNumber;
+    }
+
+    return implode('|', $parts);
+}
+
 $assetId = isset($_GET['asset_id']) ? (int)$_GET['asset_id'] : 0;
 
-$sql = 'SELECT a.id, a.asset_name, a.asset_type, a.serial_number, a.asset_status, q.qr_code_value
-        FROM assets a
-        LEFT JOIN asset_qr_codes q ON q.asset_id = a.id';
+$sql = 'SELECT a.id, a.asset_name, a.asset_type, a.serial_number, a.asset_status,
+        (
+            SELECT q.qr_code_value
+            FROM asset_qr_codes q
+            WHERE q.asset_id = a.id
+            ORDER BY q.id DESC
+            LIMIT 1
+        ) AS qr_code_value
+        FROM assets a';
 $params = [];
 if ($assetId > 0) {
     $sql .= ' WHERE a.id = ?';
     $params[] = $assetId;
 }
-$sql .= ' GROUP BY a.id ORDER BY a.id DESC';
+$sql .= ' ORDER BY a.id DESC';
 
 $stmt = $conn->prepare($sql);
 if ($assetId > 0) {
@@ -108,7 +125,7 @@ $assets = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 
         <?php foreach ($assets as $asset): ?>
             <?php
-                $qrValue = "asset_id=".$asset['id'];
+                $qrValue = $asset['qr_code_value'] ?: buildAssetQrValue((int)$asset['id'], (string)($asset['serial_number'] ?? ''));
                 $qrDataUri = $qrLibraryReady ? generateQRDataUri($qrValue) : '';
             ?>
             <div class="card">
@@ -121,6 +138,7 @@ $assets = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
                 </div>
                 <h3><?php echo htmlspecialchars($asset['asset_name']); ?> (ID <?php echo $asset['id']; ?>)</h3>
                 <p>Type: <?php echo htmlspecialchars($asset['asset_type'] ?: '-'); ?></p>
+                <p>Serial: <?php echo htmlspecialchars($asset['serial_number'] ?: '-'); ?></p>
                 <p>Status: <?php echo htmlspecialchars($asset['asset_status']); ?></p>
                 <p style="font-size: 12px; color:#555;">Scan value: <code><?php echo htmlspecialchars($qrValue); ?></code></p>
             </div>
