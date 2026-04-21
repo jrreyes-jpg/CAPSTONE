@@ -212,6 +212,18 @@ function pm_ensure_project_po_number_column(mysqli $conn): void {
     }
 }
 
+function pm_ensure_project_contact_person_column(mysqli $conn): void {
+    if (!pm_table_has_column($conn, 'projects', 'contact_person')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN contact_person VARCHAR(190) DEFAULT NULL AFTER client_id");
+    }
+}
+
+function pm_ensure_project_contact_number_column(mysqli $conn): void {
+    if (!pm_table_has_column($conn, 'projects', 'contact_number')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN contact_number VARCHAR(40) DEFAULT NULL AFTER contact_person");
+    }
+}
+
 function pm_get_project_financial_snapshot(mysqli $conn, int $projectId): ?array {
     $stmt = $conn->prepare(
         'SELECT
@@ -332,11 +344,15 @@ pm_ensure_project_site_column($conn);
 pm_ensure_project_email_column($conn);
 pm_ensure_project_code_column($conn);
 pm_ensure_project_po_number_column($conn);
+pm_ensure_project_contact_person_column($conn);
+pm_ensure_project_contact_number_column($conn);
 $hasProjectSiteColumn = pm_table_has_column($conn, 'projects', 'project_site');
 $hasProjectAddressColumn = pm_table_has_column($conn, 'projects', 'project_address');
 $hasProjectEmailColumn = pm_table_has_column($conn, 'projects', 'project_email');
 $hasProjectCodeColumn = pm_table_has_column($conn, 'projects', 'project_code');
 $hasPoNumberColumn = pm_table_has_column($conn, 'projects', 'po_number');
+$hasContactPersonColumn = pm_table_has_column($conn, 'projects', 'contact_person');
+$hasContactNumberColumn = pm_table_has_column($conn, 'projects', 'contact_number');
 $statusOptions = [];
 if ($supportsDraftStatus) {
     $statusOptions[] = 'draft';
@@ -387,6 +403,8 @@ if ($projectId > 0) {
     $projectSiteSelect = $hasProjectSiteColumn ? 'p.project_site,' : 'NULL AS project_site,';
     $projectAddressSelect = $hasProjectAddressColumn ? 'p.project_address,' : 'NULL AS project_address,';
     $projectEmailSelect = $hasProjectEmailColumn ? 'p.project_email,' : 'NULL AS project_email,';
+    $contactPersonSelect = $hasContactPersonColumn ? 'p.contact_person,' : 'NULL AS contact_person,';
+    $contactNumberSelect = $hasContactNumberColumn ? 'p.contact_number,' : 'NULL AS contact_number,';
     $projectCodeSelect = $hasProjectCodeColumn ? 'p.project_code,' : 'NULL AS project_code,';
     $poNumberSelect = $hasPoNumberColumn ? 'p.po_number,' : 'NULL AS po_number,';
 
@@ -398,6 +416,8 @@ if ($projectId > 0) {
             {$projectSiteSelect}
             {$projectAddressSelect}
             {$projectEmailSelect}
+            {$contactPersonSelect}
+            {$contactNumberSelect}
             {$projectCodeSelect}
             {$poNumberSelect}
             p.client_id,
@@ -622,6 +642,8 @@ if ($projectId > 0) {
                 }
                 $projectCode = trim((string)($project['project_code'] ?? ''));
                 $projectPoNumber = trim((string)($project['po_number'] ?? ''));
+                $projectContactPerson = trim((string)($project['contact_person'] ?? ''));
+                $projectContactNumber = trim((string)($project['contact_number'] ?? ''));
                 $projectEmail = trim((string)($project['project_email'] ?? ''));
                 ?>
 
@@ -697,6 +719,8 @@ if ($projectId > 0) {
 
                     <div class="project-details-glance">
                         <div><strong>Project Code:</strong> <?php echo htmlspecialchars($projectCode !== '' ? $projectCode : 'Not set'); ?></div>
+                        <div><strong>Client Contact Person:</strong> <?php echo htmlspecialchars($projectContactPerson !== '' ? $projectContactPerson : 'Not set'); ?></div>
+                        <div><strong>Client Contact Number:</strong> <?php echo htmlspecialchars($projectContactNumber !== '' ? $projectContactNumber : 'Not set'); ?></div>
                         <div><strong>P.O Number:</strong> <?php echo htmlspecialchars($projectPoNumber !== '' ? $projectPoNumber : 'Not set'); ?></div>
                         <div><strong>P.O Date:</strong> <?php echo htmlspecialchars(pm_format_date($project['start_date'] ?? null)); ?></div>
                         <div><strong>Completed:</strong> <?php echo htmlspecialchars(pm_format_date($project['end_date'] ?? null)); ?></div>
@@ -754,6 +778,32 @@ if ($projectId > 0) {
                                         <input type="text" id="project_name" name="project_name" value="<?php echo htmlspecialchars($project['project_name']); ?>" required readonly data-project-editable>
                                     </div>
 
+                                    <?php if ($hasContactPersonColumn): ?>
+                                        <div class="input-group">
+                                            <div class="field-label-row">
+                                                <label for="contact_person">Client Contact Person <span class="required-indicator" aria-hidden="true">*</span></label>
+                                                <button type="button" class="field-tip" aria-label="Client contact person help">
+                                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                                    <span class="field-tip__bubble">Enter the main client representative for this project. Required unless the project stays in Draft.</span>
+                                                </button>
+                                            </div>
+                                            <input type="text" id="contact_person" name="contact_person" value="<?php echo htmlspecialchars($project['contact_person'] ?? ''); ?>" readonly data-project-editable>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <?php if ($hasContactNumberColumn): ?>
+                                        <div class="input-group">
+                                            <div class="field-label-row">
+                                                <label for="contact_number">Client Contact Number <span class="required-indicator" aria-hidden="true">*</span></label>
+                                                <button type="button" class="field-tip" aria-label="Client contact number help">
+                                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                                    <span class="field-tip__bubble">Enter the direct mobile or landline number for the client contact. Required unless the project stays in Draft.</span>
+                                                </button>
+                                            </div>
+                                            <input type="text" id="contact_number" name="contact_number" value="<?php echo htmlspecialchars($project['contact_number'] ?? ''); ?>" readonly data-project-editable>
+                                        </div>
+                                    <?php endif; ?>
+
                                     <?php if ($hasProjectEmailColumn): ?>
                                         <div class="input-group">
                                             <label for="project_email">Email Address <span class="optional-indicator">(Optional)</span></label>
@@ -770,7 +820,13 @@ if ($projectId > 0) {
 
                                     <?php if ($hasPoNumberColumn): ?>
                                         <div class="input-group">
-                                            <label for="po_number">P.O Number <span class="optional-indicator">(Required for Pending/Ongoing)</span></label>
+                                            <div class="field-label-row">
+                                                <label for="po_number">P.O Number</label>
+                                                <button type="button" class="field-tip" aria-label="P.O number help">
+                                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                                    <span class="field-tip__bubble">Enter the purchase order reference number. Required when the project status is Pending or Ongoing.</span>
+                                                </button>
+                                            </div>
                                             <input type="text" id="po_number" name="po_number" value="<?php echo htmlspecialchars($project['po_number'] ?? ''); ?>" readonly data-project-editable>
                                         </div>
                                     <?php endif; ?>

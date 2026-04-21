@@ -180,6 +180,18 @@ function ensure_project_po_number_column(mysqli $conn): void {
     }
 }
 
+function ensure_project_contact_person_column(mysqli $conn): void {
+    if (!table_has_column($conn, 'projects', 'contact_person')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN contact_person VARCHAR(190) DEFAULT NULL AFTER client_id");
+    }
+}
+
+function ensure_project_contact_number_column(mysqli $conn): void {
+    if (!table_has_column($conn, 'projects', 'contact_number')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN contact_number VARCHAR(40) DEFAULT NULL AFTER contact_person");
+    }
+}
+
 function normalize_positive_int($value): int {
     $normalized = (int)$value;
     return $normalized > 0 ? $normalized : 0;
@@ -261,11 +273,15 @@ ensure_project_site_column($conn);
 ensure_project_email_column($conn);
 ensure_project_code_column($conn);
 ensure_project_po_number_column($conn);
+ensure_project_contact_person_column($conn);
+ensure_project_contact_number_column($conn);
 $hasProjectSiteColumn = table_has_column($conn, 'projects', 'project_site');
 $hasProjectAddressColumn = table_has_column($conn, 'projects', 'project_address');
 $hasProjectEmailColumn = table_has_column($conn, 'projects', 'project_email');
 $hasProjectCodeColumn = table_has_column($conn, 'projects', 'project_code');
 $hasPoNumberColumn = table_has_column($conn, 'projects', 'po_number');
+$hasContactPersonColumn = table_has_column($conn, 'projects', 'contact_person');
+$hasContactNumberColumn = table_has_column($conn, 'projects', 'contact_number');
 ensure_project_search_indexes($conn, $hasProjectAddressColumn, $hasProjectSiteColumn);
 $statusOptions = [];
 if ($supportsDraftStatus) {
@@ -316,6 +332,8 @@ function set_projects_old_input(array $input, ?string $focusField = null): void 
     $_SESSION['projects_old_input'] = [
         'project_name' => trim((string)($input['project_name'] ?? '')),
         'description' => trim((string)($input['description'] ?? '')),
+        'contact_person' => trim((string)($input['contact_person'] ?? '')),
+        'contact_number' => trim((string)($input['contact_number'] ?? '')),
         'project_site' => trim((string)($input['project_site'] ?? '')),
         'project_address' => trim((string)($input['project_address'] ?? '')),
         'project_email' => trim((string)($input['project_email'] ?? '')),
@@ -650,6 +668,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'create_project') {
         $projectName = normalize_text($_POST['project_name'] ?? '');
         $description = normalize_text($_POST['description'] ?? '');
+        $contactPerson = $hasContactPersonColumn ? normalize_text_or_null($_POST['contact_person'] ?? null) : null;
+        $contactNumber = $hasContactNumberColumn ? normalize_text_or_null($_POST['contact_number'] ?? null) : null;
         $projectSite = $hasProjectSiteColumn ? normalize_text_or_null($_POST['project_site'] ?? null) : null;
         $projectAddress = $hasProjectAddressColumn ? normalize_text_or_null($_POST['project_address'] ?? null) : null;
         $projectEmail = $hasProjectEmailColumn ? normalize_text_or_null($_POST['project_email'] ?? null) : null;
@@ -666,6 +686,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $createProjectInput = [
             'project_name' => $_POST['project_name'] ?? '',
             'description' => $_POST['description'] ?? '',
+            'contact_person' => $_POST['contact_person'] ?? '',
+            'contact_number' => $_POST['contact_number'] ?? '',
             'project_site' => $_POST['project_site'] ?? '',
             'project_address' => $_POST['project_address'] ?? '',
             'project_email' => $_POST['project_email'] ?? '',
@@ -711,6 +733,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ? 'Initial project status must be Draft, Pending, or Ongoing only.'
                     : 'Initial project status must be Pending or Ongoing only.'
             );
+            redirect_projects_page();
+        }
+
+        if ($hasContactPersonColumn && $status !== 'draft' && $contactPerson === null) {
+            set_projects_old_input($createProjectInput, 'contact_person');
+            set_projects_flash('error', 'Client contact person is required unless the project stays in Draft.');
+            redirect_projects_page();
+        }
+
+        if ($hasContactNumberColumn && $status !== 'draft' && $contactNumber === null) {
+            set_projects_old_input($createProjectInput, 'contact_number');
+            set_projects_flash('error', 'Client contact number is required unless the project stays in Draft.');
             redirect_projects_page();
         }
 
@@ -787,25 +821,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($hasProjectEmailColumn) {
                     if ($hasProjectCodeColumn && $hasPoNumberColumn) {
                         $createProject = $conn->prepare(
-                            'INSERT INTO projects (project_name, description, client_id, project_site, project_address, project_email, project_code, po_number, start_date, end_date, status, created_by)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                            'INSERT INTO projects (project_name, description, client_id, contact_person, contact_number, project_site, project_address, project_email, project_code, po_number, start_date, end_date, status, created_by)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
                         );
                     } else {
                         $createProject = $conn->prepare(
-                            'INSERT INTO projects (project_name, description, client_id, project_site, project_address, project_email, start_date, end_date, status, created_by)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                            'INSERT INTO projects (project_name, description, client_id, contact_person, contact_number, project_site, project_address, project_email, start_date, end_date, status, created_by)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
                         );
                     }
                 } else {
                     $createProject = $conn->prepare(
-                        'INSERT INTO projects (project_name, description, client_id, project_site, project_address, start_date, end_date, status, created_by)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                        'INSERT INTO projects (project_name, description, client_id, contact_person, contact_number, project_site, project_address, start_date, end_date, status, created_by)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
                     );
                 }
             } else {
                 $createProject = $conn->prepare(
-                    'INSERT INTO projects (project_name, description, client_id, start_date, end_date, status, created_by)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)'
+                    'INSERT INTO projects (project_name, description, client_id, contact_person, contact_number, start_date, end_date, status, created_by)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
                 );
             }
 
@@ -817,10 +851,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($hasProjectEmailColumn) {
                     if ($hasProjectCodeColumn && $hasPoNumberColumn) {
                         $createProject->bind_param(
-                            'ssissssssssi',
+                            'ssissssssssssi',
                             $projectName,
                             $description,
                             $clientId,
+                            $contactPerson,
+                            $contactNumber,
                             $projectSite,
                             $projectAddress,
                             $projectEmail,
@@ -833,10 +869,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         );
                     } else {
                         $createProject->bind_param(
-                            'ssissssssi',
+                            'ssissssssssi',
                             $projectName,
                             $description,
                             $clientId,
+                            $contactPerson,
+                            $contactNumber,
                             $projectSite,
                             $projectAddress,
                             $projectEmail,
@@ -848,10 +886,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 } else {
                     $createProject->bind_param(
-                        'ssisssssi',
+                        'ssissssssi',
                         $projectName,
                         $description,
                         $clientId,
+                        $contactPerson,
+                        $contactNumber,
                         $projectSite,
                         $projectAddress,
                         $startDate,
@@ -862,10 +902,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } else {
                 $createProject->bind_param(
-                    'ssisssi',
+                    'ssisssssi',
                     $projectName,
                     $description,
                     $clientId,
+                    $contactPerson,
+                    $contactNumber,
                     $startDate,
                     $endDate,
                     $status,
@@ -928,6 +970,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'status' => $status,
                     'client_id' => $clientId,
                     'engineer_ids' => $engineerIds,
+                    'contact_person' => $contactPerson,
+                    'contact_number' => $contactNumber,
                     'project_email' => $projectEmail,
                     'project_code' => $projectCode,
                     'po_number' => $poNumber,
@@ -1248,6 +1292,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $projectId = (int)($_POST['project_id'] ?? 0);
         $projectName = normalize_text($_POST['project_name'] ?? '');
         $description = normalize_text($_POST['description'] ?? '');
+        $contactPerson = $hasContactPersonColumn ? normalize_text_or_null($_POST['contact_person'] ?? null) : null;
+        $contactNumber = $hasContactNumberColumn ? normalize_text_or_null($_POST['contact_number'] ?? null) : null;
         $projectSite = $hasProjectSiteColumn ? normalize_text_or_null($_POST['project_site'] ?? null) : null;
         $projectAddress = $hasProjectAddressColumn ? normalize_text_or_null($_POST['project_address'] ?? null) : null;
         $projectEmail = $hasProjectEmailColumn ? normalize_text_or_null($_POST['project_email'] ?? null) : null;
@@ -1277,6 +1323,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (projectNameExists($conn, $projectName, $projectId)) {
             set_projects_flash('error', 'Project name already exists. Use a more specific name like site, phase, or year.');
+            redirect_projects_page();
+        }
+
+        if ($hasContactPersonColumn && ($project['status'] ?? '') !== 'draft' && $contactPerson === null) {
+            set_projects_flash('error', 'Client contact person is required unless the project stays in Draft.');
+            redirect_projects_page();
+        }
+
+        if ($hasContactNumberColumn && ($project['status'] ?? '') !== 'draft' && $contactNumber === null) {
+            set_projects_flash('error', 'Client contact number is required unless the project stays in Draft.');
             redirect_projects_page();
         }
 
@@ -1333,27 +1389,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($hasProjectCodeColumn && $hasPoNumberColumn) {
                         $updateProject = $conn->prepare(
                             'UPDATE projects
-                             SET project_name = ?, description = ?, client_id = ?, project_site = ?, project_address = ?, project_email = ?, project_code = ?, po_number = ?, start_date = ?, end_date = ?
+                             SET project_name = ?, description = ?, client_id = ?, contact_person = ?, contact_number = ?, project_site = ?, project_address = ?, project_email = ?, project_code = ?, po_number = ?, start_date = ?, end_date = ?
                              WHERE id = ?'
                         );
                     } else {
                         $updateProject = $conn->prepare(
                             'UPDATE projects
-                             SET project_name = ?, description = ?, client_id = ?, project_site = ?, project_address = ?, project_email = ?, start_date = ?, end_date = ?
+                             SET project_name = ?, description = ?, client_id = ?, contact_person = ?, contact_number = ?, project_site = ?, project_address = ?, project_email = ?, start_date = ?, end_date = ?
                              WHERE id = ?'
                         );
                     }
                 } else {
                     $updateProject = $conn->prepare(
                         'UPDATE projects
-                         SET project_name = ?, description = ?, client_id = ?, project_site = ?, project_address = ?, start_date = ?, end_date = ?
+                         SET project_name = ?, description = ?, client_id = ?, contact_person = ?, contact_number = ?, project_site = ?, project_address = ?, start_date = ?, end_date = ?
                          WHERE id = ?'
                     );
                 }
             } else {
                 $updateProject = $conn->prepare(
                     'UPDATE projects
-                     SET project_name = ?, description = ?, client_id = ?, start_date = ?, end_date = ?
+                     SET project_name = ?, description = ?, client_id = ?, contact_person = ?, contact_number = ?, start_date = ?, end_date = ?
                      WHERE id = ?'
                 );
             }
@@ -1366,26 +1422,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($hasProjectEmailColumn) {
                     if ($hasProjectCodeColumn && $hasPoNumberColumn) {
                         if (
-                            !$updateProject->bind_param('ssisssssssi', $projectName, $description, $clientId, $projectSite, $projectAddress, $projectEmail, $projectCode, $poNumber, $startDate, $endDate, $projectId) ||
+                            !$updateProject->bind_param('ssisssssssssi', $projectName, $description, $clientId, $contactPerson, $contactNumber, $projectSite, $projectAddress, $projectEmail, $projectCode, $poNumber, $startDate, $endDate, $projectId) ||
                             !$updateProject->execute()
                         ) {
                             throw new RuntimeException('Failed to update project details.');
                         }
                     } elseif (
-                        !$updateProject->bind_param('ssisssssi', $projectName, $description, $clientId, $projectSite, $projectAddress, $projectEmail, $startDate, $endDate, $projectId) ||
+                        !$updateProject->bind_param('ssisssssssi', $projectName, $description, $clientId, $contactPerson, $contactNumber, $projectSite, $projectAddress, $projectEmail, $startDate, $endDate, $projectId) ||
                         !$updateProject->execute()
                     ) {
                         throw new RuntimeException('Failed to update project details.');
                     }
                 } elseif (
-                    !$updateProject->bind_param('ssissssi', $projectName, $description, $clientId, $projectSite, $projectAddress, $startDate, $endDate, $projectId) ||
+                    !$updateProject->bind_param('ssissssssi', $projectName, $description, $clientId, $contactPerson, $contactNumber, $projectSite, $projectAddress, $startDate, $endDate, $projectId) ||
                     !$updateProject->execute()
                 ) {
                     throw new RuntimeException('Failed to update project details.');
                 }
             } else {
                 if (
-                    !$updateProject->bind_param('ssissi', $projectName, $description, $clientId, $startDate, $endDate, $projectId) ||
+                    !$updateProject->bind_param('ssissssi', $projectName, $description, $clientId, $contactPerson, $contactNumber, $startDate, $endDate, $projectId) ||
                     !$updateProject->execute()
                 ) {
                     throw new RuntimeException('Failed to update project details.');
@@ -1438,6 +1494,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'project_name' => $projectName,
                     'client_id' => $clientId,
                     'engineer_ids' => $engineerIds,
+                    'contact_person' => $contactPerson,
+                    'contact_number' => $contactNumber,
                     'project_email' => $projectEmail,
                     'project_code' => $projectCode,
                     'po_number' => $poNumber,
@@ -1826,6 +1884,8 @@ $shouldClearCreateProjectDraft = is_array($flash)
 $createProjectValues = [
     'project_name' => (string)($createProjectOldInput['project_name'] ?? ''),
     'description' => (string)($createProjectOldInput['description'] ?? ''),
+    'contact_person' => (string)($createProjectOldInput['contact_person'] ?? ''),
+    'contact_number' => (string)($createProjectOldInput['contact_number'] ?? ''),
     'project_site' => (string)($createProjectOldInput['project_site'] ?? ''),
     'project_address' => (string)($createProjectOldInput['project_address'] ?? ''),
     'project_email' => (string)($createProjectOldInput['project_email'] ?? ''),
@@ -1897,7 +1957,7 @@ if ($statusCountsResult) {
     }
 }
 
-$filteredProjects = project_search_fetch_count($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $searchQuery, $statusFilter);
+$filteredProjects = project_search_fetch_count($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter);
 
 $totalPages = max(1, (int)ceil($filteredProjects / $perPage));
 if ($currentPage > $totalPages) {
@@ -1905,7 +1965,7 @@ if ($currentPage > $totalPages) {
     $offset = ($currentPage - 1) * $perPage;
 }
 
-$projects = project_search_fetch_page($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $searchQuery, $statusFilter, $perPage, $offset);
+$projects = project_search_fetch_page($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter, $perPage, $offset);
 $projectIds = array_map(static fn(array $project): int => (int)($project['id'] ?? 0), $projects);
 $recentProjectCosts = fetchRecentProjectCostEntries($conn, $projectIds);
 $financialSummaryResult = $conn->query(
@@ -1967,8 +2027,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
             <section class="form-panel">
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px;">
                     <div>
-                        <h2 class="section-title-inline" style="margin-bottom: 4px;">Create Project</h2>
-                        <small style="color: #5f6b7a;">Draft details auto-save in this browser, even after a hard refresh.</small>
+                        <h6 class="section-title-inline" style="margin-bottom: 4px;">Create Project</h6>
                     </div>
                     <button type="button" class="btn-secondary" id="create-project-clear-details">Clear Details</button>
                 </div>
@@ -1976,6 +2035,16 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                     <input type="hidden" name="action" value="create_project">
 
                     <div class="project-create-top-grid">
+                        <div class="input-group">
+                            <label for="client_id">Client <span class="required-indicator" aria-hidden="true">*</span></label>
+                            <select id="client_id" name="client_id" required>
+                                <option value="">Select client</option>
+                                <?php foreach ($clients as $client): ?>
+                                    <option value="<?php echo (int)$client['id']; ?>" <?php echo $createProjectValues['client_id'] === (string)$client['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($client['full_name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
                         <div class="input-group">
                             <label for="project_name">Project Title <span class="required-indicator" aria-hidden="true">*</span></label>
                             <input type="text" id="project_name" name="project_name" value="<?php echo htmlspecialchars($createProjectValues['project_name']); ?>" required>
@@ -1988,25 +2057,118 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             </div>
                         <?php endif; ?>
 
+                        <?php if ($hasProjectSiteColumn): ?>
+                            <div class="input-group">
+                                <div class="field-label-row">
+                                    <label for="project_site">Project Site <span class="required-indicator" aria-hidden="true">*</span></label>
+                                    <button type="button" class="field-tip" aria-label="Project site help">
+                                        <span class="field-tip__icon" aria-hidden="true">i</span>
+                                        <span class="field-tip__bubble">Enter the site, branch, building, or location code. Required unless the project stays in Draft.</span>
+                                    </button>
+                                </div>
+                                <input type="text" id="project_site" name="project_site" value="<?php echo htmlspecialchars($createProjectValues['project_site']); ?>" placeholder="Site name, branch, building, or location code">
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if ($hasContactPersonColumn): ?>
+                            <div class="input-group">
+                                <div class="field-label-row">
+                                    <label for="contact_person">Client Contact Person <span class="required-indicator" aria-hidden="true">*</span></label>
+                                    <button type="button" class="field-tip" aria-label="Client contact person help">
+                                        <span class="field-tip__icon" aria-hidden="true">i</span>
+                                        <span class="field-tip__bubble">Enter the main client representative for this project. Required unless the project stays in Draft.</span>
+                                    </button>
+                                </div>
+                                <input type="text" id="contact_person" name="contact_person" value="<?php echo htmlspecialchars($createProjectValues['contact_person']); ?>" placeholder="Primary client contact name">
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if ($hasContactNumberColumn): ?>
+                            <div class="input-group">
+                                <div class="field-label-row">
+                                    <label for="contact_number">Client Contact Number <span class="required-indicator" aria-hidden="true">*</span></label>
+                                    <button type="button" class="field-tip" aria-label="Client contact number help">
+                                        <span class="field-tip__icon" aria-hidden="true">i</span>
+                                        <span class="field-tip__bubble">Enter the direct mobile or landline number for the client contact. Required unless the project stays in Draft.</span>
+                                    </button>
+                                </div>
+                                <input type="text" id="contact_number" name="contact_number" value="<?php echo htmlspecialchars($createProjectValues['contact_number']); ?>" placeholder="09xxxxxxxxx or landline">
+                            </div>
+                        <?php endif; ?>
+
                         <?php if ($hasPoNumberColumn): ?>
                             <div class="input-group">
-                                <label for="po_number">P.O Number <span class="optional-indicator">(Required for Pending/Ongoing)</span></label>
+                                <div class="field-label-row">
+                                    <label for="po_number">P.O Number</label>
+                                    <button type="button" class="field-tip" aria-label="P.O number help">
+                                        <span class="field-tip__icon" aria-hidden="true">i</span>
+                                        <span class="field-tip__bubble">Enter the purchase order reference number. Required when the project status is Pending or Ongoing.</span>
+                                    </button>
+                                </div>
                                 <input type="text" id="po_number" name="po_number" value="<?php echo htmlspecialchars($createProjectValues['po_number']); ?>" placeholder="Enter P.O number">
                             </div>
                         <?php endif; ?>
 
                         <div class="input-group">
-                            <label for="client_id">Client <span class="required-indicator" aria-hidden="true">*</span></label>
-                            <select id="client_id" name="client_id" required>
-                                <option value="">Select client</option>
-                                <?php foreach ($clients as $client): ?>
-                                    <option value="<?php echo (int)$client['id']; ?>" <?php echo $createProjectValues['client_id'] === (string)$client['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($client['full_name']); ?></option>
+                            <div class="field-label-row">
+                                <label for="start_date">P.O Date</label>
+                                <button type="button" class="field-tip" aria-label="P.O date reminder">
+                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                    <span class="field-tip__bubble">Use the purchase order date here. This stays editable while the project is not yet completed.</span>
+                                </button>
+                            </div>
+                            <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($createProjectValues['start_date']); ?>" max="<?php echo htmlspecialchars($todayDate); ?>">
+                        </div>
+
+                        <?php if ($hasProjectEmailColumn): ?>
+                            <div class="input-group">
+                                <label for="project_email">Email Address <span class="optional-indicator">(Optional)</span></label>
+                                <input type="email" id="project_email" name="project_email" value="<?php echo htmlspecialchars($createProjectValues['project_email']); ?>" placeholder="project@example.com">
+                            </div>
+                        <?php endif; ?>
+
+                        <div class="input-group">
+                            <div class="field-label-row">
+                                <label for="status">Initial Status <span class="required-indicator" aria-hidden="true">*</span></label>
+                                <button type="button" class="field-tip" aria-label="Project status reminder">
+                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                    <span class="field-tip__bubble">
+                                        <?php if ($supportsDraftStatus): ?>
+                                            Use Draft for incomplete or possibly wrong project entries. Use Pending for approved work, and choose Ongoing when work is already active.
+                                        <?php else: ?>
+                                            Use Pending for approved work. Choose Ongoing when work is already active.
+                                        <?php endif; ?>
+                                    </span>
+                                </button>
+                            </div>
+                            <select id="status" name="status" required>
+                                <?php foreach ($initialStatusOptions as $statusOption): ?>
+                                    <option value="<?php echo htmlspecialchars($statusOption); ?>" <?php echo $createProjectValues['status'] === $statusOption ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars(ucfirst($statusOption)); ?>
+                                    </option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                     </div>
 
                     <div class="form-grid form-grid--project-create">
+                        <div class="input-group">
+                            <label for="budget_amount">Project Budget</label>
+                            <div style="position: relative;">
+                                <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #5f6b7a; font-weight: 600; pointer-events: none;">PHP</span>
+                                <input
+                                    type="text"
+                                    id="budget_amount"
+                                    name="budget_amount"
+                                    inputmode="decimal"
+                                    autocomplete="off"
+                                    placeholder="0.00"
+                                    value="<?php echo htmlspecialchars($createProjectValues['budget_amount']); ?>"
+                                    data-currency-input="php"
+                                    style="padding-left: 52px;"
+                                >
+                            </div>
+                        </div>
 
                         <div class="input-group input-group-wide">
                             <div class="field-label-row">
@@ -2055,71 +2217,18 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             <small>Add one or more engineers depending on the project workload.</small>
                         </div>
 
-                        <div class="input-group">
-                            <div class="field-label-row">
-                                <label for="status">Initial Status <span class="required-indicator" aria-hidden="true">*</span></label>
-                                <button type="button" class="field-tip" aria-label="Project status reminder">
-                                    <span class="field-tip__icon" aria-hidden="true">i</span>
-                                    <span class="field-tip__bubble">
-                                        <?php if ($supportsDraftStatus): ?>
-                                            Use Draft for incomplete or possibly wrong project entries. Use Pending for approved work, and choose Ongoing when work is already active.
-                                        <?php else: ?>
-                                            Use Pending for approved work. Choose Ongoing when work is already active.
-                                        <?php endif; ?>
-                                    </span>
-                                </button>
-                            </div>
-                            <select id="status" name="status" required>
-                                <?php foreach ($initialStatusOptions as $statusOption): ?>
-                                    <option value="<?php echo htmlspecialchars($statusOption); ?>" <?php echo $createProjectValues['status'] === $statusOption ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars(ucfirst($statusOption)); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-
-                        <div class="input-group">
-                            <div class="field-label-row">
-                                <label for="start_date">P.O Date</label>
-                                <button type="button" class="field-tip" aria-label="P.O date reminder">
-                                    <span class="field-tip__icon" aria-hidden="true">i</span>
-                                    <span class="field-tip__bubble">Use the purchase order date here. This stays editable while the project is not yet completed.</span>
-                                </button>
-                            </div>
-                            <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($createProjectValues['start_date']); ?>" max="<?php echo htmlspecialchars($todayDate); ?>">
-                        </div>
-
-                        <?php if ($hasProjectEmailColumn): ?>
-                            <div class="input-group">
-                                <label for="project_email">Email Address <span class="optional-indicator">(Optional)</span></label>
-                                <input type="email" id="project_email" name="project_email" value="<?php echo htmlspecialchars($createProjectValues['project_email']); ?>" placeholder="project@example.com">
+                        <?php if ($hasProjectAddressColumn): ?>
+                            <div class="input-group input-group-wide">
+                                <div class="field-label-row">
+                                    <label for="project_address">Address <span class="required-indicator" aria-hidden="true">*</span></label>
+                                    <button type="button" class="field-tip" aria-label="Project address help">
+                                        <span class="field-tip__icon" aria-hidden="true">i</span>
+                                        <span class="field-tip__bubble">Enter the full project address for delivery or site reference. Required unless the project stays in Draft.</span>
+                                    </button>
+                                </div>
+                                <textarea id="project_address" name="project_address" rows="3" placeholder="Full street address, barangay, city, landmark, or delivery address"><?php echo htmlspecialchars($createProjectValues['project_address']); ?></textarea>
                             </div>
                         <?php endif; ?>
-
-                        <?php if ($hasProjectSiteColumn): ?>
-                            <div class="input-group">
-                                <label for="project_site">Project Site <span class="required-indicator" aria-hidden="true">*</span> <span class="optional-indicator">(Required unless Draft)</span></label>
-                                <input type="text" id="project_site" name="project_site" value="<?php echo htmlspecialchars($createProjectValues['project_site']); ?>" placeholder="Site name, branch, building, or location code">
-                            </div>
-                        <?php endif; ?>
-
-                        <div class="input-group">
-                            <label for="budget_amount">Project Budget</label>
-                            <div style="position: relative;">
-                                <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #5f6b7a; font-weight: 600; pointer-events: none;">PHP</span>
-                                <input
-                                    type="text"
-                                    id="budget_amount"
-                                    name="budget_amount"
-                                    inputmode="decimal"
-                                    autocomplete="off"
-                                    placeholder="0.00"
-                                    value="<?php echo htmlspecialchars($createProjectValues['budget_amount']); ?>"
-                                    data-currency-input="php"
-                                    style="padding-left: 52px;"
-                                >
-                            </div>
-                        </div>
 
                         <div class="input-group input-group-wide">
                             <label for="budget_notes">Budget Notes</label>
@@ -2131,13 +2240,6 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             <label for="description">Comment <span class="optional-indicator">(Optional)</span></label>
                             <textarea id="description" name="description" placeholder="Project comment"><?php echo htmlspecialchars($createProjectValues['description']); ?></textarea>
                         </div>
-
-                        <?php if ($hasProjectAddressColumn): ?>
-                            <div class="input-group input-group-spaced">
-                                <label for="project_address">Address <span class="required-indicator" aria-hidden="true">*</span> <span class="optional-indicator">(Required unless Draft)</span></label>
-                                <textarea id="project_address" name="project_address" rows="3" placeholder="Full street address, barangay, city, landmark, or delivery address"><?php echo htmlspecialchars($createProjectValues['project_address']); ?></textarea>
-                            </div>
-                        <?php endif; ?>
 
                         <div class="form-actions">
                             <button type="submit" class="btn-primary" <?php echo (count($clients) === 0 || count($engineers) === 0) ? 'disabled' : ''; ?>>Create Project</button>
@@ -2237,6 +2339,8 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             $projectRecentCosts = $recentProjectCosts[(int)($project['id'] ?? 0)] ?? [];
                             $projectCode = trim((string)($project['project_code'] ?? ''));
                             $projectPoNumber = trim((string)($project['po_number'] ?? ''));
+                            $projectContactPerson = trim((string)($project['contact_person'] ?? ''));
+                            $projectContactNumber = trim((string)($project['contact_number'] ?? ''));
                             $projectSite = trim((string)($project['project_site'] ?? ''));
                             $projectEmail = trim((string)($project['project_email'] ?? ''));
                             $assignedEngineerNames = trim((string)($project['engineer_names'] ?? ''));
@@ -2244,6 +2348,8 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                 $project['project_name'] ?? '',
                                 $projectCode,
                                 $projectPoNumber,
+                                $projectContactPerson,
+                                $projectContactNumber,
                                 $projectSite,
                                 $project['client_name'] ?? '',
                                 $assignedEngineerNames,
@@ -2272,6 +2378,8 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
 
                                         <div class="project-meta">
                                             <div><strong>Client:</strong> <?php echo htmlspecialchars($project['client_name'] ?? 'N/A'); ?></div>
+                                            <div><strong>Client Contact Person:</strong> <?php echo htmlspecialchars($projectContactPerson !== '' ? $projectContactPerson : 'Not set'); ?></div>
+                                            <div><strong>Client Contact Number:</strong> <?php echo htmlspecialchars($projectContactNumber !== '' ? $projectContactNumber : 'Not set'); ?></div>
                                             <div><strong>Project Code:</strong> <?php echo htmlspecialchars($projectCode !== '' ? $projectCode : 'Not set'); ?></div>
                                             <div><strong>P.O Number:</strong> <?php echo htmlspecialchars($projectPoNumber !== '' ? $projectPoNumber : 'Not set'); ?></div>
                                             <div><strong>P.O Date:</strong> <?php echo htmlspecialchars($project['start_date'] ?? 'N/A'); ?></div>
@@ -2752,6 +2860,8 @@ function initCreateProjectDraft() {
         project_code: '',
         po_number: '',
         client_id: '',
+        contact_person: '',
+        contact_number: '',
         engineer_ids: [],
         status: 'pending',
         start_date: <?php echo json_encode($todayDate, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
@@ -2843,6 +2953,8 @@ function initCreateProjectDraft() {
             project_code: String(createProjectForm.elements.namedItem('project_code')?.value || ''),
             po_number: String(createProjectForm.elements.namedItem('po_number')?.value || ''),
             client_id: String(createProjectForm.elements.namedItem('client_id')?.value || ''),
+            contact_person: String(createProjectForm.elements.namedItem('contact_person')?.value || ''),
+            contact_number: String(createProjectForm.elements.namedItem('contact_number')?.value || ''),
             engineer_ids: getEngineerIds(),
             status: String(createProjectForm.elements.namedItem('status')?.value || defaultDraft.status),
             start_date: String(createProjectForm.elements.namedItem('start_date')?.value || ''),

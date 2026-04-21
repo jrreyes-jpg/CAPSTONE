@@ -15,6 +15,8 @@ $hasProjectAddressColumn = project_search_table_has_column($conn, 'projects', 'p
 $hasProjectEmailColumn = project_search_table_has_column($conn, 'projects', 'project_email');
 $hasProjectCodeColumn = project_search_table_has_column($conn, 'projects', 'project_code');
 $hasPoNumberColumn = project_search_table_has_column($conn, 'projects', 'po_number');
+$hasContactPersonColumn = project_search_table_has_column($conn, 'projects', 'contact_person');
+$hasContactNumberColumn = project_search_table_has_column($conn, 'projects', 'contact_number');
 
 ensure_project_search_indexes($conn, $hasProjectAddressColumn, $hasProjectSiteColumn);
 
@@ -27,7 +29,7 @@ if (mb_strlen($searchQuery) < 2) {
     exit();
 }
 
-$results = project_search_fetch_suggestions($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $searchQuery, $statusFilter, $limit);
+$results = project_search_fetch_suggestions($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter, $limit);
 $payload = array_map(
     static function (array $project): array {
         return [
