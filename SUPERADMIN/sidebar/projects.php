@@ -191,7 +191,8 @@ function normalize_money_or_null($value): ?float {
         return null;
     }
 
-    $normalized = str_replace([',', ' '], '', $value);
+    $normalized = str_ireplace(['PHP', '₱'], '', $value);
+    $normalized = str_replace([',', ' '], '', $normalized);
     if (!is_numeric($normalized)) {
         return null;
     }
@@ -1817,6 +1818,10 @@ unset($_SESSION['projects_flash']);
 $createProjectOldInput = $_SESSION['projects_old_input'] ?? [];
 unset($_SESSION['projects_old_input']);
 $createProjectFocusField = trim((string)($createProjectOldInput['focus_field'] ?? ''));
+$hasCreateProjectServerInput = !empty($createProjectOldInput);
+$shouldClearCreateProjectDraft = is_array($flash)
+    && ($flash['type'] ?? '') === 'success'
+    && ($flash['message'] ?? '') === 'Project created successfully.';
 
 $createProjectValues = [
     'project_name' => (string)($createProjectOldInput['project_name'] ?? ''),
@@ -1960,7 +1965,13 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
             </section>
 
             <section class="form-panel">
-                <h2 class="section-title-inline">Create Project</h2>
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px;">
+                    <div>
+                        <h2 class="section-title-inline" style="margin-bottom: 4px;">Create Project</h2>
+                        <small style="color: #5f6b7a;">Draft details auto-save in this browser, even after a hard refresh.</small>
+                    </div>
+                    <button type="button" class="btn-secondary" id="create-project-clear-details">Clear Details</button>
+                </div>
                 <form method="POST" id="create-project-form" class="project-create-form">
                     <input type="hidden" name="action" value="create_project">
 
@@ -2094,7 +2105,20 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
 
                         <div class="input-group">
                             <label for="budget_amount">Project Budget</label>
-                            <input type="number" id="budget_amount" name="budget_amount" min="0" step="0.01" placeholder="0.00" value="<?php echo htmlspecialchars($createProjectValues['budget_amount']); ?>">
+                            <div style="position: relative;">
+                                <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #5f6b7a; font-weight: 600; pointer-events: none;">PHP</span>
+                                <input
+                                    type="text"
+                                    id="budget_amount"
+                                    name="budget_amount"
+                                    inputmode="decimal"
+                                    autocomplete="off"
+                                    placeholder="0.00"
+                                    value="<?php echo htmlspecialchars($createProjectValues['budget_amount']); ?>"
+                                    data-currency-input="php"
+                                    style="padding-left: 52px;"
+                                >
+                            </div>
                         </div>
 
                         <div class="input-group input-group-wide">
@@ -2718,6 +2742,261 @@ function initCreateProjectForm() {
     }
 }
 
+function initCreateProjectDraft() {
+    const createProjectForm = document.getElementById('create-project-form');
+    const clearButton = document.getElementById('create-project-clear-details');
+    const hasServerDraft = <?php echo $hasCreateProjectServerInput ? 'true' : 'false'; ?>;
+    const shouldClearStoredDraft = <?php echo $shouldClearCreateProjectDraft ? 'true' : 'false'; ?>;
+    const defaultDraft = {
+        project_name: '',
+        project_code: '',
+        po_number: '',
+        client_id: '',
+        engineer_ids: [],
+        status: 'pending',
+        start_date: <?php echo json_encode($todayDate, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+        project_email: '',
+        project_site: '',
+        budget_amount: '',
+        budget_notes: '',
+        description: '',
+        project_address: '',
+    };
+    const draftStorageKey = 'codesamplecaps.superadmin.projects.createProjectDraft.v1';
+
+    if (!createProjectForm) {
+        return;
+    }
+
+    function buildEngineerChip(engineerId, engineerName) {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'engineer-chip';
+        chip.setAttribute('data-engineer-chip', '');
+        chip.setAttribute('data-engineer-id', engineerId);
+        chip.setAttribute('data-engineer-name', engineerName);
+        chip.setAttribute('aria-pressed', 'true');
+        chip.innerHTML = '<span></span><span class="engineer-chip__remove" aria-hidden="true">&times;</span>';
+        chip.querySelector('span').textContent = engineerName;
+        return chip;
+    }
+
+    function setFieldValue(name, value) {
+        const field = createProjectForm.elements.namedItem(name);
+
+        if (!field) {
+            return;
+        }
+
+        if (field instanceof RadioNodeList) {
+            Array.from(field).forEach(function (option) {
+                option.checked = option.value === value;
+            });
+            return;
+        }
+
+        field.value = value;
+    }
+
+    function setEngineerIds(engineerIds) {
+        const selectedContainer = createProjectForm.querySelector('[data-engineer-selected]');
+        const inputsContainer = createProjectForm.querySelector('[data-engineer-inputs]');
+        const engineerSelect = createProjectForm.querySelector('[data-engineer-select]');
+
+        if (!selectedContainer || !inputsContainer || !engineerSelect) {
+            return;
+        }
+
+        selectedContainer.innerHTML = '';
+        inputsContainer.innerHTML = '';
+        engineerSelect.value = '';
+
+        engineerIds.forEach(function (engineerId) {
+            const option = Array.from(engineerSelect.options).find(function (candidate) {
+                return candidate.value === String(engineerId);
+            });
+
+            if (!option || option.value === '') {
+                return;
+            }
+
+            selectedContainer.appendChild(buildEngineerChip(option.value, option.text));
+
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'engineer_ids[]';
+            hiddenInput.value = option.value;
+            hiddenInput.setAttribute('data-engineer-input', '');
+            inputsContainer.appendChild(hiddenInput);
+        });
+    }
+
+    function getEngineerIds() {
+        return Array.from(createProjectForm.querySelectorAll('[data-engineer-input]')).map(function (input) {
+            return String(input.value);
+        });
+    }
+
+    function collectDraft() {
+        return {
+            project_name: String(createProjectForm.elements.namedItem('project_name')?.value || ''),
+            project_code: String(createProjectForm.elements.namedItem('project_code')?.value || ''),
+            po_number: String(createProjectForm.elements.namedItem('po_number')?.value || ''),
+            client_id: String(createProjectForm.elements.namedItem('client_id')?.value || ''),
+            engineer_ids: getEngineerIds(),
+            status: String(createProjectForm.elements.namedItem('status')?.value || defaultDraft.status),
+            start_date: String(createProjectForm.elements.namedItem('start_date')?.value || ''),
+            project_email: String(createProjectForm.elements.namedItem('project_email')?.value || ''),
+            project_site: String(createProjectForm.elements.namedItem('project_site')?.value || ''),
+            budget_amount: String(createProjectForm.elements.namedItem('budget_amount')?.value || ''),
+            budget_notes: String(createProjectForm.elements.namedItem('budget_notes')?.value || ''),
+            description: String(createProjectForm.elements.namedItem('description')?.value || ''),
+            project_address: String(createProjectForm.elements.namedItem('project_address')?.value || ''),
+        };
+    }
+
+    function saveDraft() {
+        try {
+            window.localStorage.setItem(draftStorageKey, JSON.stringify(collectDraft()));
+        } catch (error) {
+        }
+    }
+
+    function loadStoredDraft() {
+        try {
+            const rawDraft = window.localStorage.getItem(draftStorageKey);
+            if (!rawDraft) {
+                return null;
+            }
+
+            const parsedDraft = JSON.parse(rawDraft);
+            return parsedDraft && typeof parsedDraft === 'object' ? parsedDraft : null;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function clearStoredDraft() {
+        try {
+            window.localStorage.removeItem(draftStorageKey);
+        } catch (error) {
+        }
+    }
+
+    function applyDraft(draft) {
+        if (!draft || typeof draft !== 'object') {
+            return;
+        }
+
+        Object.keys(defaultDraft).forEach(function (fieldName) {
+            if (fieldName === 'engineer_ids') {
+                return;
+            }
+
+            const nextValue = Object.prototype.hasOwnProperty.call(draft, fieldName)
+                ? String(draft[fieldName] ?? '')
+                : String(defaultDraft[fieldName] ?? '');
+
+            setFieldValue(fieldName, nextValue);
+        });
+
+        setEngineerIds(Array.isArray(draft.engineer_ids) ? draft.engineer_ids.map(String) : []);
+    }
+
+    if (shouldClearStoredDraft) {
+        clearStoredDraft();
+    } else if (!hasServerDraft) {
+        applyDraft(loadStoredDraft());
+    }
+
+    createProjectForm.addEventListener('input', saveDraft);
+    createProjectForm.addEventListener('change', saveDraft);
+
+    const engineerInputsContainer = createProjectForm.querySelector('[data-engineer-inputs]');
+    if (engineerInputsContainer) {
+        const observer = new MutationObserver(saveDraft);
+        observer.observe(engineerInputsContainer, { childList: true, subtree: true, attributes: true, attributeFilter: ['value'] });
+    }
+
+    if (clearButton) {
+        clearButton.addEventListener('click', function () {
+            if (!window.confirm('Clear all saved project details?')) {
+                return;
+            }
+
+            applyDraft(defaultDraft);
+
+            const currencyInput = createProjectForm.querySelector('[data-currency-input="php"]');
+            if (currencyInput) {
+                currencyInput.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+
+            clearStoredDraft();
+        });
+    }
+}
+
+function initCurrencyInputs() {
+    const currencyInputs = Array.from(document.querySelectorAll('[data-currency-input="php"]'));
+
+    if (currencyInputs.length === 0) {
+        return;
+    }
+
+    function sanitizeCurrencyValue(value) {
+        let normalized = String(value || '').replace(/php/gi, '').replace(/[₱,\s]/g, '');
+        normalized = normalized.replace(/[^0-9.]/g, '');
+
+        const firstDotIndex = normalized.indexOf('.');
+        if (firstDotIndex !== -1) {
+            normalized = normalized.slice(0, firstDotIndex + 1) + normalized.slice(firstDotIndex + 1).replace(/\./g, '');
+        }
+
+        const parts = normalized.split('.');
+        const wholePart = (parts[0] || '').replace(/^0+(?=\d)/, '');
+        const decimalPart = parts.length > 1 ? parts[1].slice(0, 2) : '';
+
+        return {
+            wholePart: wholePart === '' ? '0' : wholePart,
+            hasDecimal: firstDotIndex !== -1,
+            decimalPart: decimalPart,
+            isEmpty: normalized === '',
+        };
+    }
+
+    function formatCurrencyValue(value, forceTwoDecimals) {
+        const sanitized = sanitizeCurrencyValue(value);
+
+        if (sanitized.isEmpty) {
+            return '';
+        }
+
+        const withCommas = sanitized.wholePart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+        if (forceTwoDecimals) {
+            return withCommas + '.' + sanitized.decimalPart.padEnd(2, '0');
+        }
+
+        if (sanitized.hasDecimal) {
+            return withCommas + '.' + sanitized.decimalPart;
+        }
+
+        return withCommas;
+    }
+
+    currencyInputs.forEach(function (input) {
+        input.addEventListener('input', function () {
+            input.value = formatCurrencyValue(input.value, false);
+        });
+
+        input.addEventListener('blur', function () {
+            input.value = formatCurrencyValue(input.value, true);
+        });
+
+        input.value = formatCurrencyValue(input.value, false);
+    });
+}
+
 function initEngineerAssignmentPicker() {
     const picker = document.querySelector('[data-engineer-picker]');
 
@@ -2886,6 +3165,8 @@ function initEngineerAssignmentPicker() {
 
 document.addEventListener('DOMContentLoaded', initProjectSearchUI);
 document.addEventListener('DOMContentLoaded', initCreateProjectForm);
+document.addEventListener('DOMContentLoaded', initCreateProjectDraft);
+document.addEventListener('DOMContentLoaded', initCurrencyInputs);
 document.addEventListener('DOMContentLoaded', initEngineerAssignmentPicker);
 </script>
 </body>

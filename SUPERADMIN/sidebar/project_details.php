@@ -588,7 +588,17 @@ if ($projectId > 0) {
                 $assignedEngineerIds = array_values(array_filter(array_map('intval', explode(',', (string)($project['engineer_ids_csv'] ?? '')))));
                 $assignedEngineerNames = trim((string)($project['engineer_names'] ?? ''));
                 $defaultTaskEngineerId = $assignedEngineerIds[0] ?? 0;
-                $completionRate = (int)round(((int)($project['completed_tasks'] ?? 0) / max(1, (int)($project['total_tasks'] ?? 0))) * 100);
+                $totalTasks = (int)($project['total_tasks'] ?? 0);
+                $completedTasks = (int)($project['completed_tasks'] ?? 0);
+                $completionRate = $totalTasks > 0
+                    ? (int)round(($completedTasks / $totalTasks) * 100)
+                    : ($isCompleted ? 100 : 0);
+                $progressSummary = $totalTasks > 0
+                    ? $completedTasks . ' of ' . $totalTasks . ' tasks finished'
+                    : ($isCompleted ? 'Project completed with no tracked tasks' : 'No tasks tracked yet');
+                $progressStatSummary = $totalTasks > 0
+                    ? $completedTasks . ' / ' . $totalTasks . ' tasks done'
+                    : ($isCompleted ? 'No tracked tasks' : '0 / 0 tasks done');
                 $budgetAmount = (float)($projectFinancials['budget_amount'] ?? 0);
                 $budgetNotes = trim((string)($projectFinancials['budget_notes'] ?? ''));
                 $totalCost = (float)($projectFinancials['total_cost'] ?? 0);
@@ -643,7 +653,7 @@ if ($projectId > 0) {
                                         <span class="project-details-progress-card__label">Project Progress</span>
                                         <strong><?php echo $completionRate; ?>% complete</strong>
                                     </div>
-                                    <small><?php echo (int)$project['completed_tasks']; ?> of <?php echo (int)$project['total_tasks']; ?> tasks finished</small>
+                                    <small><?php echo htmlspecialchars($progressSummary); ?></small>
                                 </div>
                                 <div class="project-details-progress-card__track" aria-hidden="true">
                                     <span class="project-details-progress-card__fill" style="width: <?php echo $completionRate; ?>%;"></span>
@@ -655,7 +665,7 @@ if ($projectId > 0) {
                             <div class="project-details-stat">
                                 <span>Progress</span>
                                 <strong><?php echo $completionRate; ?>%</strong>
-                                <small><?php echo (int)$project['completed_tasks']; ?> / <?php echo (int)$project['total_tasks']; ?> tasks done</small>
+                                <small><?php echo htmlspecialchars($progressStatSummary); ?></small>
                             </div>
                             <div class="project-details-stat">
                                 <span>Client</span>
