@@ -376,7 +376,7 @@ $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName
                     </span>
                     <span class="menu-mini-label">Home</span>
                 </span>
-                <span class="menu-text">Dashboard</span>
+                <span class="menu-text">Overview</span>
             </a>
         </li>
         <li>
@@ -513,7 +513,8 @@ $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName
     </div>
     <div class="global-topbar__actions">
         <div class="topbar-profile" data-profile-root>
-            <button
+            <button 
+                title="Account"
                 id="topbarProfileToggle"
                 class="topbar-profile__toggle"
                 type="button"
