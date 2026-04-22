@@ -556,6 +556,7 @@ $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName
 
         <div class="topbar-notifications" data-notification-root>
             <button
+            title="Notifications"
                 id="topbarNotificationToggle"
                 class="topbar-notifications__toggle"
                 type="button"
