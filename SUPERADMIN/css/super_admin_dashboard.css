@@ -220,36 +220,35 @@ body.page-loaded {
 .topbar-profile__toggle {
     display: inline-flex;
     align-items: center;
-    gap: 12px;
-    padding: 8px 10px 8px 8px;
-    border: 1px solid rgba(148, 163, 184, 0.24);
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.92);
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
     color: #0f172a;
     cursor: pointer;
-    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    box-shadow: none;
+    transition: transform 0.2s ease, filter 0.2s ease;
 }
 
 .topbar-profile__toggle:hover,
 .topbar-profile__toggle:focus-visible,
 .topbar-profile__toggle[aria-expanded="true"] {
     transform: translateY(-1px);
-    border-color: rgba(22, 163, 74, 0.26);
-    box-shadow: 0 18px 34px rgba(15, 23, 42, 0.14);
+    filter: drop-shadow(0 10px 20px rgba(15, 23, 42, 0.14));
 }
 
 .topbar-profile__toggle:focus-visible {
-    outline: 3px solid rgba(22, 163, 74, 0.16);
-    outline-offset: 3px;
+    outline: 3px solid rgba(22, 163, 74, 0.18);
+    outline-offset: 4px;
 }
 
 .topbar-profile__avatar-shell {
     position: relative;
-    width: 40px;
-    height: 40px;
+    width: 46px;
+    height: 46px;
     border-radius: 999px;
-    overflow: hidden;
+    overflow: visible;
     flex-shrink: 0;
 }
 
@@ -269,14 +268,14 @@ body.page-loaded {
 }
 
 .topbar-profile__avatar-image {
-    width: 40px;
-    height: 40px;
+    width: 46px;
+    height: 46px;
     border-radius: 999px;
     display: block;
     object-fit: cover;
     flex-shrink: 0;
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.14);
+    border: 2px solid rgba(255, 255, 255, 0.92);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
     position: relative;
     z-index: 1;
 }
@@ -291,6 +290,10 @@ body.page-loaded {
     font-size: 0.95rem;
     font-weight: 700;
     letter-spacing: 0.04em;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.14);
+    z-index: 0;
 }
 
 .topbar-profile__avatar--panel {
@@ -340,13 +343,29 @@ body.page-loaded {
 }
 
 .topbar-profile__chevron {
-    width: 18px;
-    height: 18px;
-    color: #64748b;
+    width: 14px;
+    height: 14px;
+    color: #1f2937;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.topbar-profile__chevron-badge {
+    position: absolute;
+    right: -1px;
+    bottom: -1px;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: #ffffff;
+    border: 1px solid rgba(203, 213, 225, 0.92);
+    box-shadow: 0 4px 10px rgba(15, 23, 42, 0.14);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
 }
 
 .topbar-profile__chevron svg {
@@ -2308,20 +2327,24 @@ tbody tr:hover {
     }
 
     .topbar-profile__toggle {
-        padding: 4px;
-        border-radius: 16px;
+        padding: 0;
+        border-radius: 999px;
     }
 
-    .topbar-profile__avatar {
+    .topbar-profile__avatar-shell {
         width: 44px;
         height: 44px;
-        border-radius: 14px;
     }
 
     .topbar-profile__avatar-image {
         width: 44px;
         height: 44px;
-        border-radius: 14px;
+        border-radius: 999px;
+    }
+
+    .topbar-profile__chevron-badge {
+        right: -2px;
+        bottom: -2px;
     }
 
     .global-topbar__brand-logo {
