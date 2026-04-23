@@ -2599,6 +2599,8 @@ $trashMetrics = $trashMetricsResult ? $trashMetricsResult->fetch_assoc() : [];
 $trashedProjects = (int)($trashMetrics['total_trashed'] ?? 0);
 $trashedSuppliers = 0;
 $trashedPurchaseRequests = 0;
+$trashedAssets = 0;
+$trashedAssetRows = [];
 $trashedSupplierRows = [];
 $trashedPurchaseRequestRows = [];
 
@@ -2664,7 +2666,52 @@ if (table_exists($conn, 'purchase_requests')) {
     }
 }
 
-$trashBinTotal = $trashedProjects + $trashedSuppliers + $trashedPurchaseRequests;
+if (table_exists($conn, 'assets')) {
+    $trashedAssetMetrics = $conn->query("SELECT COUNT(*) AS total_trashed FROM assets WHERE deleted_at IS NOT NULL");
+    $trashedAssets = (int)(($trashedAssetMetrics ? $trashedAssetMetrics->fetch_assoc() : [])['total_trashed'] ?? 0);
+
+    if ($isTrashView) {
+        $trashedAssetResult = $conn->query(
+            "SELECT
+                a.id,
+                a.asset_name,
+                a.asset_category,
+                a.asset_type,
+                a.serial_number,
+                a.asset_status,
+                a.criticality,
+                a.deleted_at,
+                i.quantity AS inventory_quantity,
+                i.min_stock AS inventory_min_stock,
+                i.status AS inventory_status,
+                COALESCE(unit_counts.available_units, 0) AS available_units,
+                COALESCE(unit_counts.deployed_units, 0) AS deployed_units,
+                COALESCE(unit_counts.maintenance_units, 0) AS maintenance_units,
+                COALESCE(unit_counts.lost_units, 0) AS lost_units
+             FROM assets a
+             LEFT JOIN inventory i ON i.asset_id = a.id
+             LEFT JOIN (
+                SELECT
+                    asset_id,
+                    SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) AS available_units,
+                    SUM(CASE WHEN status = 'deployed' THEN 1 ELSE 0 END) AS deployed_units,
+                    SUM(CASE WHEN status = 'maintenance' THEN 1 ELSE 0 END) AS maintenance_units,
+                    SUM(CASE WHEN status = 'lost' THEN 1 ELSE 0 END) AS lost_units
+                FROM asset_units
+                WHERE status <> 'archived'
+                GROUP BY asset_id
+             ) unit_counts ON unit_counts.asset_id = a.id
+             WHERE a.deleted_at IS NOT NULL
+             ORDER BY a.deleted_at DESC, a.id DESC
+             LIMIT 24"
+        );
+        if ($trashedAssetResult) {
+            $trashedAssetRows = $trashedAssetResult->fetch_all(MYSQLI_ASSOC);
+        }
+    }
+}
+
+$trashBinTotal = $trashedProjects + $trashedSuppliers + $trashedPurchaseRequests + $trashedAssets;
 
 $filteredProjects = project_search_fetch_count($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter, $trashFilterSql);
 
@@ -3406,6 +3453,55 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                                     <button type="submit" class="btn-danger">Delete Permanently</button>
                                                 </form>
                                             <?php endif; ?>
+                                        </div>
+                                    </article>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </section>
+
+                    <section class="page-stack" style="margin-top: 24px;">
+                        <h3 class="section-title-inline">Trashed Assets</h3>
+                        <?php if (empty($trashedAssetRows)): ?>
+                            <div class="empty-state">No trashed assets.</div>
+                        <?php else: ?>
+                            <div class="projects-grid">
+                                <?php foreach ($trashedAssetRows as $trashedAsset): ?>
+                                    <article class="project-card">
+                                        <div class="card-split">
+                                            <div>
+                                                <div class="project-card__eyebrow-row">
+                                                    <span class="project-card__eyebrow">Asset</span>
+                                                    <span class="project-card__reference"><?php echo htmlspecialchars((string)($trashedAsset['serial_number'] ?? '')); ?></span>
+                                                </div>
+                                                <h3><?php echo htmlspecialchars((string)($trashedAsset['asset_name'] ?? 'Asset')); ?></h3>
+                                                <div class="status-pill-wrap">
+                                                    <span class="status-pill status-inactive"><?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)($trashedAsset['asset_status'] ?? 'available')))); ?></span>
+                                                </div>
+                                            </div>
+                                            <div class="project-meta">
+                                                <div><strong>Category:</strong> <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)($trashedAsset['asset_category'] ?? 'uncategorized')))); ?></div>
+                                                <div><strong>Type:</strong> <?php echo htmlspecialchars((string)($trashedAsset['asset_type'] ?: 'Type not set')); ?></div>
+                                                <div><strong>Criticality:</strong> <?php echo htmlspecialchars(ucfirst((string)($trashedAsset['criticality'] ?? 'medium'))); ?></div>
+                                                <div><strong>Available Qty:</strong> <?php echo (int)($trashedAsset['inventory_quantity'] ?? 0); ?></div>
+                                                <div><strong>Min Stock:</strong> <?php echo $trashedAsset['inventory_min_stock'] !== null ? (int)$trashedAsset['inventory_min_stock'] : 'N/A'; ?></div>
+                                                <div><strong>Units:</strong> Avail <?php echo (int)($trashedAsset['available_units'] ?? 0); ?> | In Use <?php echo (int)($trashedAsset['deployed_units'] ?? 0); ?> | Maint <?php echo (int)($trashedAsset['maintenance_units'] ?? 0); ?> | Lost <?php echo (int)($trashedAsset['lost_units'] ?? 0); ?></div>
+                                                <div><strong>Moved To Trash:</strong> <?php echo htmlspecialchars((string)($trashedAsset['deleted_at'] ?? '')); ?></div>
+                                            </div>
+                                        </div>
+                                        <div class="form-actions project-card__actions">
+                                            <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/assets.php" class="project-card__inline-form" onsubmit="return confirm('Restore this asset from trash?');">
+                                                <input type="hidden" name="action" value="restore_asset">
+                                                <input type="hidden" name="asset_id" value="<?php echo (int)$trashedAsset['id']; ?>">
+                                                <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
+                                                <button type="submit" class="btn-secondary">Restore</button>
+                                            </form>
+                                            <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/assets.php" class="project-card__inline-form" onsubmit="return confirm('Permanently delete this asset? This cannot be undone.');">
+                                                <input type="hidden" name="action" value="permanently_delete_asset">
+                                                <input type="hidden" name="asset_id" value="<?php echo (int)$trashedAsset['id']; ?>">
+                                                <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
+                                                <button type="submit" class="btn-danger">Delete Permanently</button>
+                                            </form>
                                         </div>
                                     </article>
                                 <?php endforeach; ?>

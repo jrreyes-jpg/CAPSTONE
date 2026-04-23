@@ -21,6 +21,30 @@ $qrRequiredFiles = [
     __DIR__ . '/../../vendor/chillerlan/php-qrcode/src/QRCode.php',
 ];
 
+function assets_get_redirect_target(): string {
+    $redirectTo = $_POST['redirect_to'] ?? $_GET['redirect_to'] ?? '';
+    $redirectTo = is_string($redirectTo) ? trim($redirectTo) : '';
+
+    $allowedPrefixes = [
+        '/codesamplecaps/SUPERADMIN/sidebar/assets.php',
+        '/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash',
+        '/codesamplecaps/SUPERADMIN/sidebar/projects.php',
+    ];
+
+    foreach ($allowedPrefixes as $allowedPrefix) {
+        if ($redirectTo !== '' && str_starts_with($redirectTo, $allowedPrefix)) {
+            return $redirectTo;
+        }
+    }
+
+    return '/codesamplecaps/SUPERADMIN/sidebar/assets.php';
+}
+
+function redirect_assets_page(): void {
+    header('Location: ' . assets_get_redirect_target());
+    exit();
+}
+
 if (is_file($qrAutoloadPath)) {
     $missingQrDependency = false;
     foreach ($qrRequiredFiles as $requiredFile) {
@@ -94,6 +118,30 @@ function assets_table_has_column(mysqli $conn, string $columnName): bool {
     return (int)$count > 0;
 }
 
+function assets_get_column_type(mysqli $conn, string $columnName): ?string {
+    $stmt = $conn->prepare(
+        'SELECT COLUMN_TYPE
+         FROM information_schema.columns
+         WHERE table_schema = DATABASE()
+         AND table_name = ?
+         AND column_name = ?
+         LIMIT 1'
+    );
+
+    if (!$stmt) {
+        return null;
+    }
+
+    $tableName = 'assets';
+    $stmt->bind_param('ss', $tableName, $columnName);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
+    $stmt->close();
+
+    return $row['COLUMN_TYPE'] ?? null;
+}
+
 function ensure_assets_classification_columns(mysqli $conn): void {
     if (!assets_table_has_column($conn, 'asset_category')) {
         $conn->query("ALTER TABLE assets ADD COLUMN asset_category VARCHAR(80) DEFAULT NULL AFTER asset_name");
@@ -102,6 +150,29 @@ function ensure_assets_classification_columns(mysqli $conn): void {
     if (!assets_table_has_column($conn, 'criticality')) {
         $conn->query("ALTER TABLE assets ADD COLUMN criticality VARCHAR(30) DEFAULT NULL AFTER asset_status");
     }
+
+    if (!assets_table_has_column($conn, 'deleted_at')) {
+        $conn->query("ALTER TABLE assets ADD COLUMN deleted_at DATETIME DEFAULT NULL AFTER criticality");
+    }
+}
+
+function ensure_assets_status_values(mysqli $conn): void {
+    $columnType = assets_get_column_type($conn, 'asset_status');
+    if ($columnType === null || !str_starts_with($columnType, 'enum(')) {
+        return;
+    }
+
+    preg_match_all("/'([^']+)'/", $columnType, $matches);
+    $currentValues = $matches[1] ?? [];
+    $requiredValues = ['available', 'in_use', 'maintenance', 'lost'];
+    $nextValues = array_values(array_unique(array_merge($currentValues, $requiredValues)));
+
+    if ($currentValues === $nextValues) {
+        return;
+    }
+
+    $enumSql = "'" . implode("','", array_map(static fn(string $value): string => $conn->real_escape_string($value), $nextValues)) . "'";
+    $conn->query("ALTER TABLE assets MODIFY COLUMN asset_status ENUM($enumSql) NOT NULL DEFAULT 'available'");
 }
 
 function asset_category_seed_defaults(): array {
@@ -281,8 +352,89 @@ function build_asset_stock_badge_label(?string $status): string {
     return ucwords(str_replace('-', ' ', $normalized));
 }
 
+function getAssetInventorySnapshot(mysqli $conn, int $assetId): ?array {
+    $stmt = $conn->prepare(
+        'SELECT id, asset_id, quantity, min_stock, status
+         FROM inventory
+         WHERE asset_id = ?
+         LIMIT 1'
+    );
+
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('i', $assetId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result ? $result->fetch_assoc() : null;
+}
+
+function syncAssetInventoryFromUnitStatuses(mysqli $conn, int $assetId): array {
+    $inventory = getAssetInventorySnapshot($conn, $assetId);
+    if (!$inventory) {
+        return [
+            'inventory_id' => 0,
+            'available' => 0,
+            'deployed' => 0,
+            'maintenance' => 0,
+            'lost' => 0,
+            'inventory_status' => 'out-of-stock',
+            'asset_status' => 'available',
+        ];
+    }
+
+    $inventoryId = (int)($inventory['id'] ?? 0);
+    $counts = asset_units_fetch_status_counts($conn, $inventoryId);
+    $availableQuantity = (int)($counts['available'] ?? 0);
+    $deployedQuantity = (int)($counts['deployed'] ?? 0);
+    $maintenanceQuantity = (int)($counts['maintenance'] ?? 0);
+    $lostQuantity = (int)($counts['lost'] ?? 0);
+    $minStock = isset($inventory['min_stock']) ? (int)$inventory['min_stock'] : null;
+    $inventoryStatus = determine_asset_inventory_status($availableQuantity, $minStock);
+
+    $inventoryStmt = $conn->prepare(
+        'UPDATE inventory
+         SET quantity = ?, status = ?
+         WHERE id = ?'
+    );
+    if ($inventoryStmt) {
+        $inventoryStmt->bind_param('isi', $availableQuantity, $inventoryStatus, $inventoryId);
+        $inventoryStmt->execute();
+        $inventoryStmt->close();
+    }
+
+    $assetStatus = 'available';
+    if ($deployedQuantity > 0) {
+        $assetStatus = 'in_use';
+    } elseif ($maintenanceQuantity > 0) {
+        $assetStatus = 'maintenance';
+    } elseif ($availableQuantity <= 0 && $lostQuantity > 0) {
+        $assetStatus = 'lost';
+    }
+
+    $assetStmt = $conn->prepare('UPDATE assets SET asset_status = ? WHERE id = ?');
+    if ($assetStmt) {
+        $assetStmt->bind_param('si', $assetStatus, $assetId);
+        $assetStmt->execute();
+        $assetStmt->close();
+    }
+
+    return [
+        'inventory_id' => $inventoryId,
+        'available' => $availableQuantity,
+        'deployed' => $deployedQuantity,
+        'maintenance' => $maintenanceQuantity,
+        'lost' => $lostQuantity,
+        'inventory_status' => $inventoryStatus,
+        'asset_status' => $assetStatus,
+    ];
+}
+
 ensure_asset_unit_tracking_schema($conn);
 ensure_assets_classification_columns($conn);
+ensure_assets_status_values($conn);
 ensure_asset_category_defaults_table($conn);
 seed_asset_category_defaults($conn);
 $assetCategoryDefaultRows = fetch_asset_category_defaults($conn);
@@ -327,7 +479,7 @@ function syncAssetIdentity(mysqli $conn, array $asset): array {
 
 function getAssetSnapshot(mysqli $conn, int $assetId): ?array {
     $stmt = $conn->prepare(
-        'SELECT a.id, a.asset_name, a.asset_category, a.asset_type, a.serial_number, a.asset_status, a.criticality, q.id AS qr_id
+        'SELECT a.id, a.asset_name, a.asset_category, a.asset_type, a.serial_number, a.asset_status, a.criticality, a.deleted_at, q.id AS qr_id
          FROM assets a
          LEFT JOIN asset_qr_codes q ON q.asset_id = a.id
          WHERE a.id = ?
@@ -358,8 +510,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($categoryDefaultId <= 0 || $categoryLabel === '') {
             $_SESSION['assets_error'] = 'Category label is required.';
-            header('Location: /codesamplecaps/SUPERADMIN/sidebar/assets.php');
-            exit();
+            redirect_assets_page();
         }
 
         $updateDefault = $conn->prepare(
@@ -378,8 +529,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['assets_error'] = 'Failed to update asset category defaults.';
         }
 
-        header('Location: /codesamplecaps/SUPERADMIN/sidebar/assets.php');
-        exit();
+        redirect_assets_page();
     }
 
     if ($action === 'create_asset') {
@@ -405,6 +555,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($assetName === '') {
             $_SESSION['assets_error'] = 'Asset name is required.';
+        } elseif ($quantity <= 0) {
+            $_SESSION['assets_error'] = 'Quantity must be at least 1 when creating an asset.';
         } else {
             $emptySerial = '';
             $inventoryStatus = determine_asset_inventory_status($quantity, $minStock);
@@ -504,8 +656,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        header('Location: /codesamplecaps/SUPERADMIN/sidebar/assets.php');
-        exit();
+        redirect_assets_page();
     }
 
     if ($action === 'return_asset') {
@@ -534,43 +685,204 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['assets_message'] = 'Asset returned.';
         }
 
-        header('Location: /codesamplecaps/SUPERADMIN/sidebar/assets.php');
-        exit();
+        redirect_assets_page();
     }
 
-    if ($action === 'delete_asset') {
+    if ($action === 'mark_asset_maintenance') {
+        $assetId = (int)($_POST['asset_id'] ?? 0);
+        $requestedQuantity = max(1, (int)($_POST['status_quantity'] ?? 1));
+
+        if ($assetId > 0) {
+            $beforeStatus = getAssetSnapshot($conn, $assetId);
+            $inventory = getAssetInventorySnapshot($conn, $assetId);
+
+            if (!$inventory) {
+                $_SESSION['assets_error'] = 'Inventory record was not found for this asset.';
+                redirect_assets_page();
+            }
+
+            $availableQuantity = (int)($inventory['quantity'] ?? 0);
+            $effectiveQuantity = min($requestedQuantity, max(1, $availableQuantity));
+
+            try {
+                $conn->begin_transaction();
+                $updatedUnitCodes = asset_units_mark_available_units($conn, (int)$inventory['id'], $effectiveQuantity, 'maintenance');
+                $state = syncAssetInventoryFromUnitStatuses($conn, $assetId);
+
+                audit_log_event(
+                    $conn,
+                    (int)($_SESSION['user_id'] ?? 0),
+                    'mark_asset_maintenance',
+                    'asset',
+                    $assetId,
+                    $beforeStatus ? ['asset_status' => $beforeStatus['asset_status'] ?? null] : null,
+                    [
+                        'asset_name' => $beforeStatus['asset_name'] ?? null,
+                        'asset_status' => $state['asset_status'],
+                        'quantity_marked' => count($updatedUnitCodes),
+                        'unit_codes' => $updatedUnitCodes,
+                        'remaining_available' => $state['available'],
+                        'maintenance_units' => $state['maintenance'],
+                    ]
+                );
+
+                $conn->commit();
+                $_SESSION['assets_message'] = count($updatedUnitCodes) === 1
+                    ? '1 asset unit marked for maintenance.'
+                    : count($updatedUnitCodes) . ' asset units marked for maintenance.';
+            } catch (Throwable $exception) {
+                $conn->rollback();
+                $_SESSION['assets_error'] = $exception->getMessage();
+            }
+        }
+
+        redirect_assets_page();
+    }
+
+    if ($action === 'mark_asset_lost') {
+        $assetId = (int)($_POST['asset_id'] ?? 0);
+        $requestedQuantity = max(1, (int)($_POST['status_quantity'] ?? 1));
+
+        if ($assetId > 0) {
+            $beforeStatus = getAssetSnapshot($conn, $assetId);
+            $inventory = getAssetInventorySnapshot($conn, $assetId);
+
+            if (!$inventory) {
+                $_SESSION['assets_error'] = 'Inventory record was not found for this asset.';
+                redirect_assets_page();
+            }
+
+            $availableQuantity = (int)($inventory['quantity'] ?? 0);
+            $effectiveQuantity = min($requestedQuantity, max(1, $availableQuantity));
+
+            try {
+                $conn->begin_transaction();
+                $updatedUnitCodes = asset_units_mark_available_units($conn, (int)$inventory['id'], $effectiveQuantity, 'lost');
+                $state = syncAssetInventoryFromUnitStatuses($conn, $assetId);
+
+                audit_log_event(
+                    $conn,
+                    (int)($_SESSION['user_id'] ?? 0),
+                    'mark_asset_lost',
+                    'asset',
+                    $assetId,
+                    $beforeStatus ? [
+                        'asset_status' => $beforeStatus['asset_status'] ?? null,
+                    ] : null,
+                    [
+                        'asset_name' => $beforeStatus['asset_name'] ?? null,
+                        'asset_status' => $state['asset_status'],
+                        'quantity_marked' => count($updatedUnitCodes),
+                        'unit_codes' => $updatedUnitCodes,
+                        'remaining_available' => $state['available'],
+                        'lost_units' => $state['lost'],
+                    ]
+                );
+
+                $conn->commit();
+                $_SESSION['assets_message'] = count($updatedUnitCodes) === 1
+                    ? '1 asset unit marked as lost.'
+                    : count($updatedUnitCodes) . ' asset units marked as lost.';
+            } catch (Throwable $exception) {
+                $conn->rollback();
+                $_SESSION['assets_error'] = $exception->getMessage();
+            }
+        }
+
+        redirect_assets_page();
+    }
+
+    if ($action === 'trash_asset') {
+        $assetId = (int)($_POST['asset_id'] ?? 0);
+
+        if ($assetId > 0) {
+            $beforeTrash = getAssetSnapshot($conn, $assetId);
+            $stmt = $conn->prepare('UPDATE assets SET deleted_at = NOW() WHERE id = ? AND deleted_at IS NULL');
+            if ($stmt && $stmt->bind_param('i', $assetId) && $stmt->execute()) {
+                audit_log_event(
+                    $conn,
+                    (int)($_SESSION['user_id'] ?? 0),
+                    'trash_asset',
+                    'asset',
+                    $assetId,
+                    $beforeTrash,
+                    [
+                        'asset_name' => $beforeTrash['asset_name'] ?? null,
+                        'deleted_at' => date('Y-m-d H:i:s'),
+                    ]
+                );
+                $_SESSION['assets_message'] = 'Asset moved to trash bin.';
+            } else {
+                $_SESSION['assets_error'] = 'Failed to move asset to trash bin.';
+            }
+        }
+
+        redirect_assets_page();
+    }
+
+    if ($action === 'restore_asset') {
+        $assetId = (int)($_POST['asset_id'] ?? 0);
+
+        if ($assetId > 0) {
+            $beforeRestore = getAssetSnapshot($conn, $assetId);
+            $stmt = $conn->prepare('UPDATE assets SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL');
+            if ($stmt && $stmt->bind_param('i', $assetId) && $stmt->execute()) {
+                audit_log_event(
+                    $conn,
+                    (int)($_SESSION['user_id'] ?? 0),
+                    'restore_asset',
+                    'asset',
+                    $assetId,
+                    $beforeRestore,
+                    [
+                        'asset_name' => $beforeRestore['asset_name'] ?? null,
+                        'deleted_at' => null,
+                    ]
+                );
+                $_SESSION['assets_message'] = 'Asset restored from trash bin.';
+            } else {
+                $_SESSION['assets_error'] = 'Failed to restore asset.';
+            }
+        }
+
+        redirect_assets_page();
+    }
+
+    if ($action === 'permanently_delete_asset') {
         $assetId = (int)($_POST['asset_id'] ?? 0);
 
         if ($assetId > 0) {
             $beforeDelete = getAssetSnapshot($conn, $assetId);
             $stmtQR = $conn->prepare('DELETE FROM asset_qr_codes WHERE asset_id = ?');
-            $stmtQR->bind_param('i', $assetId);
-            $stmtQR->execute();
+            if ($stmtQR) {
+                $stmtQR->bind_param('i', $assetId);
+                $stmtQR->execute();
+            }
 
-            $stmt = $conn->prepare('DELETE FROM assets WHERE id = ?');
-            $stmt->bind_param('i', $assetId);
-            $stmt->execute();
-
-            audit_log_event(
-                $conn,
-                (int)($_SESSION['user_id'] ?? 0),
-                'delete_asset',
-                'asset',
-                $assetId,
-                $beforeDelete ? [
-                    'asset_name' => $beforeDelete['asset_name'] ?? null,
-                    'asset_type' => $beforeDelete['asset_type'] ?? null,
-                    'serial_number' => $beforeDelete['serial_number'] ?? null,
-                    'asset_status' => $beforeDelete['asset_status'] ?? null,
-                ] : null,
-                null
-            );
-
-            $_SESSION['assets_message'] = 'Asset deleted.';
+            $stmt = $conn->prepare('DELETE FROM assets WHERE id = ? AND deleted_at IS NOT NULL');
+            if ($stmt && $stmt->bind_param('i', $assetId) && $stmt->execute()) {
+                audit_log_event(
+                    $conn,
+                    (int)($_SESSION['user_id'] ?? 0),
+                    'permanently_delete_asset',
+                    'asset',
+                    $assetId,
+                    $beforeDelete ? [
+                        'asset_name' => $beforeDelete['asset_name'] ?? null,
+                        'asset_type' => $beforeDelete['asset_type'] ?? null,
+                        'serial_number' => $beforeDelete['serial_number'] ?? null,
+                        'asset_status' => $beforeDelete['asset_status'] ?? null,
+                        'deleted_at' => $beforeDelete['deleted_at'] ?? null,
+                    ] : null,
+                    null
+                );
+                $_SESSION['assets_message'] = 'Asset permanently deleted from trash bin.';
+            } else {
+                $_SESSION['assets_error'] = 'Failed to permanently delete asset.';
+            }
         }
 
-        header('Location: /codesamplecaps/SUPERADMIN/sidebar/assets.php');
-        exit();
+        redirect_assets_page();
     }
 }
 
@@ -594,13 +906,43 @@ if (isset($_SESSION['assets_created_asset_id'])) {
     unset($_SESSION['assets_created_asset_id']);
 }
 
+$view = trim((string)($_GET['view'] ?? ''));
+$isTrashView = $view === 'trash';
 $assets = [];
+$createdAssetPreviewRows = [];
+$assetQrGalleryMap = [];
+$assetUnitMetrics = [
+    'total_units' => 0,
+    'in_use_units' => 0,
+    'maintenance_units' => 0,
+    'lost_units' => 0,
+];
+$assetMetricsResult = $conn->query(
+    "SELECT
+        COUNT(*) AS total_units,
+        SUM(CASE WHEN au.status = 'deployed' THEN 1 ELSE 0 END) AS in_use_units,
+        SUM(CASE WHEN au.status = 'maintenance' THEN 1 ELSE 0 END) AS maintenance_units,
+        SUM(CASE WHEN au.status = 'lost' THEN 1 ELSE 0 END) AS lost_units
+     FROM asset_units au
+     INNER JOIN assets a ON a.id = au.asset_id
+     WHERE a.deleted_at IS NULL
+     AND au.status <> 'archived'"
+);
+if ($assetMetricsResult) {
+    $assetUnitMetrics = $assetMetricsResult->fetch_assoc() ?: $assetUnitMetrics;
+}
+
 $assetQuery = 'SELECT
     a.*,
     i.id AS inventory_id,
     i.quantity AS inventory_quantity,
     i.min_stock AS inventory_min_stock,
     i.status AS inventory_status,
+    COALESCE(unit_counts.available_units, 0) AS available_units,
+    COALESCE(unit_counts.deployed_units, 0) AS deployed_units,
+    COALESCE(unit_counts.maintenance_units, 0) AS maintenance_units,
+    COALESCE(unit_counts.lost_units, 0) AS lost_units,
+    COALESCE(unit_counts.total_units, 0) AS total_units,
     (
         SELECT q.qr_code_value
         FROM asset_qr_codes q
@@ -609,7 +951,20 @@ $assetQuery = 'SELECT
         LIMIT 1
     ) AS qr_code_value
     FROM assets a
-    LEFT JOIN inventory i ON i.asset_id = a.id';
+    LEFT JOIN inventory i ON i.asset_id = a.id
+    LEFT JOIN (
+        SELECT
+            asset_id,
+            SUM(CASE WHEN status = \'available\' THEN 1 ELSE 0 END) AS available_units,
+            SUM(CASE WHEN status = \'deployed\' THEN 1 ELSE 0 END) AS deployed_units,
+            SUM(CASE WHEN status = \'maintenance\' THEN 1 ELSE 0 END) AS maintenance_units,
+            SUM(CASE WHEN status = \'lost\' THEN 1 ELSE 0 END) AS lost_units,
+            COUNT(*) AS total_units
+        FROM asset_units
+        WHERE status <> \'archived\'
+        GROUP BY asset_id
+    ) unit_counts ON unit_counts.asset_id = a.id';
+$assetQuery .= $isTrashView ? ' WHERE a.deleted_at IS NOT NULL' : ' WHERE a.deleted_at IS NULL';
 $assetQuery .= ' ORDER BY a.created_at DESC';
 $result = $conn->query($assetQuery);
 
@@ -617,6 +972,110 @@ if ($result) {
     $assets = $result->fetch_all(MYSQLI_ASSOC);
     foreach ($assets as $index => $asset) {
         $assets[$index] = syncAssetIdentity($conn, $asset);
+    }
+}
+
+if ($assets !== []) {
+    $assetIds = array_values(array_filter(array_map(static fn(array $asset): int => (int)($asset['id'] ?? 0), $assets)));
+
+    if ($assetIds !== []) {
+        $placeholders = implode(',', array_fill(0, count($assetIds), '?'));
+        $types = str_repeat('i', count($assetIds));
+        $galleryStmt = $conn->prepare(
+            "SELECT
+                au.asset_id,
+                au.unit_code,
+                au.qr_code_value
+             FROM asset_units au
+             WHERE au.asset_id IN ($placeholders)
+             AND au.status <> 'archived'
+             ORDER BY au.asset_id ASC, au.unit_number ASC, au.id ASC"
+        );
+
+        if ($galleryStmt) {
+            $galleryStmt->bind_param($types, ...$assetIds);
+            $galleryStmt->execute();
+            $galleryResult = $galleryStmt->get_result();
+            $galleryRows = $galleryResult ? $galleryResult->fetch_all(MYSQLI_ASSOC) : [];
+
+            foreach ($galleryRows as $galleryRow) {
+                $assetId = (int)($galleryRow['asset_id'] ?? 0);
+                if ($assetId <= 0) {
+                    continue;
+                }
+
+                $assetQrGalleryMap[$assetId][] = [
+                    'label' => (string)($galleryRow['unit_code'] ?? ('Asset #' . $assetId)),
+                    'scan_value' => (string)($galleryRow['qr_code_value'] ?? ''),
+                    'src' => $qrLibraryReady ? generateQRDataUri((string)($galleryRow['qr_code_value'] ?? '')) : '',
+                ];
+            }
+        }
+    }
+
+    foreach ($assets as $asset) {
+        $assetId = (int)($asset['id'] ?? 0);
+        if ($assetId <= 0 || isset($assetQrGalleryMap[$assetId])) {
+            continue;
+        }
+
+        $fallbackQrValue = (string)($asset['qr_code_value'] ?? '');
+        if ($fallbackQrValue === '') {
+            $fallbackQrValue = buildAssetQrValue($assetId, (string)($asset['serial_number'] ?? ''));
+        }
+
+        $assetQrGalleryMap[$assetId] = [[
+            'label' => (string)($asset['serial_number'] ?? ('Asset #' . $assetId)),
+            'scan_value' => $fallbackQrValue,
+            'src' => $qrLibraryReady ? generateQRDataUri($fallbackQrValue) : '',
+        ]];
+    }
+}
+
+if ($createdAssetId > 0) {
+    $previewStmt = $conn->prepare(
+        "SELECT
+            a.id AS asset_id,
+            a.asset_name,
+            a.serial_number,
+            au.id AS asset_unit_id,
+            au.unit_code,
+            au.qr_code_value
+         FROM assets a
+         LEFT JOIN asset_units au ON au.asset_id = a.id AND au.status <> 'archived'
+         WHERE a.id = ?
+         ORDER BY au.unit_code ASC, au.id ASC"
+    );
+    if ($previewStmt) {
+        $previewStmt->bind_param('i', $createdAssetId);
+        $previewStmt->execute();
+        $previewResult = $previewStmt->get_result();
+        $createdAssetPreviewRows = $previewResult ? $previewResult->fetch_all(MYSQLI_ASSOC) : [];
+    }
+
+    if ($createdAssetPreviewRows === []) {
+        $assetPreviewStmt = $conn->prepare(
+            "SELECT id AS asset_id, asset_name, serial_number
+             FROM assets
+             WHERE id = ?
+             LIMIT 1"
+        );
+        if ($assetPreviewStmt) {
+            $assetPreviewStmt->bind_param('i', $createdAssetId);
+            $assetPreviewStmt->execute();
+            $assetPreviewResult = $assetPreviewStmt->get_result();
+            $assetPreviewRow = $assetPreviewResult ? $assetPreviewResult->fetch_assoc() : null;
+            if ($assetPreviewRow) {
+                $createdAssetPreviewRows[] = [
+                    'asset_id' => (int)$assetPreviewRow['asset_id'],
+                    'asset_name' => $assetPreviewRow['asset_name'],
+                    'serial_number' => $assetPreviewRow['serial_number'],
+                    'asset_unit_id' => null,
+                    'unit_code' => null,
+                    'qr_code_value' => buildAssetQrValue((int)$assetPreviewRow['asset_id'], (string)($assetPreviewRow['serial_number'] ?? '')),
+                ];
+            }
+        }
     }
 }
 ?>
@@ -639,27 +1098,64 @@ if ($result) {
         <?php if ($error): ?><div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div><?php endif; ?>
         <?php if (!$qrLibraryReady): ?><div class="alert alert-error">QR preview/print is temporarily unavailable because Composer packages are incomplete in `vendor/`.</div><?php endif; ?>
 
-        <?php if ($qrPreview !== ''): ?>
+        <section class="metrics-grid">
+            <div class="metric-card">
+                <span>Tracked Units</span>
+                <strong><?php echo (int)($assetUnitMetrics['total_units'] ?? 0); ?></strong>
+            </div>
+            <div class="metric-card">
+                <span>In Use</span>
+                <strong><?php echo (int)($assetUnitMetrics['in_use_units'] ?? 0); ?></strong>
+            </div>
+            <div class="metric-card">
+                <span>Maintenance</span>
+                <strong><?php echo (int)($assetUnitMetrics['maintenance_units'] ?? 0); ?></strong>
+            </div>
+            <div class="metric-card">
+                <span>Loss</span>
+                <strong><?php echo (int)($assetUnitMetrics['lost_units'] ?? 0); ?></strong>
+            </div>
+        </section>
+
+        <div class="asset-section-header asset-view-switch">
+            <h2 class="dashboard-section-title"><?php echo $isTrashView ? 'Shared Trash Bin' : 'Asset Registry'; ?></h2>
+            <div class="asset-section-actions">
+                <a href="/codesamplecaps/SUPERADMIN/sidebar/assets.php" class="btn-secondary">Active Assets</a>
+                <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash" class="btn-secondary">Open Trash Bin</a>
+            </div>
+        </div>
+
+        <?php if ($qrPreview !== '' && !$isTrashView): ?>
             <section class="form-section asset-preview-section">
                 <h2 class="dashboard-section-title">QR Preview (Newest Asset)</h2>
-                <div class="asset-preview">
-                    <?php if ($qrLibraryReady): ?>
-                        <img class="asset-preview-image" src="<?php echo generateQRDataUri($qrPreview); ?>" alt="Latest asset QR preview">
-                    <?php else: ?>
-                        <div class="empty-state-solid">QR preview unavailable until vendor packages are restored.</div>
-                    <?php endif; ?>
-                    <div class="asset-preview-meta">
-                        <?php if ($createdAssetId > 0): ?>
-                            <p>Asset ID: <strong><?php echo htmlspecialchars((string)$createdAssetId); ?></strong></p>
-                            <?php if ($qrLibraryReady): ?>
-                                <a href="/codesamplecaps/SUPERADMIN/print_qr_codes.php?asset_id=<?php echo $createdAssetId; ?>" target="_blank" class="btn-secondary" rel="noreferrer noopener">Print This QR</a>
-                            <?php endif; ?>
+                <div class="asset-preview-meta">
+                    <?php if ($createdAssetId > 0): ?>
+                        <p>Asset ID: <strong><?php echo htmlspecialchars((string)$createdAssetId); ?></strong></p>
+                        <p>Generated labels: <strong><?php echo count($createdAssetPreviewRows); ?></strong></p>
+                        <?php if ($qrLibraryReady): ?>
+                            <a href="/codesamplecaps/SUPERADMIN/print_qr_codes.php?asset_id=<?php echo $createdAssetId; ?>" target="_blank" class="btn-secondary" rel="noreferrer noopener">Print This Asset Labels</a>
                         <?php endif; ?>
-                    </div>
+                    <?php endif; ?>
+                </div>
+                <div class="asset-preview-grid">
+                    <?php if (!$qrLibraryReady): ?>
+                        <div class="empty-state-solid">QR preview unavailable until vendor packages are restored.</div>
+                    <?php else: ?>
+                        <?php foreach ($createdAssetPreviewRows as $previewIndex => $previewRow): ?>
+                            <?php $previewQrValue = (string)($previewRow['qr_code_value'] ?? $qrPreview); ?>
+                            <article class="asset-preview-card">
+                                <span class="asset-preview-card__count">#<?php echo $previewIndex + 1; ?></span>
+                                <img class="asset-preview-image" src="<?php echo generateQRDataUri($previewQrValue); ?>" alt="Asset QR preview <?php echo $previewIndex + 1; ?>">
+                                <strong><?php echo htmlspecialchars((string)($previewRow['asset_name'] ?? 'Asset')); ?></strong>
+                                <small><?php echo htmlspecialchars((string)($previewRow['unit_code'] ?? ('Asset ID ' . $createdAssetId))); ?></small>
+                            </article>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </section>
         <?php endif; ?>
 
+        <?php if (!$isTrashView): ?>
         <section class="form-section">
             <h2 class="dashboard-section-title">Create New Asset</h2>
             <form method="POST" class="asset-form">
@@ -697,7 +1193,7 @@ if ($result) {
                     </div>
                     <div class="form-group">
                         <label for="quantity">Quantity</label>
-                        <input type="number" id="quantity" name="quantity" min="0" step="1" value="0" required>
+                        <input type="number" id="quantity" name="quantity" min="1" step="1" value="1" required>
                     </div>
                     <div class="form-group">
                         <label for="min_stock">Min Stock</label>
@@ -707,12 +1203,13 @@ if ($result) {
                 <button type="submit" class="btn-primary">Create Asset + Inventory + QR</button>
             </form>
         </section>
+        <?php endif; ?>
 
         <section class="asset-listing-section">
             <div class="asset-section-header">
-                <h2 class="dashboard-section-title">Existing Assets</h2>
+                <h2 class="dashboard-section-title"><?php echo $isTrashView ? 'Trashed Assets' : 'Existing Assets'; ?></h2>
                 <div class="asset-section-actions">
-                    <?php if ($qrLibraryReady): ?>
+                    <?php if ($qrLibraryReady && !$isTrashView): ?>
                         <a href="/codesamplecaps/SUPERADMIN/print_qr_codes.php" target="_blank" class="btn-secondary">Print QR Codes</a>
                     <?php endif; ?>
                 </div>
@@ -732,7 +1229,7 @@ if ($result) {
                     <tbody>
                         <?php if (count($assets) === 0): ?>
                             <tr>
-                                <td colspan="6" class="table-empty-cell">No assets yet.</td>
+                                <td colspan="6" class="table-empty-cell"><?php echo $isTrashView ? 'No trashed assets yet.' : 'No assets yet.'; ?></td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($assets as $asset): ?>
@@ -741,14 +1238,16 @@ if ($result) {
                                     <td data-label="Asset">
                                         <strong><?php echo htmlspecialchars($asset['asset_name']); ?></strong><br>
                                         <small>Category: <?php echo htmlspecialchars(asset_category_label($asset['asset_category'] ?? null)); ?></small><br>
-                                        <small><?php echo htmlspecialchars($asset['asset_type'] ?: 'No type'); ?></small><br>
+                                        <small><?php echo htmlspecialchars($asset['asset_type'] ?: 'Type not set'); ?></small><br>
                                         <small>SN: <?php echo htmlspecialchars($asset['serial_number'] ?: 'Generating...'); ?></small>
                                     </td>
                                     <td data-label="Status">
+                                        <small><strong>Usage Status:</strong></small><br>
                                         <span class="asset-status asset-status--<?php echo htmlspecialchars($asset['asset_status']); ?>">
-                                            <?php echo htmlspecialchars($asset['asset_status']); ?>
+                                            <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$asset['asset_status']))); ?>
                                         </span>
                                         <br>
+                                        <small><strong>Stock Status:</strong></small><br>
                                         <span class="status-pill status-<?php echo htmlspecialchars((string)($asset['inventory_status'] ?? 'available')); ?>">
                                             <?php echo htmlspecialchars(build_asset_stock_badge_label($asset['inventory_status'] ?? null)); ?>
                                         </span>
@@ -759,21 +1258,27 @@ if ($result) {
                                             Min: <?php echo $asset['inventory_min_stock'] !== null ? (int)$asset['inventory_min_stock'] : 'N/A'; ?>
                                         </small>
                                         <br>
+                                        <small>
+                                            Units:
+                                            Avail <?php echo (int)($asset['available_units'] ?? 0); ?> |
+                                            In Use <?php echo (int)($asset['deployed_units'] ?? 0); ?> |
+                                            Maint <?php echo (int)($asset['maintenance_units'] ?? 0); ?> |
+                                            Lost <?php echo (int)($asset['lost_units'] ?? 0); ?>
+                                        </small>
+                                        <br>
                                         <small>Criticality: <?php echo htmlspecialchars(asset_criticality_label($asset['criticality'] ?? null)); ?></small>
                                     </td>
                                     <td data-label="QR Code">
                                         <div class="asset-qr-actions">
-                                            <?php if (!empty($asset['qr_code_value'])): ?>
+                                            <?php if (!$isTrashView && !empty($asset['qr_code_value'])): ?>
                                                 <?php if ($qrLibraryReady): ?>
-                                                    <?php
-                                                    $qrValue = $asset['qr_code_value'] ?: buildAssetQrValue((int)$asset['id'], (string)($asset['serial_number'] ?? ''));
-                                                    $qrDataUri = generateQRDataUri($qrValue);
-                                                    ?>
-                                                    <button type="button" onclick="showQR('<?php echo $qrDataUri; ?>')" class="btn-secondary">Preview</button>
+                                                    <button type="button" onclick="showAssetQrGallery(<?php echo (int)$asset['id']; ?>)" class="btn-secondary">Preview</button>
                                                     <a href="/codesamplecaps/SUPERADMIN/print_qr_codes.php?asset_id=<?php echo $asset['id']; ?>" target="_blank" rel="noreferrer noopener" class="asset-link-btn">Print</a>
                                                 <?php else: ?>
                                                     <span class="asset-inline-note">QR unavailable</span>
                                                 <?php endif; ?>
+                                            <?php elseif ($isTrashView): ?>
+                                                <span class="asset-inline-note">Printing disabled while in trash</span>
                                             <?php else: ?>
                                                 <span class="asset-inline-note">No QR</span>
                                             <?php endif; ?>
@@ -782,20 +1287,54 @@ if ($result) {
                                     <td data-label="Created"><?php echo htmlspecialchars($asset['created_at']); ?></td>
                                     <td data-label="Actions">
                                         <div class="asset-row-actions">
-                                            <form method="POST" class="asset-inline-form" onsubmit="return confirm('Delete this asset?');">
-                                                <input type="hidden" name="action" value="delete_asset">
-                                                <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
-                                                <button type="submit" class="btn-danger">Delete Asset</button>
-                                            </form>
-
-                                            <?php if ($asset['asset_status'] === 'in_use'): ?>
-                                                <form method="POST" class="asset-inline-form">
-                                                    <input type="hidden" name="action" value="return_asset">
+                                            <?php if ($isTrashView): ?>
+                                                <form method="POST" class="asset-inline-form" onsubmit="return confirm('Restore this asset from trash bin?');">
+                                                    <input type="hidden" name="action" value="restore_asset">
                                                     <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
-                                                    <button type="submit" class="btn-secondary">Mark Returned</button>
+                                                    <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
+                                                    <button type="submit" class="btn-secondary">Restore</button>
+                                                </form>
+                                                <form method="POST" class="asset-inline-form" onsubmit="return confirm('Permanently delete this asset from trash bin?');">
+                                                    <input type="hidden" name="action" value="permanently_delete_asset">
+                                                    <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
+                                                    <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
+                                                    <button type="submit" class="btn-danger">Delete Permanently</button>
                                                 </form>
                                             <?php else: ?>
-                                                <span class="asset-inline-note">Ready to use</span>
+                                                <form method="POST" class="asset-inline-form" onsubmit="return confirm('Move this asset to trash bin?');">
+                                                    <input type="hidden" name="action" value="trash_asset">
+                                                    <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
+                                                    <button type="submit" class="btn-danger">Delete</button>
+                                                </form>
+                                                <?php if ((int)($asset['deployed_units'] ?? 0) > 0): ?>
+                                                    <form method="POST" class="asset-inline-form">
+                                                        <input type="hidden" name="action" value="return_asset">
+                                                        <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
+                                                        <button type="submit" class="btn-secondary">Mark Returned</button>
+                                                    </form>
+                                                <?php endif; ?>
+                                                <?php if ((int)($asset['available_units'] ?? 0) > 0): ?>
+                                                    <form method="POST" class="asset-inline-form">
+                                                        <input type="hidden" name="action" value="mark_asset_maintenance">
+                                                        <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
+                                                        <?php if ((int)($asset['available_units'] ?? 0) > 1): ?>
+                                                            <input type="number" name="status_quantity" min="1" max="<?php echo (int)$asset['available_units']; ?>" value="1" class="asset-action-qty" aria-label="Maintenance quantity">
+                                                        <?php endif; ?>
+                                                        <button type="submit" class="btn-secondary">Mark Maintenance</button>
+                                                    </form>
+                                                <?php else: ?>
+                                                    <span class="asset-inline-note">No available units to update</span>
+                                                <?php endif; ?>
+                                                <?php if ((int)($asset['available_units'] ?? 0) > 0): ?>
+                                                    <form method="POST" class="asset-inline-form" onsubmit="return confirm('Mark this asset as lost?');">
+                                                        <input type="hidden" name="action" value="mark_asset_lost">
+                                                        <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
+                                                        <?php if ((int)($asset['available_units'] ?? 0) > 1): ?>
+                                                            <input type="number" name="status_quantity" min="1" max="<?php echo (int)$asset['available_units']; ?>" value="1" class="asset-action-qty" aria-label="Lost quantity">
+                                                        <?php endif; ?>
+                                                        <button type="submit" class="btn-secondary">Mark Lost</button>
+                                                    </form>
+                                                <?php endif; ?>
                                             <?php endif; ?>
                                         </div>
                                     </td>
@@ -809,8 +1348,14 @@ if ($result) {
     </main>
 </div>
 
-<div id="qrModal" class="modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); justify-content:center; align-items:center;">
-    <img id="qrModalImg" class="modal-image" style="max-width:300px; background:#fff; padding:10px;">
+<div id="qrModal" class="modal-backdrop asset-qr-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.72); justify-content:center; align-items:center; padding:24px; z-index:1000;">
+    <div class="asset-qr-modal__panel" onclick="event.stopPropagation();">
+        <div class="asset-qr-modal__header">
+            <h3>Asset QR Preview</h3>
+            <button type="button" class="btn-secondary" onclick="closeAssetQrModal()">Close</button>
+        </div>
+        <div id="qrModalContent" class="asset-qr-modal__grid"></div>
+    </div>
 </div>
 
 <script src="../js/super_admin_dashboard.js"></script>
@@ -837,6 +1382,55 @@ document.addEventListener('DOMContentLoaded', () => {
         minStockField.value = recommendedMinStock;
     });
 });
+
+const assetQrGalleryMap = <?php echo json_encode($assetQrGalleryMap, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+
+function closeAssetQrModal() {
+    const modal = document.getElementById('qrModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function showAssetQrGallery(assetId) {
+    const modal = document.getElementById('qrModal');
+    const modalContent = document.getElementById('qrModalContent');
+    const galleryItems = assetQrGalleryMap[String(assetId)] || assetQrGalleryMap[assetId] || [];
+
+    if (!modal || !modalContent || galleryItems.length === 0) {
+        return;
+    }
+
+    modalContent.innerHTML = galleryItems.map((item, index) => {
+        const safeLabel = String(item.label || 'Asset QR')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        const safeScanValue = String(item.scan_value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+        const safeSrc = String(item.src || '').replace(/"/g, '&quot;');
+
+        return `
+            <article class="asset-preview-card">
+                <span class="asset-preview-card__count">#${index + 1}</span>
+                <img class="asset-preview-image" src="${safeSrc}" alt="${safeLabel}">
+                <strong>${safeLabel}</strong>
+                <small class="asset-qr-modal__scan">${safeScanValue}</small>
+            </article>
+        `;
+    }).join('');
+
+    modal.style.display = 'flex';
+}
+
+const assetQrModal = document.getElementById('qrModal');
+if (assetQrModal) {
+    assetQrModal.addEventListener('click', closeAssetQrModal);
+}
 </script>
 </body>
 </html>

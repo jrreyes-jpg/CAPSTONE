@@ -90,6 +90,7 @@ if ($assetId > 0) {
 $stmt->execute();
 $result = $stmt->get_result();
 $assets = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+$assetUnitCounters = [];
 
 ?>
 <!DOCTYPE html>
@@ -105,15 +106,19 @@ $assets = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
         .header h1 { margin: 0; font-size: 20px; }
         .btn { padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
         .btn-primary { background: #2d3a56; color: #fff; }
-        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 18px; }
-        .card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 12px 30px rgba(0,0,0,0.08); }
+        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px; }
+        .card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 12px 30px rgba(0,0,0,0.08); min-height: 320px; display: flex; flex-direction: column; }
         .card h3 { margin: 0 0 6px; font-size: 16px; }
         .card p { margin: 4px 0; font-size: 13px; color: #444; }
         .card .qr { width: 130px; height: 130px; margin: 10px auto; }
+        .card .scan-value { margin-top: auto; font-size: 12px; color: #555; word-break: break-all; overflow-wrap: anywhere; line-height: 1.35; }
+        .card .label-number { display: inline-flex; margin-bottom: 6px; padding: 4px 8px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 12px; font-weight: 700; }
         @media print {
-            body { padding: 0; }
+            @page { size: auto; margin: 10mm; }
+            body { padding: 0; background: #fff; }
             .header { display: none; }
-            .card { page-break-inside: avoid; }
+            .cards { gap: 10px; }
+            .card { page-break-inside: avoid; break-inside: avoid; box-shadow: none; border: 1px solid #d1d5db; min-height: 280px; }
         }
     </style>
 </head>
@@ -136,12 +141,16 @@ $assets = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 
         <?php foreach ($assets as $asset): ?>
             <?php
+                $assetKey = (int)($asset['id'] ?? 0);
+                $assetUnitCounters[$assetKey] = ($assetUnitCounters[$assetKey] ?? 0) + 1;
+                $labelNumber = $assetUnitCounters[$assetKey];
                 $qrValue = !empty($asset['unit_qr_code_value'])
                     ? (string)$asset['unit_qr_code_value']
                     : (($asset['qr_code_value'] ?: buildAssetQrValue((int)$asset['id'], (string)($asset['serial_number'] ?? ''))));
                 $qrDataUri = $qrLibraryReady ? generateQRDataUri($qrValue) : '';
             ?>
             <div class="card">
+                <span class="label-number">Label #<?php echo $labelNumber; ?></span>
                 <div class="qr">
                     <?php if ($qrLibraryReady): ?>
                         <img src="<?php echo $qrDataUri; ?>" alt="QR code" style="width:100%; height:auto; display:block;">
@@ -151,10 +160,10 @@ $assets = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
                 </div>
                 <h3><?php echo htmlspecialchars($asset['asset_name']); ?> (ID <?php echo $asset['id']; ?>)</h3>
                 <p>Unit: <?php echo htmlspecialchars((string)($asset['unit_code'] ?? 'General asset QR')); ?></p>
-                <p>Type: <?php echo htmlspecialchars($asset['asset_type'] ?: '-'); ?></p>
+                <p>Type: <?php echo htmlspecialchars($asset['asset_type'] ?: 'Type not set'); ?></p>
                 <p>Serial: <?php echo htmlspecialchars($asset['serial_number'] ?: '-'); ?></p>
                 <p>Status: <?php echo htmlspecialchars((string)($asset['unit_status'] ?? $asset['asset_status'])); ?></p>
-                <p style="font-size: 12px; color:#555;">Scan value: <code><?php echo htmlspecialchars($qrValue); ?></code></p>
+                <p class="scan-value">Scan value: <code><?php echo htmlspecialchars($qrValue); ?></code></p>
             </div>
         <?php endforeach; ?>
     </div>

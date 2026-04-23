@@ -106,12 +106,28 @@ function activity_history_build_details(array $entry): string {
         return (string)($newValues['asset_name'] ?? 'Asset') . ' | ' . (string)($newValues['asset_type'] ?? 'Unspecified');
     }
 
-    if ($action === 'delete_asset') {
-        return (string)($oldValues['asset_name'] ?? 'Asset') . ' | by ' . $actorName;
+    if ($action === 'trash_asset') {
+        return (string)($newValues['asset_name'] ?? $oldValues['asset_name'] ?? 'Asset') . ' | moved to trash by ' . $actorName;
+    }
+
+    if ($action === 'restore_asset') {
+        return (string)($newValues['asset_name'] ?? $oldValues['asset_name'] ?? 'Asset') . ' | restored by ' . $actorName;
+    }
+
+    if ($action === 'permanently_delete_asset') {
+        return (string)($oldValues['asset_name'] ?? 'Asset') . ' | permanently deleted by ' . $actorName;
     }
 
     if ($action === 'return_asset') {
         return (string)($newValues['asset_name'] ?? 'Asset') . ' | status available';
+    }
+
+    if ($action === 'mark_asset_maintenance') {
+        return (string)($newValues['asset_name'] ?? 'Asset') . ' | status maintenance';
+    }
+
+    if ($action === 'mark_asset_lost') {
+        return (string)($newValues['asset_name'] ?? 'Asset') . ' | status lost';
     }
 
     return ucfirst($entityType) . ' | by ' . $actorName;
