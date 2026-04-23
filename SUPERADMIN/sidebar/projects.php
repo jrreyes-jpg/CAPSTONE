@@ -2223,7 +2223,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                 <input type="email" id="project_email" name="project_email" value="<?php echo htmlspecialchars($createProjectValues['project_email']); ?>" placeholder="project@example.com">
                             </div>
                         <?php endif; ?> 
-                        
+
                             <div class="input-group">
                             <div class="field-label-row">
                                 <label for="project_start_date">Project Start Date <span class="required-indicator" aria-hidden="true">*</span></label>
@@ -2247,7 +2247,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                         </div>
 
 
-                         <div class="input-group">
+                         <div class="input-group project-create-status-group">
                             <div class="field-label-row">
                                 <label for="status">Initial Status <span class="required-indicator" aria-hidden="true">*</span></label>
                                 <button type="button" class="field-tip" aria-label="Project status reminder">
@@ -2269,15 +2269,13 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                    </div>
 
-                    <div class="form-grid form-grid--project-create">
-                        <div class="input-group input-group-wide">
+                        <div class="input-group project-create-engineers-group">
                             <div class="field-label-row">
                                 <label for="engineer_ids">Assigned Engineer/s <span class="required-indicator" aria-hidden="true">*</span></label>
                                 <button type="button" class="field-tip" aria-label="Assigned engineers help">
                                     <span class="field-tip__icon" aria-hidden="true">i</span>
-                                    <span class="field-tip__bubble">Pick an engineer from the dropdown, then press the plus button to add. Press the same button again to remove the selected engineer.</span>
+                                    <span class="field-tip__bubble">Pick an engineer from the dropdown, then press the plus button to add. Press the same button again to remove the selected engineer, Add one or more engineers depending on the project workload.</span>
                                 </button>
                             </div>
                             <div class="engineer-picker" data-engineer-picker>
@@ -2316,9 +2314,10 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                     <?php endforeach; ?>
                                 </div>
                             </div>
-                            <small>Add one or more engineers depending on the project workload.</small>
                         </div>
+                    </div>
 
+                    <div class="form-grid form-grid--project-create">
                         <?php if ($hasProjectAddressColumn): ?>
                             <div class="input-group input-group-wide">
                                 <div class="field-label-row">
