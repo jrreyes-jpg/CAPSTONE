@@ -4,6 +4,7 @@ $currentFile = basename($currentPath);
 
 $isOverview = $currentFile === 'engineer_dashboard.php';
 $isProjects = $currentFile === 'projects.php';
+$isProcurement = $currentFile === 'procurement.php';
 $isTasks = $currentFile === 'tasks.php';
 $isUpdates = $currentFile === 'progress_updates.php';
 $isProfile = $currentFile === 'profile.php';
@@ -67,6 +68,21 @@ $isProfile = $currentFile === 'profile.php';
             <span class="menu-mini-label">Projects</span>
         </span>
         <span class="menu-text">My Projects</span>
+    </a>
+    <a href="../dashboards/procurement.php" class="menu-link<?php echo $isProcurement ? ' active-link' : ''; ?>">
+        <span class="menu-visual" aria-hidden="true">
+            <span class="menu-icon">
+                <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                    <path d="M4 7h16"></path>
+                    <path d="M6 7V5.5A1.5 1.5 0 0 1 7.5 4h9A1.5 1.5 0 0 1 18 5.5V7"></path>
+                    <path d="M6 7v11a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7"></path>
+                    <path d="M9 12h6"></path>
+                    <path d="M9 16h4"></path>
+                </svg>
+            </span>
+            <span class="menu-mini-label">Proc</span>
+        </span>
+        <span class="menu-text">Procurement</span>
     </a>
     <a href="../dashboards/progress_updates.php" class="menu-link<?php echo $isUpdates ? ' active-link' : ''; ?>">
         <span class="menu-visual" aria-hidden="true">

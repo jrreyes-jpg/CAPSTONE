@@ -1192,7 +1192,6 @@ if ($projectId > 0) {
                         <h2 class="section-title-inline">Update Status</h2>
                     </div>
                     <?php if (!$isCompleted): ?>
-                        <div class="lock-note">The completion date is now recorded automatically when the project is marked as Completed.</div>
                     <?php endif; ?>
                     <?php if ($isCompleted): ?>
                         <div class="lock-note">This project is locked because it is already completed.</div>

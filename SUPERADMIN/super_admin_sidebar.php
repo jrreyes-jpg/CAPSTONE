@@ -10,6 +10,7 @@ $isCreate = $isDashboardPage && str_contains($currentQuery, 'tab=create');
 $isUsers = $isDashboardPage && str_contains($currentQuery, 'tab=users');
 $isProjects = str_contains($currentPath, '/SUPERADMIN/sidebar/projects.php');
 $isProjectsTrash = $isProjects && str_contains($currentQuery, 'view=trash');
+$isProcurement = str_contains($currentPath, '/SUPERADMIN/sidebar/procurement.php');
 $isInventory = str_contains($currentPath, '/SUPERADMIN/sidebar/inventory.php');
 $isAssets = str_contains($currentPath, '/SUPERADMIN/sidebar/assets.php');
 $isScanHistory = str_contains($currentPath, '/SUPERADMIN/sidebar/scan_history.php');
@@ -442,6 +443,23 @@ $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName
                     <span class="menu-mini-label">Trash</span>
                 </span>
                 <span class="menu-text">Project Trash</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/SUPERADMIN/sidebar/procurement.php" class="menu-link<?php echo $isProcurement ? ' active' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M4 7h16"></path>
+                            <path d="M6 7V5.5A1.5 1.5 0 0 1 7.5 4h9A1.5 1.5 0 0 1 18 5.5V7"></path>
+                            <path d="M6 7v11a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7"></path>
+                            <path d="M9 12h6"></path>
+                            <path d="M9 16h4"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">PO</span>
+                </span>
+                <span class="menu-text">Procurement</span>
             </a>
         </li>
         <li>
