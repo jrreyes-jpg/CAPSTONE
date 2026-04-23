@@ -1197,22 +1197,68 @@ if ($createdAssetId > 0) {
         </section>
         <?php endif; ?>
 
+        <?php
+        $assetFilterCounts = [
+            'all' => count($assets),
+            'available' => 0,
+            'in_use' => 0,
+            'maintenance' => 0,
+            'lost' => 0,
+        ];
+
+        foreach ($assets as $assetRow) {
+            $statusKey = (string)($assetRow['asset_status'] ?? '');
+            if (isset($assetFilterCounts[$statusKey])) {
+                $assetFilterCounts[$statusKey]++;
+            }
+        }
+        ?>
+
         <section class="asset-listing-section">
             <div class="asset-section-header">
-                <h2 class="dashboard-section-title"><?php echo $isTrashView ? 'Trashed Assets' : 'Existing Assets'; ?></h2>
+                <div>
+                    <h2 class="dashboard-section-title"><?php echo $isTrashView ? 'Trashed Assets' : 'Existing Assets'; ?></h2>
+                    <p class="asset-section-subtitle">
+                        <?php echo $isTrashView ? 'Archived asset records stay recoverable here until permanently removed.' : 'Review asset details, stock distribution, and status changes at a glance.'; ?>
+                    </p>
+                </div>
                 <div class="asset-section-actions">
                     <?php if ($qrLibraryReady && !$isTrashView): ?>
                         <a href="/codesamplecaps/SUPERADMIN/print_qr_codes.php" target="_blank" class="btn-secondary">Print QR Codes</a>
                     <?php endif; ?>
                 </div>
             </div>
+            <?php if (!$isTrashView && count($assets) > 0): ?>
+                <div class="asset-filter-tabs" role="tablist" aria-label="Filter existing assets by status">
+                    <button type="button" class="asset-filter-tab is-active" data-filter="all">
+                        <span>All</span>
+                        <strong><?php echo (int)$assetFilterCounts['all']; ?></strong>
+                    </button>
+                    <button type="button" class="asset-filter-tab" data-filter="available">
+                        <span>Available</span>
+                        <strong><?php echo (int)$assetFilterCounts['available']; ?></strong>
+                    </button>
+                    <button type="button" class="asset-filter-tab" data-filter="in_use">
+                        <span>In Use</span>
+                        <strong><?php echo (int)$assetFilterCounts['in_use']; ?></strong>
+                    </button>
+                    <button type="button" class="asset-filter-tab" data-filter="maintenance">
+                        <span>Maintenance</span>
+                        <strong><?php echo (int)$assetFilterCounts['maintenance']; ?></strong>
+                    </button>
+                    <button type="button" class="asset-filter-tab" data-filter="lost">
+                        <span>Lost</span>
+                        <strong><?php echo (int)$assetFilterCounts['lost']; ?></strong>
+                    </button>
+                </div>
+            <?php endif; ?>
             <div class="table-wrapper">
                 <table class="responsive-table mobile-card-table assets-table">
                     <thead>
                         <tr>
                             <th>#</th>
-                            <th>Asset</th>
-                            <th>Status</th>
+                            <th>Asset Information</th>
+                            <th>Stock / Usage Information</th>
                             <th>QR Code</th>
                             <th>Created On</th>
                             <th>Actions</th>
@@ -1225,40 +1271,77 @@ if ($createdAssetId > 0) {
                             </tr>
                         <?php else: ?>
                             <?php foreach ($assets as $asset): ?>
-                                <tr>
+                                <?php
+                                $availableUnits = (int)($asset['available_units'] ?? 0);
+                                $deployedUnits = (int)($asset['deployed_units'] ?? 0);
+                                $maintenanceUnits = (int)($asset['maintenance_units'] ?? 0);
+                                $lostUnits = (int)($asset['lost_units'] ?? 0);
+                                $totalTrackedUnits = max(1, $availableUnits + $deployedUnits + $maintenanceUnits + $lostUnits);
+                                $availableWidth = ($availableUnits / $totalTrackedUnits) * 100;
+                                $deployedWidth = ($deployedUnits / $totalTrackedUnits) * 100;
+                                $maintenanceWidth = ($maintenanceUnits / $totalTrackedUnits) * 100;
+                                $lostWidth = ($lostUnits / $totalTrackedUnits) * 100;
+                                ?>
+                                <tr class="asset-table-row" data-asset-status="<?php echo htmlspecialchars((string)($asset['asset_status'] ?? 'available')); ?>">
                                     <td data-label="ID"><?php echo htmlspecialchars($asset['id']); ?></td>
-                                    <td data-label="Asset">
-                                        <strong><?php echo htmlspecialchars($asset['asset_name']); ?></strong><br>
-                                        <small>Category: <?php echo htmlspecialchars(asset_category_label($asset['asset_category'] ?? null)); ?></small><br>
-                                        <small><?php echo htmlspecialchars($asset['asset_type'] ?: 'Type not set'); ?></small><br>
-                                        <small>SN: <?php echo htmlspecialchars($asset['serial_number'] ?: 'Generating...'); ?></small>
+                                    <td data-label="Asset Information">
+                                        <div class="asset-info-card">
+                                            <div class="asset-info-card__header">
+                                                <div>
+                                                    <strong class="asset-info-card__name"><?php echo htmlspecialchars($asset['asset_name']); ?></strong>
+                                                    <div class="asset-meta-list">
+                                                        <span class="asset-meta-pill"><?php echo htmlspecialchars(asset_category_label($asset['asset_category'] ?? null)); ?></span>
+                                                        <span class="asset-meta-text">SN: <?php echo htmlspecialchars($asset['serial_number'] ?: 'Generating...'); ?></span>
+                                                        <span class="asset-meta-text">Type: <?php echo htmlspecialchars($asset['asset_type'] ?: 'Not set'); ?></span>
+                                                    </div>
+                                                </div>
+                                                <span class="asset-status asset-status--<?php echo htmlspecialchars((string)($asset['asset_status'] ?? 'available')); ?>">
+                                                    <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)($asset['asset_status'] ?? 'available')))); ?>
+                                                </span>
+                                            </div>
+                                            <div class="asset-info-card__footer">
+                                                <div class="asset-meta-stack">
+                                                    <span class="asset-meta-label">Criticality</span>
+                                                    <strong><?php echo htmlspecialchars(asset_criticality_label($asset['criticality'] ?? null)); ?></strong>
+                                                </div>
+                                                <div class="asset-meta-stack">
+                                                    <span class="asset-meta-label">Stock Health</span>
+                                                    <span class="status-pill status-<?php echo htmlspecialchars((string)($asset['inventory_status'] ?? 'available')); ?>">
+                                                        <?php echo htmlspecialchars(build_asset_stock_badge_label($asset['inventory_status'] ?? null)); ?>
+                                                    </span>
+                                                </div>
+                                                <div class="asset-meta-stack">
+                                                    <span class="asset-meta-label">Quantity / Min</span>
+                                                    <strong>
+                                                        <?php echo (int)($asset['inventory_quantity'] ?? 0); ?>
+                                                        /
+                                                        <?php echo $asset['inventory_min_stock'] !== null ? (int)$asset['inventory_min_stock'] : 'N/A'; ?>
+                                                    </strong>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td data-label="Status">
-                                        <small><strong>Usage Status:</strong></small><br>
-                                        <span class="asset-status asset-status--<?php echo htmlspecialchars($asset['asset_status']); ?>">
-                                            <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$asset['asset_status']))); ?>
-                                        </span>
-                                        <br>
-                                        <small><strong>Stock Status:</strong></small><br>
-                                        <span class="status-pill status-<?php echo htmlspecialchars((string)($asset['inventory_status'] ?? 'available')); ?>">
-                                            <?php echo htmlspecialchars(build_asset_stock_badge_label($asset['inventory_status'] ?? null)); ?>
-                                        </span>
-                                        <br>
-                                        <small>
-                                            Qty: <?php echo (int)($asset['inventory_quantity'] ?? 0); ?>
-                                            |
-                                            Min: <?php echo $asset['inventory_min_stock'] !== null ? (int)$asset['inventory_min_stock'] : 'N/A'; ?>
-                                        </small>
-                                        <br>
-                                        <small>
-                                            Units:
-                                            Avail <?php echo (int)($asset['available_units'] ?? 0); ?> |
-                                            In Use <?php echo (int)($asset['deployed_units'] ?? 0); ?> |
-                                            Maint <?php echo (int)($asset['maintenance_units'] ?? 0); ?> |
-                                            Lost <?php echo (int)($asset['lost_units'] ?? 0); ?>
-                                        </small>
-                                        <br>
-                                        <small>Criticality: <?php echo htmlspecialchars(asset_criticality_label($asset['criticality'] ?? null)); ?></small>
+                                    <td data-label="Stock / Usage Information">
+                                        <div class="asset-stock-panel">
+                                            <div class="asset-stock-panel__chips">
+                                                <span class="stock-chip stock-chip--available">Available <strong><?php echo $availableUnits; ?></strong></span>
+                                                <span class="stock-chip stock-chip--in-use">In Use <strong><?php echo $deployedUnits; ?></strong></span>
+                                                <span class="stock-chip stock-chip--maintenance">Maintenance <strong><?php echo $maintenanceUnits; ?></strong></span>
+                                                <span class="stock-chip stock-chip--lost">Lost <strong><?php echo $lostUnits; ?></strong></span>
+                                            </div>
+                                            <div class="asset-distribution">
+                                                <div class="asset-distribution__label-row">
+                                                    <span>Stock distribution</span>
+                                                    <strong><?php echo $availableUnits + $deployedUnits + $maintenanceUnits + $lostUnits; ?> total tracked</strong>
+                                                </div>
+                                                <div class="asset-distribution__bar" aria-hidden="true">
+                                                    <span class="asset-distribution__segment asset-distribution__segment--available" style="width: <?php echo round($availableWidth, 2); ?>%"></span>
+                                                    <span class="asset-distribution__segment asset-distribution__segment--in-use" style="width: <?php echo round($deployedWidth, 2); ?>%"></span>
+                                                    <span class="asset-distribution__segment asset-distribution__segment--maintenance" style="width: <?php echo round($maintenanceWidth, 2); ?>%"></span>
+                                                    <span class="asset-distribution__segment asset-distribution__segment--lost" style="width: <?php echo round($lostWidth, 2); ?>%"></span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td data-label="QR Code">
                                         <div class="asset-qr-actions">
@@ -1293,45 +1376,59 @@ if ($createdAssetId > 0) {
                                                     <button type="submit" class="btn-danger">Delete Permanently</button>
                                                 </form>
                                             <?php else: ?>
-                                                <form method="POST" class="asset-inline-form" onsubmit="return confirm('Move this asset to trash bin?');">
-                                                    <input type="hidden" name="action" value="trash_asset">
-                                                    <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
-                                                    <button type="submit" class="btn-danger">Delete</button>
-                                                </form>
-                                                <?php if ((int)($asset['deployed_units'] ?? 0) > 0): ?>
-                                                    <form method="POST" class="asset-inline-form">
-                                                        <input type="hidden" name="action" value="return_asset">
+                                                <?php if ($availableUnits > 0): ?>
+                                                    <form method="POST" class="asset-inline-form asset-action-form" data-confirm-lost="Mark the selected quantity as lost?">
+                                                        <input type="hidden" name="action" value="mark_asset_maintenance" class="asset-action-input">
                                                         <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
-                                                        <button type="submit" class="btn-secondary">Mark Returned</button>
-                                                    </form>
-                                                <?php endif; ?>
-                                                <?php if ((int)($asset['available_units'] ?? 0) > 0): ?>
-                                                    <form method="POST" class="asset-inline-form">
-                                                        <input type="hidden" name="action" value="mark_asset_maintenance">
-                                                        <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
-                                                        <?php if ((int)($asset['available_units'] ?? 0) > 1): ?>
-                                                            <input type="number" name="status_quantity" min="1" max="<?php echo (int)$asset['available_units']; ?>" value="1" class="asset-action-qty" aria-label="Maintenance quantity">
-                                                        <?php endif; ?>
-                                                        <button type="submit" class="btn-secondary">Mark Maintenance</button>
+                                                        <div class="asset-action-card">
+                                                            <span class="asset-action-card__label">Update available stock</span>
+                                                            <div class="asset-action-controls">
+                                                                <input
+                                                                    type="number"
+                                                                    name="status_quantity"
+                                                                    min="1"
+                                                                    max="<?php echo $availableUnits; ?>"
+                                                                    value="1"
+                                                                    class="asset-action-qty"
+                                                                    aria-label="Quantity to update"
+                                                                >
+                                                                <select class="asset-action-select" aria-label="Select stock action">
+                                                                    <option value="mark_asset_maintenance">Send to maintenance</option>
+                                                                    <option value="mark_asset_lost">Mark as lost</option>
+                                                                </select>
+                                                                <button type="submit" class="btn-secondary">Apply</button>
+                                                            </div>
+                                                            <small class="asset-inline-note">Up to <?php echo $availableUnits; ?> available unit<?php echo $availableUnits === 1 ? '' : 's'; ?> can be updated.</small>
+                                                        </div>
                                                     </form>
                                                 <?php else: ?>
-                                                    <span class="asset-inline-note">No available units to update</span>
+                                                    <div class="asset-action-card asset-action-card--muted">
+                                                        <span class="asset-action-card__label">Update available stock</span>
+                                                        <small class="asset-inline-note">No available units to move to maintenance or lost.</small>
+                                                    </div>
                                                 <?php endif; ?>
-                                                <?php if ((int)($asset['available_units'] ?? 0) > 0): ?>
-                                                    <form method="POST" class="asset-inline-form" onsubmit="return confirm('Mark this asset as lost?');">
-                                                        <input type="hidden" name="action" value="mark_asset_lost">
+                                                <div class="asset-row-actions__secondary">
+                                                    <?php if ($deployedUnits > 0): ?>
+                                                        <form method="POST" class="asset-inline-form">
+                                                            <input type="hidden" name="action" value="return_asset">
+                                                            <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
+                                                            <button type="submit" class="btn-secondary">Mark Returned</button>
+                                                        </form>
+                                                    <?php endif; ?>
+                                                    <form method="POST" class="asset-inline-form" onsubmit="return confirm('Move this asset to trash bin?');">
+                                                        <input type="hidden" name="action" value="trash_asset">
                                                         <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
-                                                        <?php if ((int)($asset['available_units'] ?? 0) > 1): ?>
-                                                            <input type="number" name="status_quantity" min="1" max="<?php echo (int)$asset['available_units']; ?>" value="1" class="asset-action-qty" aria-label="Lost quantity">
-                                                        <?php endif; ?>
-                                                        <button type="submit" class="btn-secondary">Mark Lost</button>
+                                                        <button type="submit" class="btn-danger">Delete</button>
                                                     </form>
-                                                <?php endif; ?>
+                                                </div>
                                             <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
+                            <tr class="asset-filter-empty" hidden>
+                                <td colspan="6" class="table-empty-cell">No assets match the selected filter.</td>
+                            </tr>
                         <?php endif; ?>
                     </tbody>
                 </table>
@@ -1372,6 +1469,57 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         minStockField.value = recommendedMinStock;
+    });
+
+    const filterTabs = Array.from(document.querySelectorAll('.asset-filter-tab'));
+    const assetRows = Array.from(document.querySelectorAll('.asset-table-row'));
+    const filterEmptyRow = document.querySelector('.asset-filter-empty');
+
+    if (filterTabs.length > 0 && assetRows.length > 0) {
+        const applyAssetFilter = (filterValue) => {
+            let visibleRows = 0;
+
+            assetRows.forEach((row) => {
+                const rowStatus = row.getAttribute('data-asset-status') || 'available';
+                const isVisible = filterValue === 'all' || rowStatus === filterValue;
+                row.hidden = !isVisible;
+                if (isVisible) {
+                    visibleRows++;
+                }
+            });
+
+            if (filterEmptyRow) {
+                filterEmptyRow.hidden = visibleRows !== 0;
+            }
+        };
+
+        filterTabs.forEach((tab) => {
+            tab.addEventListener('click', () => {
+                filterTabs.forEach((button) => button.classList.remove('is-active'));
+                tab.classList.add('is-active');
+                applyAssetFilter(tab.getAttribute('data-filter') || 'all');
+            });
+        });
+    }
+
+    document.querySelectorAll('.asset-action-form').forEach((form) => {
+        const actionInput = form.querySelector('.asset-action-input');
+        const actionSelect = form.querySelector('.asset-action-select');
+
+        if (!actionInput || !actionSelect) {
+            return;
+        }
+
+        form.addEventListener('submit', (event) => {
+            actionInput.value = actionSelect.value;
+
+            if (actionSelect.value === 'mark_asset_lost') {
+                const lostMessage = form.getAttribute('data-confirm-lost') || 'Mark the selected quantity as lost?';
+                if (!window.confirm(lostMessage)) {
+                    event.preventDefault();
+                }
+            }
+        });
     });
 });
 
