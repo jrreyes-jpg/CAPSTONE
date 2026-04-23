@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/audit_log.php';
+require_once __DIR__ . '/../../config/asset_unit_helpers.php';
 require_once __DIR__ . '/project_search_support.php';
 
 require_role('super_admin');
@@ -386,6 +387,7 @@ $todayDate = today_date();
 
 ensure_project_inventory_deployments_table($conn);
 ensure_project_inventory_return_logs_table($conn);
+ensure_asset_unit_tracking_schema($conn);
 ensure_project_budget_profiles_table($conn);
 ensure_project_cost_entries_table($conn);
 ensure_project_payments_table($conn);
@@ -2310,6 +2312,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->begin_transaction();
 
         try {
+            asset_units_sync_for_inventory($conn, $inventoryId);
+
             $deployStmt = $conn->prepare(
                 'INSERT INTO project_inventory_deployments (project_id, inventory_id, quantity, deployed_by, notes)
                  VALUES (?, ?, ?, ?, ?)'
@@ -2337,6 +2341,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('Failed to update inventory quantity after deployment.');
             }
 
+            $assignedUnitCodes = asset_units_assign_available_to_deployment($conn, (int)$deployStmt->insert_id, $inventoryId, $quantity);
+
             $conn->commit();
             audit_log_event(
                 $conn,
@@ -2350,6 +2356,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'asset_name' => $inventoryItem['asset_name'] ?? null,
                     'quantity' => $quantity,
                     'remaining_quantity' => $remainingQuantity,
+                    'unit_codes' => $assignedUnitCodes,
                 ]
             );
             set_projects_flash('success', 'Inventory deployed to project successfully.');
@@ -2417,6 +2424,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->begin_transaction();
 
         try {
+            asset_units_sync_for_inventory($conn, $inventoryId);
+
             $logReturn = $conn->prepare(
                 'INSERT INTO project_inventory_return_logs (deployment_id, quantity, returned_by, notes)
                  VALUES (?, ?, ?, ?)'
@@ -2459,6 +2468,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('Failed to restore inventory quantity.');
             }
 
+            $returnedUnitCodes = asset_units_release_from_deployment($conn, $deploymentId, $returnQuantity);
+
             $conn->commit();
             audit_log_event(
                 $conn,
@@ -2473,6 +2484,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'asset_name' => $deployment['asset_name'] ?? null,
                     'quantity' => $returnQuantity,
                     'next_inventory_quantity' => $nextQuantity,
+                    'unit_codes' => $returnedUnitCodes,
                 ]
             );
             set_projects_flash('success', 'Inventory return saved successfully.');

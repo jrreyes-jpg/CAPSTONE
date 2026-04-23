@@ -16,24 +16,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const scannerError = document.querySelector('#qrScannerError');
 
     let html5QrCode = null;
-    let lastScannedAssetId = null;
+    let lastScannedContext = null;
 
-    const parseAssetId = (decodedText) => {
+    const parseAssetContext = (decodedText) => {
         if (!decodedText) return null;
 
         const trimmed = decodedText.trim();
+        const payload = {};
 
-        if (trimmed.startsWith('asset_id=')) {
-            return parseInt(trimmed.split('=')[1], 10) || null;
+        if (trimmed.includes('|') || trimmed.includes('=')) {
+            trimmed.split('|').forEach((segment) => {
+                const [rawKey, ...rawValueParts] = segment.split('=');
+                const key = (rawKey || '').trim();
+                const value = rawValueParts.join('=').trim();
+                if (key !== '') {
+                    payload[key] = decodeURIComponent(value || '');
+                }
+            });
+        }
+
+        if (payload.asset_id) {
+            return {
+                assetId: parseInt(payload.asset_id, 10) || null,
+                unitId: parseInt(payload.unit_id || '', 10) || null,
+                unitCode: payload.unit_code || '',
+            };
         }
 
         const assetMatch = trimmed.match(/\/(?:asset|assets)\/(\d+)/i);
         if (assetMatch) {
-            return parseInt(assetMatch[1], 10);
+            return { assetId: parseInt(assetMatch[1], 10), unitId: null, unitCode: '' };
         }
 
         const numeric = parseInt(trimmed, 10);
-        return Number.isNaN(numeric) ? null : numeric;
+        if (Number.isNaN(numeric)) {
+            return null;
+        }
+
+        return { assetId: numeric, unitId: null, unitCode: '' };
     };
 
     const setStatus = (message, isError = false) => {
@@ -60,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
         notesInput.value = '';
         assetInfo.textContent = '';
         scannerError.textContent = '';
-        lastScannedAssetId = null;
+        lastScannedContext = null;
 
         if (!window.Html5Qrcode) {
             setStatus('QR scanner library not loaded.', true);
@@ -72,21 +92,34 @@ document.addEventListener('DOMContentLoaded', () => {
             { facingMode: 'environment' },
             { fps: 10, qrbox: 250 },
             async (decodedText) => {
-                const assetId = parseAssetId(decodedText);
-                if (!assetId) {
+                const assetContext = parseAssetContext(decodedText);
+                if (!assetContext || !assetContext.assetId) {
                     setStatus('Unrecognized QR format. Please scan a valid asset code.', true);
                     return;
                 }
 
-                if (assetId === lastScannedAssetId) {
+                if (
+                    lastScannedContext &&
+                    assetContext.assetId === lastScannedContext.assetId &&
+                    assetContext.unitId === lastScannedContext.unitId &&
+                    assetContext.unitCode === lastScannedContext.unitCode
+                ) {
                     return;
                 }
 
-                lastScannedAssetId = assetId;
+                lastScannedContext = assetContext;
                 setStatus('QR scanned. Fetching asset...');
 
                 try {
-                    const res = await fetch(`/codesamplecaps/get_asset.php?asset_id=${assetId}`);
+                    const params = new URLSearchParams({ asset_id: String(assetContext.assetId) });
+                    if (assetContext.unitId) {
+                        params.set('unit_id', String(assetContext.unitId));
+                    }
+                    if (assetContext.unitCode) {
+                        params.set('unit_code', assetContext.unitCode);
+                    }
+
+                    const res = await fetch(`/codesamplecaps/get_asset.php?${params.toString()}`);
                     const json = await res.json();
                     if (json.status !== 'success') {
                         throw new Error(json.message || 'Failed to load asset');
@@ -95,6 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const asset = json.asset;
                     assetInfo.innerHTML = `
                         <strong>${asset.asset_name}</strong> (ID: ${asset.id})<br>
+                        Unit: ${asset.unit_code || '<em>General asset QR</em>'}<br>
                         Type: ${asset.asset_type || '<em>n/a</em>'}<br>
                         Status: ${asset.asset_status}<br>
                         Serial: ${asset.serial_number || '<em>n/a</em>'}`;
@@ -104,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             },
             (errorMessage) => {
-                if (!lastScannedAssetId) {
+                if (!lastScannedContext) {
                     scannerError.textContent = errorMessage;
                 }
             }
@@ -128,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     logBtn.addEventListener('click', async () => {
-        if (!lastScannedAssetId) {
+        if (!lastScannedContext || !lastScannedContext.assetId) {
             setStatus('Scan an asset QR code first.', true);
             return;
         }
@@ -148,7 +182,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    asset_id: lastScannedAssetId,
+                    asset_id: lastScannedContext.assetId,
+                    asset_unit_id: lastScannedContext.unitId,
+                    unit_code: lastScannedContext.unitCode,
                     worker_name: workerName,
                     notes,
                     device: navigator.userAgent

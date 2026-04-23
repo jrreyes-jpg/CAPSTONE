@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/asset_unit_helpers.php';
 
 require_role('super_admin');
 
@@ -22,6 +23,8 @@ $hasDeploymentTables = scan_history_table_exists($conn, 'inventory')
     && scan_history_table_exists($conn, 'project_inventory_return_logs')
     && scan_history_table_exists($conn, 'projects');
 
+ensure_asset_unit_tracking_schema($conn);
+
 if ($hasScanHistoryTable) {
     $scanHistorySql = 'SELECT
         h.id,
@@ -30,12 +33,13 @@ if ($hasScanHistoryTable) {
         a.asset_name,
         a.asset_type,
         a.serial_number,
-        u.full_name AS foreman_name';
+        u.full_name AS foreman_name,
+        au.unit_code';
 
     if ($hasUsageLogsTable) {
         $scanHistorySql .= ',
-        usage.worker_name,
-        usage.used_at';
+        latest_usage_log.worker_name,
+        latest_usage_log.used_at';
     } else {
         $scanHistorySql .= ',
         NULL AS worker_name,
@@ -44,18 +48,23 @@ if ($hasScanHistoryTable) {
 
     if ($hasDeploymentTables) {
         $scanHistorySql .= ',
-        deployment.project_name,
-        deployment.remaining_quantity';
+        current_unit_deployment.project_name,
+        current_unit_deployment.remaining_quantity,
+        deployment.project_name AS asset_level_project_name,
+        deployment.remaining_quantity AS asset_level_remaining_quantity';
     } else {
         $scanHistorySql .= ',
         NULL AS project_name,
-        NULL AS remaining_quantity';
+        NULL AS remaining_quantity,
+        NULL AS asset_level_project_name,
+        NULL AS asset_level_remaining_quantity';
     }
 
     $scanHistorySql .= '
      FROM asset_scan_history h
      LEFT JOIN assets a ON a.id = h.asset_id
-     LEFT JOIN users u ON u.id = h.foreman_id';
+     LEFT JOIN users u ON u.id = h.foreman_id
+     LEFT JOIN asset_units au ON au.id = h.asset_unit_id';
 
     if ($hasUsageLogsTable) {
         $scanHistorySql .= '
@@ -70,11 +79,21 @@ if ($hasScanHistoryTable) {
             FROM asset_usage_logs
             GROUP BY asset_id
         ) latest_usage ON latest_usage.latest_usage_id = aul.id
-     ) usage ON usage.asset_id = h.asset_id';
+     ) latest_usage_log ON latest_usage_log.asset_id = h.asset_id';
     }
 
     if ($hasDeploymentTables) {
         $scanHistorySql .= '
+     LEFT JOIN (
+        SELECT
+            pdu.asset_unit_id,
+            p.project_name,
+            1 AS remaining_quantity
+        FROM project_inventory_deployment_units pdu
+        INNER JOIN project_inventory_deployments pid ON pid.id = pdu.deployment_id
+        INNER JOIN projects p ON p.id = pid.project_id
+        WHERE pdu.returned_at IS NULL
+     ) current_unit_deployment ON current_unit_deployment.asset_unit_id = h.asset_unit_id
      LEFT JOIN (
         SELECT
             pid.inventory_id,
@@ -162,6 +181,7 @@ if ($hasScanHistoryTable) {
                                 <td data-label="Time"><?php echo htmlspecialchars($row['scan_time']); ?></td>
                                 <td data-label="Asset">
                                     <strong><?php echo htmlspecialchars($row['asset_name'] ?? 'Unknown'); ?></strong><br>
+                                    <small>Unit: <?php echo htmlspecialchars((string)($row['unit_code'] ?? 'General asset QR')); ?></small><br>
                                     <small><?php echo htmlspecialchars($row['asset_type'] ?? ''); ?></small><br>
                                     <small>SN: <?php echo htmlspecialchars($row['serial_number'] ?? ''); ?></small>
                                 </td>
@@ -171,6 +191,9 @@ if ($hasScanHistoryTable) {
                                     <?php if (!empty($row['project_name'])): ?>
                                         <strong><?php echo htmlspecialchars((string)$row['project_name']); ?></strong><br>
                                         <small>Project deployment | Qty: <?php echo (int)($row['remaining_quantity'] ?? 0); ?></small>
+                                    <?php elseif (!empty($row['asset_level_project_name'])): ?>
+                                        <strong><?php echo htmlspecialchars((string)$row['asset_level_project_name']); ?></strong><br>
+                                        <small>Asset-level deployment view | Qty: <?php echo (int)($row['asset_level_remaining_quantity'] ?? 0); ?></small>
                                     <?php elseif (!empty($row['worker_name'])): ?>
                                         <strong><?php echo htmlspecialchars((string)$row['worker_name']); ?></strong><br>
                                         <small>Latest usage log: <?php echo htmlspecialchars((string)($row['used_at'] ?? '')); ?></small>

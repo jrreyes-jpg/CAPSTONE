@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/auth_middleware.php';
 require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/asset_unit_helpers.php';
 
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
@@ -56,21 +57,31 @@ function buildAssetQrValue(int $assetId, string $serialNumber = ''): string {
 
 $assetId = isset($_GET['asset_id']) ? (int)$_GET['asset_id'] : 0;
 
-$sql = 'SELECT a.id, a.asset_name, a.asset_type, a.serial_number, a.asset_status,
-        (
-            SELECT q.qr_code_value
-            FROM asset_qr_codes q
-            WHERE q.asset_id = a.id
-            ORDER BY q.id DESC
-            LIMIT 1
-        ) AS qr_code_value
-        FROM assets a';
-$params = [];
+ensure_asset_unit_tracking_schema($conn);
+
+$sql = "SELECT
+            a.id,
+            a.asset_name,
+            a.asset_type,
+            a.serial_number,
+            a.asset_status,
+            au.id AS asset_unit_id,
+            au.unit_code,
+            au.qr_code_value AS unit_qr_code_value,
+            au.status AS unit_status,
+            (
+                SELECT q.qr_code_value
+                FROM asset_qr_codes q
+                WHERE q.asset_id = a.id
+                ORDER BY q.id DESC
+                LIMIT 1
+            ) AS qr_code_value
+        FROM assets a
+        LEFT JOIN asset_units au ON au.asset_id = a.id AND au.status <> 'archived'";
 if ($assetId > 0) {
     $sql .= ' WHERE a.id = ?';
-    $params[] = $assetId;
 }
-$sql .= ' ORDER BY a.id DESC';
+$sql .= ' ORDER BY a.id DESC, au.unit_code ASC';
 
 $stmt = $conn->prepare($sql);
 if ($assetId > 0) {
@@ -125,7 +136,9 @@ $assets = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 
         <?php foreach ($assets as $asset): ?>
             <?php
-                $qrValue = $asset['qr_code_value'] ?: buildAssetQrValue((int)$asset['id'], (string)($asset['serial_number'] ?? ''));
+                $qrValue = !empty($asset['unit_qr_code_value'])
+                    ? (string)$asset['unit_qr_code_value']
+                    : (($asset['qr_code_value'] ?: buildAssetQrValue((int)$asset['id'], (string)($asset['serial_number'] ?? ''))));
                 $qrDataUri = $qrLibraryReady ? generateQRDataUri($qrValue) : '';
             ?>
             <div class="card">
@@ -137,9 +150,10 @@ $assets = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
                     <?php endif; ?>
                 </div>
                 <h3><?php echo htmlspecialchars($asset['asset_name']); ?> (ID <?php echo $asset['id']; ?>)</h3>
+                <p>Unit: <?php echo htmlspecialchars((string)($asset['unit_code'] ?? 'General asset QR')); ?></p>
                 <p>Type: <?php echo htmlspecialchars($asset['asset_type'] ?: '-'); ?></p>
                 <p>Serial: <?php echo htmlspecialchars($asset['serial_number'] ?: '-'); ?></p>
-                <p>Status: <?php echo htmlspecialchars($asset['asset_status']); ?></p>
+                <p>Status: <?php echo htmlspecialchars((string)($asset['unit_status'] ?? $asset['asset_status'])); ?></p>
                 <p style="font-size: 12px; color:#555;">Scan value: <code><?php echo htmlspecialchars($qrValue); ?></code></p>
             </div>
         <?php endforeach; ?>

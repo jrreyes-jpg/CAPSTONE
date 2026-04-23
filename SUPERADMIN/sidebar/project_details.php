@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/asset_unit_helpers.php';
 
 require_role('super_admin');
 
@@ -403,6 +404,7 @@ $detailsPath = '/codesamplecaps/SUPERADMIN/sidebar/project_details.php?id=' . $p
 
 pm_ensure_project_inventory_deployments_table($conn);
 pm_ensure_project_inventory_return_logs_table($conn);
+ensure_asset_unit_tracking_schema($conn);
 pm_ensure_project_budget_profiles_table($conn);
 pm_ensure_project_cost_entries_table($conn);
 pm_ensure_project_payments_table($conn);
@@ -555,7 +557,8 @@ if ($projectId > 0) {
             a.asset_name,
             a.asset_type,
             a.serial_number,
-            deployer.full_name AS deployed_by_name
+            deployer.full_name AS deployed_by_name,
+            unit_summary.unit_codes
         FROM project_inventory_deployments pid
         INNER JOIN inventory i ON i.id = pid.inventory_id
         INNER JOIN assets a ON a.id = i.asset_id
@@ -565,6 +568,15 @@ if ($projectId > 0) {
             FROM project_inventory_return_logs
             GROUP BY deployment_id
         ) returns ON returns.deployment_id = pid.id
+        LEFT JOIN (
+            SELECT
+                pdu.deployment_id,
+                GROUP_CONCAT(au.unit_code ORDER BY au.unit_code SEPARATOR ', ') AS unit_codes
+            FROM project_inventory_deployment_units pdu
+            INNER JOIN asset_units au ON au.id = pdu.asset_unit_id
+            WHERE pdu.returned_at IS NULL
+            GROUP BY pdu.deployment_id
+        ) unit_summary ON unit_summary.deployment_id = pid.id
         WHERE pid.project_id = ?
         AND (pid.quantity - COALESCE(returns.returned_quantity, 0)) > 0
         ORDER BY pid.deployed_at DESC, pid.id DESC
@@ -589,7 +601,8 @@ if ($projectId > 0) {
             a.asset_type,
             a.serial_number,
             deployer.full_name AS deployed_by_name,
-            last_return.last_returned_at
+            last_return.last_returned_at,
+            unit_summary.unit_codes
         FROM project_inventory_deployments pid
         INNER JOIN inventory i ON i.id = pid.inventory_id
         INNER JOIN assets a ON a.id = i.asset_id
@@ -604,6 +617,14 @@ if ($projectId > 0) {
             FROM project_inventory_return_logs
             GROUP BY deployment_id
         ) last_return ON last_return.deployment_id = pid.id
+        LEFT JOIN (
+            SELECT
+                pdu.deployment_id,
+                GROUP_CONCAT(au.unit_code ORDER BY au.unit_code SEPARATOR ', ') AS unit_codes
+            FROM project_inventory_deployment_units pdu
+            INNER JOIN asset_units au ON au.id = pdu.asset_unit_id
+            GROUP BY pdu.deployment_id
+        ) unit_summary ON unit_summary.deployment_id = pid.id
         WHERE pid.project_id = ?
         ORDER BY pid.deployed_at DESC, pid.id DESC
     ");
@@ -1349,6 +1370,7 @@ if ($projectId > 0) {
                                     <span>Returned: <?php echo (int)$deployment['returned_quantity']; ?></span>
                                     <span>Remaining: <?php echo (int)$deployment['remaining_quantity']; ?></span>
                                     <span>Deployed By: <?php echo htmlspecialchars($deployment['deployed_by_name'] ?? 'N/A'); ?></span>
+                                    <span>Unit Codes: <?php echo htmlspecialchars((string)($deployment['unit_codes'] ?? 'Auto-assigned')); ?></span>
                                     <span>Deployed At: <?php echo htmlspecialchars($deployment['deployed_at']); ?></span>
                                     <span>Notes: <?php echo htmlspecialchars($deployment['notes'] ?: 'None'); ?></span>
                                     <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form">
@@ -1450,6 +1472,7 @@ if ($projectId > 0) {
                                     <span>Remaining: <?php echo (int)$historyItem['remaining_quantity']; ?></span>
                                     <span>Status: <?php echo (int)$historyItem['remaining_quantity'] > 0 ? 'Active' : 'Closed'; ?></span>
                                     <span>Deployed By: <?php echo htmlspecialchars($historyItem['deployed_by_name'] ?? 'N/A'); ?></span>
+                                    <span>Unit Codes: <?php echo htmlspecialchars((string)($historyItem['unit_codes'] ?? 'Auto-assigned')); ?></span>
                                     <span>Deployed At: <?php echo htmlspecialchars($historyItem['deployed_at']); ?></span>
                                     <span>Last Return: <?php echo htmlspecialchars($historyItem['last_returned_at'] ?? 'None yet'); ?></span>
                                     <span>Notes: <?php echo htmlspecialchars($historyItem['notes'] ?: 'None'); ?></span>

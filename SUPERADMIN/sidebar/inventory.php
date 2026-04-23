@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/audit_log.php';
+require_once __DIR__ . '/../../config/asset_unit_helpers.php';
 
 require_role('super_admin');
 
@@ -59,6 +60,8 @@ function inventory_table_exists(mysqli $conn, string $table): bool {
     return $result instanceof mysqli_result && $result->num_rows > 0;
 }
 
+ensure_asset_unit_tracking_schema($conn);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -90,11 +93,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $status = determine_inventory_status_for_page($quantity, $minStock);
         $insertStmt = $conn->prepare('INSERT INTO inventory (asset_id, quantity, min_stock, status) VALUES (?, ?, ?, ?)');
 
-        if (
-            $insertStmt &&
-            $insertStmt->bind_param('iiis', $assetId, $quantity, $minStock, $status) &&
-            $insertStmt->execute()
-        ) {
+        try {
+            $conn->begin_transaction();
+
+            if (
+                !$insertStmt ||
+                !$insertStmt->bind_param('iiis', $assetId, $quantity, $minStock, $status) ||
+                !$insertStmt->execute()
+            ) {
+                throw new RuntimeException('Failed to create inventory item.');
+            }
+
+            $createdInventoryId = (int)$insertStmt->insert_id;
+            asset_units_sync_for_inventory($conn, $createdInventoryId, $quantity);
+
             $assetLabel = '';
             $assetStmt = $conn->prepare('SELECT asset_name FROM assets WHERE id = ? LIMIT 1');
             if ($assetStmt) {
@@ -109,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 (int)($_SESSION['user_id'] ?? 0),
                 'create_inventory_item',
                 'inventory',
-                (int)$insertStmt->insert_id,
+                $createdInventoryId,
                 null,
                 [
                     'asset_id' => $assetId,
@@ -119,9 +131,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'status' => $status,
                 ]
             );
-            set_inventory_flash('success', 'Inventory item created successfully.');
-        } else {
-            set_inventory_flash('error', 'Failed to create inventory item.');
+            $conn->commit();
+            set_inventory_flash('success', 'Inventory item created successfully. Unit QR records are ready.');
+        } catch (Throwable $exception) {
+            $conn->rollback();
+            set_inventory_flash('error', $exception->getMessage());
         }
 
         redirect_inventory_page();
@@ -146,11 +160,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              WHERE id = ?'
         );
 
-        if (
-            $updateStmt &&
-            $updateStmt->bind_param('iisi', $quantity, $minStock, $status, $inventoryId) &&
-            $updateStmt->execute()
-        ) {
+        try {
+            $conn->begin_transaction();
+
+            if (
+                !$updateStmt ||
+                !$updateStmt->bind_param('iisi', $quantity, $minStock, $status, $inventoryId) ||
+                !$updateStmt->execute()
+            ) {
+                throw new RuntimeException('Failed to update inventory item.');
+            }
+
+            asset_units_sync_for_inventory($conn, $inventoryId, $quantity);
             audit_log_event(
                 $conn,
                 (int)($_SESSION['user_id'] ?? 0),
@@ -170,9 +191,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'status' => $status,
                 ]
             );
-            set_inventory_flash('success', 'Inventory item updated successfully.');
-        } else {
-            set_inventory_flash('error', 'Failed to update inventory item.');
+            $conn->commit();
+            set_inventory_flash('success', 'Inventory item updated successfully. Unit instances were synced.');
+        } catch (Throwable $exception) {
+            $conn->rollback();
+            set_inventory_flash('error', $exception->getMessage());
         }
 
         redirect_inventory_page();
@@ -236,26 +259,35 @@ if ($hasUsageLogsTable) {
         latest_usage.worker_name AS latest_worker_name,
         latest_usage.used_at AS latest_used_at,
         latest_usage.notes AS latest_usage_notes,
-        latest_usage.foreman_name AS latest_usage_foreman_name";
+        latest_usage.foreman_name AS latest_usage_foreman_name,
+        latest_usage.unit_code AS latest_usage_unit_code";
 } else {
     $inventoryQuery .= ",
         NULL AS latest_worker_name,
         NULL AS latest_used_at,
         NULL AS latest_usage_notes,
-        NULL AS latest_usage_foreman_name";
+        NULL AS latest_usage_foreman_name,
+        NULL AS latest_usage_unit_code";
 }
 
 if ($hasScanHistoryTable) {
     $inventoryQuery .= ",
         latest_scan.scan_time AS latest_scan_time,
         latest_scan.scan_device AS latest_scan_device,
-        latest_scan.scanned_by_name AS latest_scan_by_name";
+        latest_scan.scanned_by_name AS latest_scan_by_name,
+        latest_scan.unit_code AS latest_scan_unit_code";
 } else {
     $inventoryQuery .= ",
         NULL AS latest_scan_time,
         NULL AS latest_scan_device,
-        NULL AS latest_scan_by_name";
+        NULL AS latest_scan_by_name,
+        NULL AS latest_scan_unit_code";
 }
+
+$inventoryQuery .= ",
+        COALESCE(unit_totals.total_units, 0) AS total_unit_instances,
+        COALESCE(unit_totals.available_units, 0) AS available_unit_instances,
+        COALESCE(unit_totals.deployed_units, 0) AS deployed_unit_instances";
 
 $inventoryQuery .= "
      FROM inventory i
@@ -303,9 +335,11 @@ if ($hasUsageLogsTable) {
             aul.worker_name,
             aul.notes,
             aul.used_at,
-            u.full_name AS foreman_name
+            u.full_name AS foreman_name,
+            au.unit_code
         FROM asset_usage_logs aul
         LEFT JOIN users u ON u.id = aul.foreman_id
+        LEFT JOIN asset_units au ON au.id = aul.asset_unit_id
         INNER JOIN (
             SELECT asset_id, MAX(id) AS latest_usage_id
             FROM asset_usage_logs
@@ -321,9 +355,11 @@ if ($hasScanHistoryTable) {
             ash.asset_id,
             ash.scan_time,
             ash.scan_device,
-            u.full_name AS scanned_by_name
+            u.full_name AS scanned_by_name,
+            au.unit_code
         FROM asset_scan_history ash
         LEFT JOIN users u ON u.id = ash.foreman_id
+        LEFT JOIN asset_units au ON au.id = ash.asset_unit_id
         INNER JOIN (
             SELECT asset_id, MAX(id) AS latest_scan_id
             FROM asset_scan_history
@@ -331,6 +367,18 @@ if ($hasScanHistoryTable) {
         ) latest_scan ON latest_scan.latest_scan_id = ash.id
      ) latest_scan ON latest_scan.asset_id = a.id";
 }
+
+$inventoryQuery .= "
+     LEFT JOIN (
+        SELECT
+            inventory_id,
+            COUNT(*) AS total_units,
+            SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) AS available_units,
+            SUM(CASE WHEN status = 'deployed' THEN 1 ELSE 0 END) AS deployed_units
+        FROM asset_units
+        WHERE status <> 'archived'
+        GROUP BY inventory_id
+     ) unit_totals ON unit_totals.inventory_id = i.id";
 $whereSql = '';
 if ($statusFilter === 'attention') {
     $whereSql = " WHERE i.status IN ('low-stock', 'out-of-stock')";
@@ -477,9 +525,13 @@ foreach ($inventoryItems as $item) {
                                         <div><strong>Type:</strong> <?php echo htmlspecialchars($item['asset_type'] ?: 'N/A'); ?></div>
                                         <div><strong>Serial:</strong> <?php echo htmlspecialchars($item['serial_number'] ?: 'N/A'); ?></div>
                                         <div><strong>Available Qty:</strong> <?php echo (int)$item['quantity']; ?></div>
+                                        <div><strong>Tracked Units:</strong> <?php echo (int)($item['total_unit_instances'] ?? 0); ?></div>
+                                        <div><strong>Available Units:</strong> <?php echo (int)($item['available_unit_instances'] ?? 0); ?></div>
+                                        <div><strong>Deployed Units:</strong> <?php echo (int)($item['deployed_unit_instances'] ?? 0); ?></div>
                                         <div><strong>Min Stock:</strong> <?php echo $item['min_stock'] !== null ? (int)$item['min_stock'] : 'Not set'; ?></div>
                                         <div><strong>Updated:</strong> <?php echo htmlspecialchars($item['updated_at']); ?></div>
                                         <div><strong>Last QR Scan By:</strong> <?php echo htmlspecialchars((string)($item['latest_scan_by_name'] ?? 'No scan yet')); ?></div>
+                                        <div><strong>Last Scanned Unit:</strong> <?php echo htmlspecialchars((string)($item['latest_scan_unit_code'] ?? 'No unit scan yet')); ?></div>
                                         <div><strong>Last Scan Time:</strong> <?php echo htmlspecialchars((string)($item['latest_scan_time'] ?? 'No scan yet')); ?></div>
                                         <div><strong>Scan Device:</strong> <?php echo htmlspecialchars((string)($item['latest_scan_device'] ?? 'Not recorded')); ?></div>
                                         <div>
@@ -518,6 +570,7 @@ foreach ($inventoryItems as $item) {
                                             }
                                             ?>
                                         </div>
+                                        <div><strong>Latest Used Unit:</strong> <?php echo htmlspecialchars((string)($item['latest_usage_unit_code'] ?? 'No usage log yet')); ?></div>
                                     </div>
                                 </div>
 

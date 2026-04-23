@@ -93,6 +93,7 @@ $foremanNotifications = [
                                 </div>
                                 <div class="activity-meta">
                                     <span>Type: <?php echo htmlspecialchars((string)($log['asset_type'] ?? 'No type')); ?></span>
+                                    <span>Unit: <?php echo htmlspecialchars((string)($log['unit_code'] ?? 'General asset QR')); ?></span>
                                     <span><?php echo htmlspecialchars(foreman_format_datetime($log['used_at'] ?? null)); ?></span>
                                 </div>
                                 <p><?php echo htmlspecialchars(foreman_excerpt($log['notes'] ?? null, 180)); ?></p>
@@ -119,6 +120,7 @@ $foremanNotifications = [
                                 <h3><?php echo htmlspecialchars((string)($scan['asset_name'] ?? 'Unknown Asset')); ?></h3>
                                 <div class="scan-meta">
                                     <span>Type: <?php echo htmlspecialchars((string)($scan['asset_type'] ?? 'No type')); ?></span>
+                                    <span>Unit: <?php echo htmlspecialchars((string)($scan['unit_code'] ?? 'General asset QR')); ?></span>
                                     <span><?php echo htmlspecialchars(foreman_format_datetime($scan['scan_time'] ?? null)); ?></span>
                                 </div>
                                 <p><?php echo htmlspecialchars(foreman_excerpt($scan['scan_device'] ?? 'No device recorded', 140)); ?></p>

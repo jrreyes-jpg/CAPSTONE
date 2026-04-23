@@ -1,6 +1,9 @@
 <?php
 
 require_once __DIR__ . '/../../config/project_access.php';
+require_once __DIR__ . '/../../config/asset_unit_helpers.php';
+
+ensure_asset_unit_tracking_schema($conn);
 
 function foreman_table_exists(mysqli $conn, string $tableName): bool
 {
@@ -445,9 +448,11 @@ function foreman_fetch_dashboard_data(mysqli $conn, int $userId): array
                 aul.used_at,
                 a.asset_name,
                 a.asset_type,
+                au.unit_code,
                 {$assetStatusExpression} AS resolved_status
              FROM asset_usage_logs aul
              INNER JOIN assets a ON a.id = aul.asset_id
+             LEFT JOIN asset_units au ON au.id = aul.asset_unit_id
              WHERE aul.foreman_id = ?
              ORDER BY aul.used_at DESC, aul.id DESC
              LIMIT 20"
@@ -473,9 +478,11 @@ function foreman_fetch_dashboard_data(mysqli $conn, int $userId): array
                 ash.scan_time,
                 ash.scan_device,
                 a.asset_name,
-                a.asset_type
+                a.asset_type,
+                au.unit_code
              FROM asset_scan_history ash
              INNER JOIN assets a ON a.id = ash.asset_id
+             LEFT JOIN asset_units au ON au.id = ash.asset_unit_id
              WHERE ash.foreman_id = ?
              ORDER BY ash.scan_time DESC, ash.id DESC
              LIMIT 20"

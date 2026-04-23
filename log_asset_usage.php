@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config/auth_middleware.php';
 require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . '/config/asset_unit_helpers.php';
 
 require_any_role(['foreman']);
 
@@ -128,6 +129,8 @@ function ensure_usage_tables(mysqli $conn): void
             KEY idx_scan_time (scan_time)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
     );
+
+    ensure_asset_unit_tracking_schema($conn);
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -146,6 +149,8 @@ if (!is_array($payload)) {
 }
 
 $assetId = (int)($payload['asset_id'] ?? 0);
+$assetUnitId = isset($payload['asset_unit_id']) ? (int)$payload['asset_unit_id'] : 0;
+$unitCode = trim((string)($payload['unit_code'] ?? ''));
 $workerName = trim((string)($payload['worker_name'] ?? ''));
 $notes = trim((string)($payload['notes'] ?? ''));
 $device = trim((string)($payload['device'] ?? ''));
@@ -184,6 +189,19 @@ if (!$assetExists) {
     exit;
 }
 
+$assetUnit = null;
+if ($assetUnitId > 0 || $unitCode !== '') {
+    $assetUnit = asset_units_find_by_scan_context($conn, $assetId, $assetUnitId > 0 ? $assetUnitId : null, $unitCode !== '' ? $unitCode : null);
+
+    if (!$assetUnit) {
+        http_response_code(404);
+        echo json_encode(['status' => 'error', 'message' => 'Asset unit not found for this QR code.']);
+        exit;
+    }
+
+    $assetUnitId = (int)($assetUnit['asset_unit_id'] ?? 0);
+}
+
 $notesValue = $notes === '' ? null : $notes;
 $deviceValue = $device === '' ? null : mb_substr($device, 0, 255);
 
@@ -191,13 +209,13 @@ $conn->begin_transaction();
 
 try {
     $usageInsert = $conn->prepare(
-        'INSERT INTO asset_usage_logs (asset_id, foreman_id, worker_name, notes)
-         VALUES (?, ?, ?, ?)'
+        'INSERT INTO asset_usage_logs (asset_id, asset_unit_id, foreman_id, worker_name, notes)
+         VALUES (?, ?, ?, ?, ?)'
     );
 
     if (
         !$usageInsert ||
-        !$usageInsert->bind_param('iiss', $assetId, $foremanId, $workerName, $notesValue) ||
+        !$usageInsert->bind_param('iiiss', $assetId, $assetUnitId, $foremanId, $workerName, $notesValue) ||
         !$usageInsert->execute()
     ) {
         throw new RuntimeException('Failed to save usage log.');
@@ -206,19 +224,38 @@ try {
     $usageInsert->close();
 
     $scanInsert = $conn->prepare(
-        'INSERT INTO asset_scan_history (asset_id, foreman_id, scan_device)
-         VALUES (?, ?, ?)'
+        'INSERT INTO asset_scan_history (asset_id, asset_unit_id, foreman_id, scan_device)
+         VALUES (?, ?, ?, ?)'
     );
 
     if (
         !$scanInsert ||
-        !$scanInsert->bind_param('iis', $assetId, $foremanId, $deviceValue) ||
+        !$scanInsert->bind_param('iiis', $assetId, $assetUnitId, $foremanId, $deviceValue) ||
         !$scanInsert->execute()
     ) {
         throw new RuntimeException('Failed to save scan history.');
     }
 
     $scanInsert->close();
+
+    if ($assetUnitId > 0) {
+        $unitUpdate = $conn->prepare(
+            'UPDATE asset_units
+             SET last_scanned_at = NOW(),
+                 last_scanned_by = ?
+             WHERE id = ?'
+        );
+
+        if (
+            !$unitUpdate ||
+            !$unitUpdate->bind_param('ii', $foremanId, $assetUnitId) ||
+            !$unitUpdate->execute()
+        ) {
+            throw new RuntimeException('Failed to update the scanned unit record.');
+        }
+
+        $unitUpdate->close();
+    }
 
     if (
         usage_column_exists($conn, 'assets', 'asset_status') &&
@@ -261,6 +298,8 @@ try {
     echo json_encode([
         'status' => 'success',
         'message' => 'Asset usage logged successfully.',
+        'asset_unit_id' => $assetUnitId > 0 ? $assetUnitId : null,
+        'unit_code' => $assetUnit['unit_code'] ?? null,
     ]);
 } catch (Throwable $exception) {
     $conn->rollback();
