@@ -224,6 +224,18 @@ function pm_ensure_project_contact_number_column(mysqli $conn): void {
     }
 }
 
+function pm_ensure_project_start_date_column(mysqli $conn): void {
+    if (!pm_table_has_column($conn, 'projects', 'project_start_date')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN project_start_date DATE DEFAULT NULL AFTER start_date");
+    }
+}
+
+function pm_ensure_estimated_completion_date_column(mysqli $conn): void {
+    if (!pm_table_has_column($conn, 'projects', 'estimated_completion_date')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN estimated_completion_date DATE DEFAULT NULL AFTER project_start_date");
+    }
+}
+
 function pm_ensure_project_soft_delete_columns(mysqli $conn): void {
     if (!pm_table_has_column($conn, 'projects', 'deleted_at')) {
         $conn->query("ALTER TABLE projects ADD COLUMN deleted_at DATETIME DEFAULT NULL AFTER status");
@@ -362,6 +374,8 @@ pm_ensure_project_code_column($conn);
 pm_ensure_project_po_number_column($conn);
 pm_ensure_project_contact_person_column($conn);
 pm_ensure_project_contact_number_column($conn);
+pm_ensure_project_start_date_column($conn);
+pm_ensure_estimated_completion_date_column($conn);
 pm_ensure_project_soft_delete_columns($conn);
 $hasProjectSiteColumn = pm_table_has_column($conn, 'projects', 'project_site');
 $hasProjectAddressColumn = pm_table_has_column($conn, 'projects', 'project_address');
@@ -370,6 +384,8 @@ $hasProjectCodeColumn = pm_table_has_column($conn, 'projects', 'project_code');
 $hasPoNumberColumn = pm_table_has_column($conn, 'projects', 'po_number');
 $hasContactPersonColumn = pm_table_has_column($conn, 'projects', 'contact_person');
 $hasContactNumberColumn = pm_table_has_column($conn, 'projects', 'contact_number');
+$hasProjectStartDateColumn = pm_table_has_column($conn, 'projects', 'project_start_date');
+$hasEstimatedCompletionDateColumn = pm_table_has_column($conn, 'projects', 'estimated_completion_date');
 $statusOptions = [];
 if ($supportsDraftStatus) {
     $statusOptions[] = 'draft';
@@ -424,6 +440,8 @@ if ($projectId > 0) {
     $contactNumberSelect = $hasContactNumberColumn ? 'p.contact_number,' : 'NULL AS contact_number,';
     $projectCodeSelect = $hasProjectCodeColumn ? 'p.project_code,' : 'NULL AS project_code,';
     $poNumberSelect = $hasPoNumberColumn ? 'p.po_number,' : 'NULL AS po_number,';
+    $projectStartDateSelect = $hasProjectStartDateColumn ? 'p.project_start_date,' : 'NULL AS project_start_date,';
+    $estimatedCompletionDateSelect = $hasEstimatedCompletionDateColumn ? 'p.estimated_completion_date,' : 'NULL AS estimated_completion_date,';
 
     $projectStmt = $conn->prepare("
         SELECT
@@ -437,6 +455,8 @@ if ($projectId > 0) {
             {$contactNumberSelect}
             {$projectCodeSelect}
             {$poNumberSelect}
+            {$projectStartDateSelect}
+            {$estimatedCompletionDateSelect}
             p.client_id,
             p.start_date,
             p.end_date,
@@ -720,9 +740,9 @@ if ($projectId > 0) {
                                 <small>Current assigned team</small>
                             </div>
                             <div class="project-details-stat">
-                                <span>Completed On</span>
-                                <strong><?php echo htmlspecialchars(pm_format_date($project['end_date'] ?? null)); ?></strong>
-                                <small><?php echo $isCompleted ? 'Saved when marked completed' : 'Pending until project completion'; ?></small>
+                                <span>Project Start Date</span>
+                                <strong><?php echo htmlspecialchars(pm_format_date($project['project_start_date'] ?? null)); ?></strong>
+                                <small>Planned work commencement</small>
                             </div>
                             <div class="project-details-stat project-details-stat--payment">
                                 <span>Customer Payment</span>
@@ -893,14 +913,46 @@ if ($projectId > 0) {
                                     <h3>Key project dates</h3>
                                 </div>
                                 <div class="form-grid">
-                                    <div class="input-group">
-                                        <label>Completed On</label>
-                                        <div class="project-form-static-field"><?php echo htmlspecialchars(pm_format_date($project['end_date'] ?? null)); ?></div>
-                                    </div>
-                                    <div class="input-group">
-                                        <label>Created On</label>
-                                        <div class="project-form-static-field"><?php echo htmlspecialchars(pm_format_date($project['created_at'] ?? null)); ?></div>
-                                    </div>
+                                    <?php if ($isCompleted): ?>
+                                        <div class="input-group">
+                                            <label>Completion Date</label>
+                                            <div class="project-form-static-field"><?php echo htmlspecialchars(pm_format_date($project['end_date'] ?? null)); ?></div>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="input-group">
+                                            <div class="field-label-row">
+                                                <label>Project Start Date <span class="required-indicator" aria-hidden="true">*</span></label>
+                                                <button type="button" class="field-tip" aria-label="Project start date help">
+                                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                                    <span class="field-tip__bubble">Set the planned date when project work should begin.</span>
+                                                </button>
+                                            </div>
+                                            <div class="project-form-static-field"><?php echo htmlspecialchars(pm_format_date($project['project_start_date'] ?? null)); ?></div>
+                                            <input
+                                                type="hidden"
+                                                id="project_start_date"
+                                                name="project_start_date"
+                                                value="<?php echo htmlspecialchars($project['project_start_date'] ?? ''); ?>"
+                                            >
+                                        </div>
+                                        <div class="input-group">
+                                            <div class="field-label-row">
+                                                <label for="estimated_completion_date">Estimated Completion Date <span class="required-indicator" aria-hidden="true">*</span></label>
+                                                <button type="button" class="field-tip" aria-label="Estimated completion date help">
+                                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                                    <span class="field-tip__bubble">Set the expected completion date. This cannot be earlier than the Project Start Date.</span>
+                                                </button>
+                                            </div>
+                                            <input
+                                                type="date"
+                                                id="estimated_completion_date"
+                                                name="estimated_completion_date"
+                                                value="<?php echo htmlspecialchars($project['estimated_completion_date'] ?? ''); ?>"
+                                                readonly
+                                                data-project-editable
+                                            >
+                                        </div>
+                                    <?php endif; ?>
                                 </div>
                             </section>
 
@@ -910,15 +962,54 @@ if ($projectId > 0) {
                                     <h3>People responsible</h3>
                                 </div>
                                 <div class="form-grid">
-                                    <div class="input-group">
-                                        <label for="engineer_ids">Assigned Engineer/s</label>
-                                        <select id="engineer_ids" name="engineer_ids[]" required multiple size="<?php echo min(6, max(3, count($engineers))); ?>" disabled>
-                                            <?php foreach ($engineers as $engineer): ?>
-                                                <option value="<?php echo (int)$engineer['id']; ?>" <?php echo in_array((int)$engineer['id'], $assignedEngineerIds, true) ? 'selected' : ''; ?>>
-                                                    <?php echo htmlspecialchars($engineer['full_name']); ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
+                                    <div class="input-group input-group-wide">
+                                        <div class="field-label-row">
+                                            <label for="engineer_ids_picker">Assigned Engineer/s <span class="required-indicator" aria-hidden="true">*</span></label>
+                                            <button type="button" class="field-tip" aria-label="Assigned engineers help">
+                                                <span class="field-tip__icon" aria-hidden="true">i</span>
+                                                <span class="field-tip__bubble">Pick an engineer from the dropdown, then press the plus button to add. Press the same button again to remove the selected engineer. Add one or more engineers depending on the project workload.</span>
+                                            </button>
+                                        </div>
+                                        <div class="engineer-picker" data-engineer-picker>
+                                            <div class="engineer-picker__controls">
+                                                <select id="engineer_ids_picker" class="engineer-picker__select" data-engineer-select data-project-editable disabled>
+                                                    <option value="">Select engineer</option>
+                                                    <?php foreach ($engineers as $engineer): ?>
+                                                        <option value="<?php echo (int)$engineer['id']; ?>"><?php echo htmlspecialchars($engineer['full_name']); ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                                <button type="button" class="engineer-picker__toggle" data-engineer-toggle data-project-editable-control aria-label="Add selected engineer" disabled>
+                                                    <span class="engineer-picker__toggle-icon" aria-hidden="true">+</span>
+                                                    <span class="engineer-picker__toggle-text">Add</span>
+                                                </button>
+                                            </div>
+                                            <div class="engineer-picker__selected" data-engineer-selected>
+                                                <?php if ($assignedEngineerIds !== []): ?>
+                                                    <?php foreach ($engineers as $engineer): ?>
+                                                        <?php if (in_array((int)$engineer['id'], $assignedEngineerIds, true)): ?>
+                                                            <button
+                                                                type="button"
+                                                                class="engineer-chip"
+                                                                data-engineer-chip
+                                                                data-engineer-id="<?php echo (int)$engineer['id']; ?>"
+                                                                data-engineer-name="<?php echo htmlspecialchars($engineer['full_name'], ENT_QUOTES); ?>"
+                                                                aria-pressed="true"
+                                                            >
+                                                                <span><?php echo htmlspecialchars($engineer['full_name']); ?></span>
+                                                                <span class="engineer-chip__remove" aria-hidden="true">&times;</span>
+                                                            </button>
+                                                        <?php endif; ?>
+                                                    <?php endforeach; ?>
+                                                <?php else: ?>
+                                                    <span class="engineer-picker__empty">No engineers added yet.</span>
+                                                <?php endif; ?>
+                                            </div>
+                                            <div class="engineer-picker__inputs" data-engineer-inputs>
+                                                <?php foreach ($assignedEngineerIds as $engineerId): ?>
+                                                    <input type="hidden" name="engineer_ids[]" value="<?php echo (int)$engineerId; ?>" data-engineer-input>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </section>
@@ -932,54 +1023,7 @@ if ($projectId > 0) {
                         <h2 class="section-title-inline">Budget / Cost / Payment Management</h2>
                     </div>
 
-                    <section class="cost-note-panel" aria-label="Project costing note">
-                        <div class="cost-note-panel__title-row">
-                            <div>
-                                <span class="cost-note-panel__eyebrow">Project Costing Note</span>
-                                <h4>Converted from the submitted layout</h4>
-                            </div>
-                            <span class="budget-health budget-health--<?php echo htmlspecialchars($budgetHealth['status']); ?>">
-                                <?php echo htmlspecialchars($budgetHealth['label']); ?>
-                            </span>
-                        </div>
-
-                        <div class="cost-note-grid">
-                            <div class="cost-note-field">
-                                <span>Client</span>
-                                <strong><?php echo htmlspecialchars($project['client_name'] ?? 'N/A'); ?></strong>
-                            </div>
-                            <div class="cost-note-field">
-                                <span>PO Number</span>
-                                <strong><?php echo htmlspecialchars($projectPoNumber !== '' ? $projectPoNumber : 'Not set'); ?></strong>
-                            </div>
-                            <div class="cost-note-field cost-note-field--wide">
-                                <span>Project Title</span>
-                                <strong><?php echo htmlspecialchars($project['project_name'] ?? 'Untitled project'); ?></strong>
-                            </div>
-                            <div class="cost-note-field">
-                                <span>PO Date</span>
-                                <strong><?php echo htmlspecialchars(pm_format_date($project['start_date'] ?? null)); ?></strong>
-                            </div>
-                            <div class="cost-note-field">
-                                <span>Project Code</span>
-                                <strong><?php echo htmlspecialchars($projectCode !== '' ? $projectCode : 'Not set'); ?></strong>
-                            </div>
-                            <?php if ($hasProjectSiteColumn): ?>
-                                <div class="cost-note-field">
-                                    <span>Project Site</span>
-                                    <strong><?php echo htmlspecialchars($project['project_site'] ?? 'Not set'); ?></strong>
-                                </div>
-                            <?php endif; ?>
-                            <div class="cost-note-field cost-note-field--wide">
-                                <span>Address</span>
-                                <strong><?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></strong>
-                            </div>
-                            <div class="cost-note-field cost-note-field--wide">
-                                <span>Email Address</span>
-                                <strong><?php echo htmlspecialchars($projectEmail !== '' ? $projectEmail : (trim((string)($project['client_email'] ?? '')) !== '' ? trim((string)($project['client_email'] ?? '')) : 'Not set')); ?></strong>
-                            </div>
-                        </div>
-                    </section>
+                  
 
                     <section class="budget-panel budget-panel--<?php echo htmlspecialchars($budgetHealth['status']); ?>">
                         <div class="budget-panel__header">
@@ -1502,13 +1546,26 @@ document.addEventListener('DOMContentLoaded', function () {
     const updateButton = document.querySelector('[data-project-update-button]');
     const cancelButton = document.querySelector('[data-project-cancel-button]');
     const editableFields = Array.from(document.querySelectorAll('[data-project-editable]'));
+    const editableControls = Array.from(document.querySelectorAll('[data-project-editable-control]'));
     const overviewPanel = document.querySelector('[data-project-panel="overview"]');
 
     if (editForm && editToggle && updateButton && cancelButton && editableFields.length > 0) {
         const fieldSnapshots = editableFields.map(function (field) {
-            return {
+            const snapshot = {
                 field: field,
                 value: field.value,
+            };
+
+            if (field.tagName === 'SELECT' && field.multiple) {
+                snapshot.values = Array.from(field.selectedOptions).map(function (option) {
+                    return option.value;
+                });
+            }
+
+            return {
+                field: snapshot.field,
+                value: snapshot.value,
+                values: snapshot.values || null,
             };
         });
 
@@ -1523,6 +1580,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         field.setAttribute('readonly', 'readonly');
                     }
                 }
+            });
+
+            editableControls.forEach(function (control) {
+                control.disabled = !isEditing;
             });
 
             editToggle.classList.toggle('hidden', isEditing);
@@ -1549,11 +1610,165 @@ document.addEventListener('DOMContentLoaded', function () {
 
         cancelButton.addEventListener('click', function () {
             fieldSnapshots.forEach(function (snapshot) {
+                if (snapshot.field.tagName === 'SELECT' && snapshot.field.multiple && Array.isArray(snapshot.values)) {
+                    Array.from(snapshot.field.options).forEach(function (option) {
+                        option.selected = snapshot.values.indexOf(option.value) !== -1;
+                    });
+                    return;
+                }
+
                 snapshot.field.value = snapshot.value;
             });
             setEditMode(false);
         });
     }
+
+    document.querySelectorAll('[data-engineer-picker]').forEach(function (picker) {
+        const engineerSelect = picker.querySelector('[data-engineer-select]');
+        const toggleButton = picker.querySelector('[data-engineer-toggle]');
+        const toggleButtonIcon = picker.querySelector('.engineer-picker__toggle-icon');
+        const toggleButtonText = picker.querySelector('.engineer-picker__toggle-text');
+        const selectedContainer = picker.querySelector('[data-engineer-selected]');
+        const inputsContainer = picker.querySelector('[data-engineer-inputs]');
+
+        if (!engineerSelect || !toggleButton || !selectedContainer || !inputsContainer) {
+            return;
+        }
+
+        function getSelectedEngineerIds() {
+            return Array.from(inputsContainer.querySelectorAll('[data-engineer-input]')).map(function (input) {
+                return String(input.value);
+            });
+        }
+
+        function syncValidation() {
+            if (getSelectedEngineerIds().length > 0) {
+                engineerSelect.setCustomValidity('');
+            } else {
+                engineerSelect.setCustomValidity('Assigned engineer is required.');
+            }
+        }
+
+        function syncToggleButton() {
+            const selectedValue = engineerSelect.value;
+            const hasSelectedValue = selectedValue !== '';
+            const isAlreadyAdded = hasSelectedValue && getSelectedEngineerIds().includes(selectedValue);
+
+            toggleButton.disabled = toggleButton.hasAttribute('data-project-editable-control') && toggleButton.closest('[data-project-panel="overview"]')?.classList.contains('is-editing') === false
+                ? true
+                : !hasSelectedValue;
+            toggleButton.classList.toggle('is-remove', Boolean(isAlreadyAdded));
+            toggleButton.setAttribute('aria-label', isAlreadyAdded ? 'Remove selected engineer' : 'Add selected engineer');
+            toggleButtonIcon.textContent = isAlreadyAdded ? '\u2212' : '+';
+            toggleButtonText.textContent = isAlreadyAdded ? 'Remove' : 'Add';
+        }
+
+        function renderEmptyState() {
+            const hasChip = selectedContainer.querySelector('[data-engineer-chip]');
+            selectedContainer.classList.toggle('is-empty', !hasChip);
+
+            if (!hasChip) {
+                selectedContainer.innerHTML = '<span class="engineer-picker__empty">No engineers added yet.</span>';
+            }
+        }
+
+        function addEngineer(engineerId, engineerName) {
+            const existingInput = inputsContainer.querySelector('[data-engineer-input][value="' + CSS.escape(engineerId) + '"]');
+
+            if (existingInput) {
+                return;
+            }
+
+            const emptyState = selectedContainer.querySelector('.engineer-picker__empty');
+            if (emptyState) {
+                emptyState.remove();
+            }
+
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'engineer-chip';
+            chip.setAttribute('data-engineer-chip', '');
+            chip.setAttribute('data-engineer-id', engineerId);
+            chip.setAttribute('data-engineer-name', engineerName);
+            chip.setAttribute('aria-pressed', 'true');
+            chip.innerHTML = '<span></span><span class="engineer-chip__remove" aria-hidden="true">&times;</span>';
+            chip.querySelector('span').textContent = engineerName;
+            selectedContainer.appendChild(chip);
+
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'engineer_ids[]';
+            hiddenInput.value = engineerId;
+            hiddenInput.setAttribute('data-engineer-input', '');
+            inputsContainer.appendChild(hiddenInput);
+
+            syncValidation();
+            syncToggleButton();
+        }
+
+        function removeEngineer(engineerId) {
+            const hiddenInput = inputsContainer.querySelector('[data-engineer-input][value="' + CSS.escape(engineerId) + '"]');
+            const chip = selectedContainer.querySelector('[data-engineer-chip][data-engineer-id="' + CSS.escape(engineerId) + '"]');
+
+            if (hiddenInput) {
+                hiddenInput.remove();
+            }
+
+            if (chip) {
+                chip.remove();
+            }
+
+            renderEmptyState();
+            syncValidation();
+            syncToggleButton();
+        }
+
+        engineerSelect.addEventListener('change', function () {
+            engineerSelect.setCustomValidity('');
+            syncToggleButton();
+        });
+
+        toggleButton.addEventListener('click', function () {
+            const engineerId = engineerSelect.value;
+
+            if (engineerId === '') {
+                engineerSelect.setCustomValidity('Select an engineer first.');
+                engineerSelect.reportValidity();
+                return;
+            }
+
+            const selectedOption = engineerSelect.options[engineerSelect.selectedIndex];
+            if (!selectedOption) {
+                return;
+            }
+
+            if (getSelectedEngineerIds().includes(engineerId)) {
+                removeEngineer(engineerId);
+            } else {
+                addEngineer(engineerId, selectedOption.text);
+            }
+        });
+
+        selectedContainer.addEventListener('click', function (event) {
+            const chip = event.target.closest('[data-engineer-chip]');
+
+            if (!chip) {
+                return;
+            }
+
+            const engineerId = chip.getAttribute('data-engineer-id') || '';
+            if (engineerId === '') {
+                return;
+            }
+
+            engineerSelect.value = engineerId;
+            removeEngineer(engineerId);
+        });
+
+        renderEmptyState();
+        syncValidation();
+        syncToggleButton();
+    });
 
     document.querySelectorAll('[data-inline-edit-form]').forEach(function (form) {
         const editButton = form.querySelector('[data-inline-edit]');

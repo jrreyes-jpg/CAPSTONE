@@ -13,6 +13,7 @@ $foremanNotifications = $foremanNotifications ?? [
 ];
 
 $isOverview = $currentFile === 'foreman_dashboard.php';
+$isProjects = $currentFile === 'projects.php';
 $isAssets = $currentFile === 'asset_status.php';
 $isLogs = $currentFile === 'usage_logs.php';
 $isWorkers = $currentFile === 'worker_summary.php';
@@ -73,6 +74,19 @@ $isWorkers = $currentFile === 'worker_summary.php';
                 </span>
                 <span class="menu-text">Scan Asset</span>
             </button>
+        </li>
+        <li>
+            <a href="/codesamplecaps/FOREMAN/dashboards/projects.php" class="menu-link<?php echo $isProjects ? ' active' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Proj</span>
+                </span>
+                <span class="menu-text">My Projects</span>
+            </a>
         </li>
         <li>
             <a href="/codesamplecaps/FOREMAN/dashboards/asset_status.php" class="menu-link<?php echo $isAssets ? ' active' : ''; ?>">

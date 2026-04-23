@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/project_access.php';
 require_once __DIR__ . '/../includes/foreman_helpers.php';
 
 require_role('foreman');
@@ -21,6 +22,7 @@ $foremanNotifications = [
     'logs_today' => (int)($usageSummary['logs_today'] ?? 0),
     'scans_today' => (int)($scanSummary['scans_today'] ?? 0),
 ];
+$projectRoleSummary = project_role_summary_label('foreman');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -45,6 +47,7 @@ $foremanNotifications = [
                     Simple field dashboard for scanning assets, checking current site status,
                     and reviewing worker activity without repeating the full details from other pages.
                 </p>
+                <p class="page-hero__copy page-hero__copy--compact"><?php echo htmlspecialchars($projectRoleSummary); ?></p>
                 <div class="hero-actions">
                     <button class="btn-primary" type="button" data-open-qr-scanner>Scan Asset</button>
                     <a class="btn-secondary" href="/codesamplecaps/FOREMAN/dashboards/usage_logs.php">View Logs</a>
@@ -116,6 +119,10 @@ $foremanNotifications = [
                     <a class="quick-link" href="/codesamplecaps/FOREMAN/dashboards/usage_logs.php">
                         <strong>Usage Logs</strong>
                         <span>Review detailed usage entries and scan history.</span>
+                    </a>
+                    <a class="quick-link" href="/codesamplecaps/FOREMAN/dashboards/projects.php">
+                        <strong>My Projects</strong>
+                        <span>Review assigned project status, deadlines, and open work only.</span>
                     </a>
                     <a class="quick-link" href="/codesamplecaps/FOREMAN/dashboards/worker_summary.php">
                         <strong>Worker Summary</strong>

@@ -86,6 +86,11 @@ body {
     line-height: 1.7;
 }
 
+.page-hero__copy--compact {
+    margin-top: 10px;
+    max-width: 520px;
+}
+
 .hero-actions {
     display: flex;
     flex-wrap: wrap;
@@ -291,20 +296,23 @@ body {
 
 .activity-list,
 .scan-list,
-.worker-grid {
+.worker-grid,
+.project-list {
     display: grid;
     gap: 14px;
 }
 
 .activity-card,
 .scan-card,
-.worker-card {
+.worker-card,
+.project-card {
     padding: 18px;
     border-radius: 18px;
 }
 
 .activity-card__header,
-.worker-card__header {
+.worker-card__header,
+.project-card__header {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -313,6 +321,7 @@ body {
 
 .activity-card h3,
 .worker-card h3,
+.project-card h3,
 .scan-card h3 {
     margin: 0;
     color: #0f172a;
@@ -321,7 +330,8 @@ body {
 
 .activity-card p,
 .scan-card p,
-.worker-card p {
+.worker-card p,
+.project-card p {
     margin: 12px 0 0;
     color: var(--text-light);
     line-height: 1.6;
@@ -413,6 +423,63 @@ body {
     color: #166534;
 }
 
+.status-badge--warning {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-badge--danger {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.status-badge--neutral {
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.status-badge--pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-badge--ongoing {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-badge--completed {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.status-badge--on-hold {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.project-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.project-meta span {
+    display: block;
+    color: var(--text-light);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.project-meta strong {
+    display: block;
+    margin-top: 6px;
+    color: #0f172a;
+    font-size: 0.98rem;
+}
+
 .empty-state {
     padding: 26px;
     border-radius: 20px;
@@ -475,7 +542,8 @@ body {
     .quick-links-grid,
     .status-grid,
     .activity-meta,
-    .scan-meta {
+    .scan-meta,
+    .project-meta {
         grid-template-columns: 1fr;
     }
 

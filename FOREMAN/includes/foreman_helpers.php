@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/../../config/project_access.php';
+
 function foreman_table_exists(mysqli $conn, string $tableName): bool
 {
     static $cache = [];
@@ -81,6 +83,69 @@ function foreman_status_label(?string $value): string
 {
     $value = trim(str_replace(['-', '_'], ' ', (string)$value));
     return $value === '' ? 'Unknown' : ucwords($value);
+}
+
+function foreman_format_date(?string $value): string
+{
+    $value = trim((string)$value);
+
+    if ($value === '') {
+        return 'Not set';
+    }
+
+    try {
+        return (new DateTimeImmutable($value))->format('M j, Y');
+    } catch (Throwable $exception) {
+        return $value;
+    }
+}
+
+function foreman_build_deadline_meta(?string $deadline, string $status): array
+{
+    $deadline = trim((string)$deadline);
+    if ($deadline === '') {
+        return [
+            'label' => 'No deadline',
+            'class' => 'status-badge--neutral',
+        ];
+    }
+
+    $deadlineDate = DateTimeImmutable::createFromFormat('Y-m-d', $deadline);
+    if (!$deadlineDate) {
+        return [
+            'label' => $deadline,
+            'class' => 'status-badge--neutral',
+        ];
+    }
+
+    if ($status === 'completed') {
+        return [
+            'label' => 'Delivered',
+            'class' => 'status-badge--ok',
+        ];
+    }
+
+    $today = new DateTimeImmutable('today');
+    $days = (int)$today->diff($deadlineDate)->format('%r%a');
+
+    if ($days < 0) {
+        return [
+            'label' => 'Overdue by ' . abs($days) . ' day' . (abs($days) === 1 ? '' : 's'),
+            'class' => 'status-badge--danger',
+        ];
+    }
+
+    if ($days <= 2) {
+        return [
+            'label' => $days === 0 ? 'Due today' : 'Due in ' . $days . ' day' . ($days === 1 ? '' : 's'),
+            'class' => 'status-badge--warning',
+        ];
+    }
+
+    return [
+        'label' => 'Due ' . $deadlineDate->format('M j, Y'),
+        'class' => 'status-badge--ok',
+    ];
 }
 
 function foreman_excerpt(?string $value, int $limit = 120): string
@@ -188,6 +253,7 @@ function foreman_fetch_dashboard_data(mysqli $conn, int $userId): array
             'active_projects' => 0,
             'open_tasks' => 0,
         ],
+        'assigned_projects' => [],
         'recent_usage_logs' => [],
         'recent_scan_rows' => [],
         'worker_summary_rows' => [],
@@ -279,14 +345,25 @@ function foreman_fetch_dashboard_data(mysqli $conn, int $userId): array
         }
     }
 
-    if (foreman_table_exists($conn, 'tasks') && foreman_table_exists($conn, 'projects')) {
+    if (
+        project_user_can('view_assigned_projects', 'foreman') &&
+        foreman_table_exists($conn, 'project_assignments') &&
+        foreman_table_exists($conn, 'projects')
+    ) {
         $supportStatement = $conn->prepare(
             "SELECT
-                COUNT(DISTINCT CASE WHEN p.status IN ('pending', 'ongoing', 'on-hold') THEN t.project_id END) AS active_projects,
-                SUM(CASE WHEN t.status IN ('pending', 'ongoing', 'delayed') THEN 1 ELSE 0 END) AS open_tasks
-             FROM tasks t
-             INNER JOIN projects p ON p.id = t.project_id
-             WHERE t.assigned_to = ?
+                COUNT(DISTINCT CASE WHEN p.status IN ('pending', 'ongoing', 'on-hold') THEN p.id END) AS active_projects,
+                COALESCE(SUM(CASE WHEN task_totals.open_tasks IS NOT NULL THEN task_totals.open_tasks ELSE 0 END), 0) AS open_tasks
+             FROM project_assignments pa
+             INNER JOIN projects p ON p.id = pa.project_id
+             LEFT JOIN (
+                 SELECT
+                    project_id,
+                    SUM(CASE WHEN status IN ('pending', 'ongoing', 'delayed') THEN 1 ELSE 0 END) AS open_tasks
+                 FROM tasks
+                 GROUP BY project_id
+             ) task_totals ON task_totals.project_id = p.id
+             WHERE pa.engineer_id = ?
              AND p.status <> 'draft'"
         );
 
@@ -300,6 +377,62 @@ function foreman_fetch_dashboard_data(mysqli $conn, int $userId): array
             }
 
             $supportStatement->close();
+        }
+
+        $assignedProjectsStatement = $conn->prepare(
+            "SELECT
+                p.id,
+                p.project_name,
+                p.description,
+                p.start_date,
+                p.end_date,
+                p.status,
+                client.full_name AS client_name,
+                creator.full_name AS project_owner_name,
+                COALESCE(task_totals.total_tasks, 0) AS total_tasks,
+                COALESCE(task_totals.completed_tasks, 0) AS completed_tasks,
+                COALESCE(task_totals.open_tasks, 0) AS open_tasks,
+                task_totals.next_deadline
+             FROM project_assignments pa
+             INNER JOIN projects p ON p.id = pa.project_id
+             LEFT JOIN users client ON client.id = p.client_id
+             LEFT JOIN users creator ON creator.id = p.created_by
+             LEFT JOIN (
+                 SELECT
+                    project_id,
+                    COUNT(*) AS total_tasks,
+                    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_tasks,
+                    SUM(CASE WHEN status IN ('pending', 'ongoing', 'delayed') THEN 1 ELSE 0 END) AS open_tasks,
+                    MIN(CASE WHEN status <> 'completed' AND deadline IS NOT NULL THEN deadline END) AS next_deadline
+                 FROM tasks
+                 GROUP BY project_id
+             ) task_totals ON task_totals.project_id = p.id
+             WHERE pa.engineer_id = ?
+             AND p.status <> 'draft'
+             GROUP BY p.id, p.project_name, p.description, p.start_date, p.end_date, p.status, client.full_name, creator.full_name,
+                      task_totals.total_tasks, task_totals.completed_tasks, task_totals.open_tasks, task_totals.next_deadline
+             ORDER BY
+                CASE p.status
+                    WHEN 'ongoing' THEN 1
+                    WHEN 'pending' THEN 2
+                    WHEN 'on-hold' THEN 3
+                    WHEN 'completed' THEN 4
+                    ELSE 5
+                END,
+                p.created_at DESC,
+                p.id DESC"
+        );
+
+        if ($assignedProjectsStatement) {
+            $assignedProjectsStatement->bind_param('i', $userId);
+            $assignedProjectsStatement->execute();
+            $assignedProjectsResult = $assignedProjectsStatement->get_result();
+
+            if ($assignedProjectsResult) {
+                $data['assigned_projects'] = $assignedProjectsResult->fetch_all(MYSQLI_ASSOC);
+            }
+
+            $assignedProjectsStatement->close();
         }
     }
 

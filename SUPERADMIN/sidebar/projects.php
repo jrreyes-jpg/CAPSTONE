@@ -1446,10 +1446,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'update_project_details') {
         $projectId = (int)($_POST['project_id'] ?? 0);
+        $projectName = normalize_text($_POST['project_name'] ?? '');
         $description = normalize_text($_POST['description'] ?? '');
+        $clientId = (int)($_POST['client_id'] ?? 0);
         $contactPerson = $hasContactPersonColumn ? normalize_text_or_null($_POST['contact_person'] ?? null) : null;
         $contactNumber = $hasContactNumberColumn ? normalize_text_or_null($_POST['contact_number'] ?? null) : null;
+        $projectSite = $hasProjectSiteColumn ? normalize_text_or_null($_POST['project_site'] ?? null) : null;
+        $projectAddress = $hasProjectAddressColumn ? normalize_text_or_null($_POST['project_address'] ?? null) : null;
         $projectEmail = $hasProjectEmailColumn ? normalize_text_or_null($_POST['project_email'] ?? null) : null;
+        $projectCode = $hasProjectCodeColumn ? normalize_text_or_null($_POST['project_code'] ?? null) : null;
+        $poNumber = $hasPoNumberColumn ? normalize_text_or_null($_POST['po_number'] ?? null) : null;
+        $engineerIds = normalize_engineer_ids($_POST['engineer_ids'] ?? []);
+        $startDate = normalize_date_or_null($_POST['start_date'] ?? null);
+        $projectStartDate = $hasProjectStartDateColumn ? normalize_date_or_null($_POST['project_start_date'] ?? null) : null;
+        $estimatedCompletionDate = $hasEstimatedCompletionDateColumn ? normalize_date_or_null($_POST['estimated_completion_date'] ?? null) : null;
         $endDate = null;
         $project = $projectId > 0 ? getProjectSnapshot($conn, $projectId) : null;
         $updatedBy = (int)($_SESSION['user_id'] ?? 0);
@@ -1464,14 +1474,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
-        $projectName = normalize_text((string)($project['project_name'] ?? ''));
-        $projectSite = $hasProjectSiteColumn ? normalize_text_or_null($project['project_site'] ?? null) : null;
-        $projectAddress = $hasProjectAddressColumn ? normalize_text_or_null($project['project_address'] ?? null) : null;
-        $projectCode = $hasProjectCodeColumn ? normalize_text_or_null($project['project_code'] ?? null) : null;
-        $poNumber = $hasPoNumberColumn ? normalize_text_or_null($project['po_number'] ?? null) : null;
-        $clientId = (int)($project['client_id'] ?? 0);
-        $engineerIds = normalize_engineer_ids(explode(',', (string)($project['engineer_ids_csv'] ?? '')));
-        $startDate = normalize_date_or_null($project['start_date'] ?? null);
+        if ($projectName === '') {
+            $projectName = normalize_text((string)($project['project_name'] ?? ''));
+        }
+
+        if ($clientId <= 0) {
+            $clientId = (int)($project['client_id'] ?? 0);
+        }
+
+        if ($engineerIds === []) {
+            $engineerIds = normalize_engineer_ids(explode(',', (string)($project['engineer_ids_csv'] ?? '')));
+        }
 
         if ($projectName === '' || $clientId <= 0 || $engineerIds === []) {
             set_projects_flash('error', 'Project title, client, and assigned engineer/s are required.');
@@ -1533,6 +1546,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
+        if ($hasProjectStartDateColumn && $projectStartDate === null) {
+            set_projects_flash('error', 'Project Start Date is required.');
+            redirect_projects_page();
+        }
+
+        if ($hasEstimatedCompletionDateColumn && $estimatedCompletionDate === null) {
+            set_projects_flash('error', 'Estimated Completion Date is required.');
+            redirect_projects_page();
+        }
+
+        if ($projectStartDate !== null && $estimatedCompletionDate !== null && $estimatedCompletionDate < $projectStartDate) {
+            set_projects_flash('error', 'Estimated Completion Date must be the same as or later than Project Start Date.');
+            redirect_projects_page();
+        }
+
         if ($hasProjectAddressColumn && ($project['status'] ?? '') !== 'draft' && $projectAddress === null) {
             set_projects_flash('error', 'Project address is required unless the project stays in Draft.');
             redirect_projects_page();
@@ -1546,27 +1574,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($hasProjectCodeColumn && $hasPoNumberColumn) {
                         $updateProject = $conn->prepare(
                             'UPDATE projects
-                             SET project_name = ?, description = ?, client_id = ?, contact_person = ?, contact_number = ?, project_site = ?, project_address = ?, project_email = ?, project_code = ?, po_number = ?, start_date = ?, end_date = ?
+                             SET project_name = ?, description = ?, client_id = ?, contact_person = ?, contact_number = ?, project_site = ?, project_address = ?, project_email = ?, project_code = ?, po_number = ?, start_date = ?, project_start_date = ?, estimated_completion_date = ?, end_date = ?
                              WHERE id = ?'
                         );
                     } else {
                         $updateProject = $conn->prepare(
                             'UPDATE projects
-                             SET project_name = ?, description = ?, client_id = ?, contact_person = ?, contact_number = ?, project_site = ?, project_address = ?, project_email = ?, start_date = ?, end_date = ?
+                             SET project_name = ?, description = ?, client_id = ?, contact_person = ?, contact_number = ?, project_site = ?, project_address = ?, project_email = ?, start_date = ?, project_start_date = ?, estimated_completion_date = ?, end_date = ?
                              WHERE id = ?'
                         );
                     }
                 } else {
                     $updateProject = $conn->prepare(
                         'UPDATE projects
-                         SET project_name = ?, description = ?, client_id = ?, contact_person = ?, contact_number = ?, project_site = ?, project_address = ?, start_date = ?, end_date = ?
+                         SET project_name = ?, description = ?, client_id = ?, contact_person = ?, contact_number = ?, project_site = ?, project_address = ?, start_date = ?, project_start_date = ?, estimated_completion_date = ?, end_date = ?
                          WHERE id = ?'
                     );
                 }
             } else {
                 $updateProject = $conn->prepare(
                     'UPDATE projects
-                     SET project_name = ?, description = ?, client_id = ?, contact_person = ?, contact_number = ?, start_date = ?, end_date = ?
+                     SET project_name = ?, description = ?, client_id = ?, contact_person = ?, contact_number = ?, start_date = ?, project_start_date = ?, estimated_completion_date = ?, end_date = ?
                      WHERE id = ?'
                 );
             }
@@ -1579,26 +1607,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($hasProjectEmailColumn) {
                     if ($hasProjectCodeColumn && $hasPoNumberColumn) {
                         if (
-                            !$updateProject->bind_param('ssisssssssssi', $projectName, $description, $clientId, $contactPerson, $contactNumber, $projectSite, $projectAddress, $projectEmail, $projectCode, $poNumber, $startDate, $endDate, $projectId) ||
+                            !$updateProject->bind_param('ssisssssssssssi', $projectName, $description, $clientId, $contactPerson, $contactNumber, $projectSite, $projectAddress, $projectEmail, $projectCode, $poNumber, $startDate, $projectStartDate, $estimatedCompletionDate, $endDate, $projectId) ||
                             !$updateProject->execute()
                         ) {
                             throw new RuntimeException('Failed to update project details.');
                         }
                     } elseif (
-                        !$updateProject->bind_param('ssisssssssi', $projectName, $description, $clientId, $contactPerson, $contactNumber, $projectSite, $projectAddress, $projectEmail, $startDate, $endDate, $projectId) ||
+                        !$updateProject->bind_param('ssisssssssssi', $projectName, $description, $clientId, $contactPerson, $contactNumber, $projectSite, $projectAddress, $projectEmail, $startDate, $projectStartDate, $estimatedCompletionDate, $endDate, $projectId) ||
                         !$updateProject->execute()
                     ) {
                         throw new RuntimeException('Failed to update project details.');
                     }
                 } elseif (
-                    !$updateProject->bind_param('ssissssssi', $projectName, $description, $clientId, $contactPerson, $contactNumber, $projectSite, $projectAddress, $startDate, $endDate, $projectId) ||
+                    !$updateProject->bind_param('ssissssssssi', $projectName, $description, $clientId, $contactPerson, $contactNumber, $projectSite, $projectAddress, $startDate, $projectStartDate, $estimatedCompletionDate, $endDate, $projectId) ||
                     !$updateProject->execute()
                 ) {
                     throw new RuntimeException('Failed to update project details.');
                 }
             } else {
                 if (
-                    !$updateProject->bind_param('ssissssi', $projectName, $description, $clientId, $contactPerson, $contactNumber, $startDate, $endDate, $projectId) ||
+                    !$updateProject->bind_param('ssissssssi', $projectName, $description, $clientId, $contactPerson, $contactNumber, $startDate, $projectStartDate, $estimatedCompletionDate, $endDate, $projectId) ||
                     !$updateProject->execute()
                 ) {
                     throw new RuntimeException('Failed to update project details.');
@@ -1657,6 +1685,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'project_code' => $projectCode,
                     'po_number' => $poNumber,
                     'start_date' => $startDate,
+                    'project_start_date' => $projectStartDate,
+                    'estimated_completion_date' => $estimatedCompletionDate,
                     'end_date' => $endDate,
                 ]
             );
