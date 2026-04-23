@@ -298,6 +298,85 @@ if (!function_exists('asset_units_mark_available_units')) {
     }
 }
 
+if (!function_exists('asset_units_restore_units_to_available')) {
+    function asset_units_restore_units_to_available(mysqli $conn, int $inventoryId, int $quantity, string $sourceStatus): array
+    {
+        $allowedStatuses = ['deployed', 'maintenance', 'lost'];
+        if ($quantity <= 0 || !in_array($sourceStatus, $allowedStatuses, true)) {
+            return [];
+        }
+
+        $statement = $conn->prepare(
+            "SELECT id, unit_code
+             FROM asset_units
+             WHERE inventory_id = ?
+             AND status = ?
+             ORDER BY id DESC
+             LIMIT ?"
+        );
+
+        if (!$statement) {
+            throw new RuntimeException('Failed to prepare asset unit recovery lookup.');
+        }
+
+        $statement->bind_param('isi', $inventoryId, $sourceStatus, $quantity);
+        $statement->execute();
+        $result = $statement->get_result();
+        $units = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
+        $statement->close();
+
+        if (count($units) < $quantity) {
+            throw new RuntimeException('Not enough asset units were found for the selected recovery action.');
+        }
+
+        $unitIds = array_map('intval', array_column($units, 'id'));
+        $unitCodes = array_map(static fn(array $row): string => (string)($row['unit_code'] ?? ''), $units);
+        $placeholders = implode(',', array_fill(0, count($unitIds), '?'));
+        $types = str_repeat('i', count($unitIds));
+
+        if (
+            $sourceStatus === 'deployed' &&
+            asset_units_table_exists($conn, 'project_inventory_deployment_units')
+        ) {
+            $mappingTypes = $types;
+            $mappingStatement = $conn->prepare(
+                "UPDATE project_inventory_deployment_units
+                 SET returned_at = NOW()
+                 WHERE asset_unit_id IN ($placeholders)
+                 AND returned_at IS NULL"
+            );
+
+            if (!$mappingStatement) {
+                throw new RuntimeException('Failed to release deployment mapping for returned units.');
+            }
+
+            $mappingStatement->bind_param($mappingTypes, ...$unitIds);
+            if (!$mappingStatement->execute()) {
+                throw new RuntimeException('Failed to release deployment mapping for returned units.');
+            }
+            $mappingStatement->close();
+        }
+
+        $updateStatement = $conn->prepare(
+            "UPDATE asset_units
+             SET status = 'available'
+             WHERE id IN ($placeholders)"
+        );
+
+        if (!$updateStatement) {
+            throw new RuntimeException('Failed to restore asset unit statuses.');
+        }
+
+        $updateStatement->bind_param($types, ...$unitIds);
+        if (!$updateStatement->execute()) {
+            throw new RuntimeException('Failed to restore asset unit statuses.');
+        }
+        $updateStatement->close();
+
+        return $unitCodes;
+    }
+}
+
 if (!function_exists('asset_units_fetch_inventory_context')) {
     function asset_units_fetch_inventory_context(mysqli $conn, int $inventoryId): ?array
     {

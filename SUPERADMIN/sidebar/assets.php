@@ -661,28 +661,152 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'return_asset') {
         $assetId = (int)($_POST['asset_id'] ?? 0);
+        $requestedQuantity = max(1, (int)($_POST['status_quantity'] ?? 1));
 
         if ($assetId > 0) {
             $beforeReturn = getAssetSnapshot($conn, $assetId);
-            $stmt = $conn->prepare('UPDATE assets SET asset_status = ? WHERE id = ?');
-            $status = 'available';
-            $stmt->bind_param('si', $status, $assetId);
-            $stmt->execute();
+            $inventory = getAssetInventorySnapshot($conn, $assetId);
 
-            audit_log_event(
-                $conn,
-                (int)($_SESSION['user_id'] ?? 0),
-                'return_asset',
-                'asset',
-                $assetId,
-                $beforeReturn ? ['asset_status' => $beforeReturn['asset_status'] ?? null] : null,
-                [
-                    'asset_name' => $beforeReturn['asset_name'] ?? null,
-                    'asset_status' => 'available',
-                ]
-            );
+            if (!$inventory) {
+                $_SESSION['assets_error'] = 'Inventory record was not found for this asset.';
+                redirect_assets_page();
+            }
 
-            $_SESSION['assets_message'] = 'Asset returned.';
+            $deployedQuantity = asset_units_fetch_status_counts($conn, (int)$inventory['id'])['deployed'] ?? 0;
+            $effectiveQuantity = min($requestedQuantity, max(1, (int)$deployedQuantity));
+
+            try {
+                $conn->begin_transaction();
+                $updatedUnitCodes = asset_units_restore_units_to_available($conn, (int)$inventory['id'], $effectiveQuantity, 'deployed');
+                $state = syncAssetInventoryFromUnitStatuses($conn, $assetId);
+
+                audit_log_event(
+                    $conn,
+                    (int)($_SESSION['user_id'] ?? 0),
+                    'return_asset',
+                    'asset',
+                    $assetId,
+                    $beforeReturn ? ['asset_status' => $beforeReturn['asset_status'] ?? null] : null,
+                    [
+                        'asset_name' => $beforeReturn['asset_name'] ?? null,
+                        'asset_status' => $state['asset_status'],
+                        'quantity_returned' => count($updatedUnitCodes),
+                        'unit_codes' => $updatedUnitCodes,
+                        'available_units' => $state['available'],
+                        'deployed_units' => $state['deployed'],
+                    ]
+                );
+
+                $conn->commit();
+                $_SESSION['assets_message'] = count($updatedUnitCodes) === 1
+                    ? '1 deployed asset unit returned to available.'
+                    : count($updatedUnitCodes) . ' deployed asset units returned to available.';
+            } catch (Throwable $exception) {
+                $conn->rollback();
+                $_SESSION['assets_error'] = $exception->getMessage();
+            }
+        }
+
+        redirect_assets_page();
+    }
+
+    if ($action === 'resolve_asset_maintenance') {
+        $assetId = (int)($_POST['asset_id'] ?? 0);
+        $requestedQuantity = max(1, (int)($_POST['status_quantity'] ?? 1));
+
+        if ($assetId > 0) {
+            $beforeStatus = getAssetSnapshot($conn, $assetId);
+            $inventory = getAssetInventorySnapshot($conn, $assetId);
+
+            if (!$inventory) {
+                $_SESSION['assets_error'] = 'Inventory record was not found for this asset.';
+                redirect_assets_page();
+            }
+
+            $maintenanceQuantity = asset_units_fetch_status_counts($conn, (int)$inventory['id'])['maintenance'] ?? 0;
+            $effectiveQuantity = min($requestedQuantity, max(1, (int)$maintenanceQuantity));
+
+            try {
+                $conn->begin_transaction();
+                $updatedUnitCodes = asset_units_restore_units_to_available($conn, (int)$inventory['id'], $effectiveQuantity, 'maintenance');
+                $state = syncAssetInventoryFromUnitStatuses($conn, $assetId);
+
+                audit_log_event(
+                    $conn,
+                    (int)($_SESSION['user_id'] ?? 0),
+                    'resolve_asset_maintenance',
+                    'asset',
+                    $assetId,
+                    $beforeStatus ? ['asset_status' => $beforeStatus['asset_status'] ?? null] : null,
+                    [
+                        'asset_name' => $beforeStatus['asset_name'] ?? null,
+                        'asset_status' => $state['asset_status'],
+                        'quantity_restored' => count($updatedUnitCodes),
+                        'unit_codes' => $updatedUnitCodes,
+                        'available_units' => $state['available'],
+                        'maintenance_units' => $state['maintenance'],
+                    ]
+                );
+
+                $conn->commit();
+                $_SESSION['assets_message'] = count($updatedUnitCodes) === 1
+                    ? '1 maintenance asset unit restored to available.'
+                    : count($updatedUnitCodes) . ' maintenance asset units restored to available.';
+            } catch (Throwable $exception) {
+                $conn->rollback();
+                $_SESSION['assets_error'] = $exception->getMessage();
+            }
+        }
+
+        redirect_assets_page();
+    }
+
+    if ($action === 'recover_asset_lost') {
+        $assetId = (int)($_POST['asset_id'] ?? 0);
+        $requestedQuantity = max(1, (int)($_POST['status_quantity'] ?? 1));
+
+        if ($assetId > 0) {
+            $beforeStatus = getAssetSnapshot($conn, $assetId);
+            $inventory = getAssetInventorySnapshot($conn, $assetId);
+
+            if (!$inventory) {
+                $_SESSION['assets_error'] = 'Inventory record was not found for this asset.';
+                redirect_assets_page();
+            }
+
+            $lostQuantity = asset_units_fetch_status_counts($conn, (int)$inventory['id'])['lost'] ?? 0;
+            $effectiveQuantity = min($requestedQuantity, max(1, (int)$lostQuantity));
+
+            try {
+                $conn->begin_transaction();
+                $updatedUnitCodes = asset_units_restore_units_to_available($conn, (int)$inventory['id'], $effectiveQuantity, 'lost');
+                $state = syncAssetInventoryFromUnitStatuses($conn, $assetId);
+
+                audit_log_event(
+                    $conn,
+                    (int)($_SESSION['user_id'] ?? 0),
+                    'recover_asset_lost',
+                    'asset',
+                    $assetId,
+                    $beforeStatus ? ['asset_status' => $beforeStatus['asset_status'] ?? null] : null,
+                    [
+                        'asset_name' => $beforeStatus['asset_name'] ?? null,
+                        'asset_status' => $state['asset_status'],
+                        'quantity_restored' => count($updatedUnitCodes),
+                        'unit_codes' => $updatedUnitCodes,
+                        'available_units' => $state['available'],
+                        'lost_units' => $state['lost'],
+                    ]
+                );
+
+                $conn->commit();
+                $_SESSION['assets_message'] = count($updatedUnitCodes) === 1
+                    ? '1 lost asset unit recovered and restored to available.'
+                    : count($updatedUnitCodes) . ' lost asset units recovered and restored to available.';
+            } catch (Throwable $exception) {
+                $conn->rollback();
+                $_SESSION['assets_error'] = $exception->getMessage();
+            }
         }
 
         redirect_assets_page();
@@ -1219,7 +1343,7 @@ if ($createdAssetId > 0) {
                 <div>
                     <h2 class="dashboard-section-title"><?php echo $isTrashView ? 'Trashed Assets' : 'Existing Assets'; ?></h2>
                     <p class="asset-section-subtitle">
-                        <?php echo $isTrashView ? 'Archived asset records stay recoverable here until permanently removed.' : 'Review asset details, stock distribution, and status changes at a glance.'; ?>
+                        <?php echo $isTrashView ? 'Archived asset records stay recoverable here until permanently removed.' : 'Review asset details, stock distribution, and status changes at a glance. ' . (int)($assetUnitMetrics['in_use_units'] ?? 0) . ' unit(s) are currently in use.'; ?>
                     </p>
                 </div>
                 <div class="asset-section-actions">
@@ -1292,7 +1416,6 @@ if ($createdAssetId > 0) {
                                                     <div class="asset-meta-list">
                                                         <span class="asset-meta-pill"><?php echo htmlspecialchars(asset_category_label($asset['asset_category'] ?? null)); ?></span>
                                                         <span class="asset-meta-text">SN: <?php echo htmlspecialchars($asset['serial_number'] ?: 'Generating...'); ?></span>
-                                                        <span class="asset-meta-text">Type: <?php echo htmlspecialchars($asset['asset_type'] ?: 'Not set'); ?></span>
                                                     </div>
                                                 </div>
                                                 <span class="asset-status asset-status--<?php echo htmlspecialchars((string)($asset['asset_status'] ?? 'available')); ?>">
@@ -1300,40 +1423,23 @@ if ($createdAssetId > 0) {
                                                 </span>
                                             </div>
                                             <div class="asset-info-card__footer">
-                                                <div class="asset-meta-stack">
-                                                    <span class="asset-meta-label">Criticality</span>
-                                                    <strong><?php echo htmlspecialchars(asset_criticality_label($asset['criticality'] ?? null)); ?></strong>
-                                                </div>
-                                                <div class="asset-meta-stack">
-                                                    <span class="asset-meta-label">Stock Health</span>
-                                                    <span class="status-pill status-<?php echo htmlspecialchars((string)($asset['inventory_status'] ?? 'available')); ?>">
-                                                        <?php echo htmlspecialchars(build_asset_stock_badge_label($asset['inventory_status'] ?? null)); ?>
+                                                <div class="asset-meta-inline">
+                                                    <span class="asset-meta-inline__item"><strong>Type:</strong> <?php echo htmlspecialchars($asset['asset_type'] ?: 'Not set'); ?></span>
+                                                    <span class="asset-meta-inline__item"><strong>Criticality:</strong> <?php echo htmlspecialchars(asset_criticality_label($asset['criticality'] ?? null)); ?></span>
+                                                    <span class="asset-meta-inline__item asset-meta-inline__item--status">
+                                                        <strong>Stock Health:</strong>
+                                                        <span class="status-pill status-<?php echo htmlspecialchars((string)($asset['inventory_status'] ?? 'available')); ?>">
+                                                            <?php echo htmlspecialchars(build_asset_stock_badge_label($asset['inventory_status'] ?? null)); ?>
+                                                        </span>
                                                     </span>
-                                                </div>
-                                                <div class="asset-meta-stack">
-                                                    <span class="asset-meta-label">Quantity / Min</span>
-                                                    <strong>
-                                                        <?php echo (int)($asset['inventory_quantity'] ?? 0); ?>
-                                                        /
-                                                        <?php echo $asset['inventory_min_stock'] !== null ? (int)$asset['inventory_min_stock'] : 'N/A'; ?>
-                                                    </strong>
+                                                    <span class="asset-meta-inline__item"><strong>Qty / Min:</strong> <?php echo (int)($asset['inventory_quantity'] ?? 0); ?> / <?php echo $asset['inventory_min_stock'] !== null ? (int)$asset['inventory_min_stock'] : 'N/A'; ?></span>
                                                 </div>
                                             </div>
                                         </div>
                                     </td>
                                     <td data-label="Stock / Usage Information">
                                         <div class="asset-stock-panel">
-                                            <div class="asset-stock-panel__chips">
-                                                <span class="stock-chip stock-chip--available">Available <strong><?php echo $availableUnits; ?></strong></span>
-                                                <span class="stock-chip stock-chip--in-use">In Use <strong><?php echo $deployedUnits; ?></strong></span>
-                                                <span class="stock-chip stock-chip--maintenance">Maintenance <strong><?php echo $maintenanceUnits; ?></strong></span>
-                                                <span class="stock-chip stock-chip--lost">Lost <strong><?php echo $lostUnits; ?></strong></span>
-                                            </div>
-                                            <div class="asset-distribution">
-                                                <div class="asset-distribution__label-row">
-                                                    <span>Stock distribution</span>
-                                                    <strong><?php echo $availableUnits + $deployedUnits + $maintenanceUnits + $lostUnits; ?> total tracked</strong>
-                                                </div>
+                                          
                                                 <div class="asset-distribution__bar" aria-hidden="true">
                                                     <span class="asset-distribution__segment asset-distribution__segment--available" style="width: <?php echo round($availableWidth, 2); ?>%"></span>
                                                     <span class="asset-distribution__segment asset-distribution__segment--in-use" style="width: <?php echo round($deployedWidth, 2); ?>%"></span>
@@ -1407,14 +1513,42 @@ if ($createdAssetId > 0) {
                                                         <small class="asset-inline-note">No available units to move to maintenance or lost.</small>
                                                     </div>
                                                 <?php endif; ?>
+                                                <?php if ($deployedUnits > 0 || $maintenanceUnits > 0 || $lostUnits > 0): ?>
+                                                    <form method="POST" class="asset-inline-form asset-recovery-form">
+                                                        <input type="hidden" name="action" value="<?php echo $deployedUnits > 0 ? 'return_asset' : ($maintenanceUnits > 0 ? 'resolve_asset_maintenance' : 'recover_asset_lost'); ?>" class="asset-recovery-action-input">
+                                                        <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
+                                                        <div class="asset-action-card asset-action-card--muted">
+                                                            <span class="asset-action-card__label">Restore non-available units</span>
+                                                            <div class="asset-action-controls">
+                                                                <input
+                                                                    type="number"
+                                                                    name="status_quantity"
+                                                                    min="1"
+                                                                    max="<?php echo max($deployedUnits, $maintenanceUnits, $lostUnits); ?>"
+                                                                    value="1"
+                                                                    class="asset-action-qty"
+                                                                    aria-label="Quantity to restore"
+                                                                >
+                                                                <select class="asset-action-select asset-recovery-select" aria-label="Select restore action">
+                                                                    <?php if ($deployedUnits > 0): ?>
+                                                                        <option value="return_asset" data-max-qty="<?php echo $deployedUnits; ?>">Return in-use to available</option>
+                                                                    <?php endif; ?>
+                                                                    <?php if ($maintenanceUnits > 0): ?>
+                                                                        <option value="resolve_asset_maintenance" data-max-qty="<?php echo $maintenanceUnits; ?>">Maintenance fixed to available</option>
+                                                                    <?php endif; ?>
+                                                                    <?php if ($lostUnits > 0): ?>
+                                                                        <option value="recover_asset_lost" data-max-qty="<?php echo $lostUnits; ?>">Recovered lost to available</option>
+                                                                    <?php endif; ?>
+                                                                </select>
+                                                                <button type="submit" class="btn-secondary">Restore</button>
+                                                            </div>
+                                                            <small class="asset-inline-note">
+                                                                In use: <?php echo $deployedUnits; ?> | Maintenance: <?php echo $maintenanceUnits; ?> | Lost: <?php echo $lostUnits; ?>
+                                                            </small>
+                                                        </div>
+                                                    </form>
+                                                <?php endif; ?>
                                                 <div class="asset-row-actions__secondary">
-                                                    <?php if ($deployedUnits > 0): ?>
-                                                        <form method="POST" class="asset-inline-form">
-                                                            <input type="hidden" name="action" value="return_asset">
-                                                            <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
-                                                            <button type="submit" class="btn-secondary">Mark Returned</button>
-                                                        </form>
-                                                    <?php endif; ?>
                                                     <form method="POST" class="asset-inline-form" onsubmit="return confirm('Move this asset to trash bin?');">
                                                         <input type="hidden" name="action" value="trash_asset">
                                                         <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
@@ -1519,6 +1653,32 @@ document.addEventListener('DOMContentLoaded', () => {
                     event.preventDefault();
                 }
             }
+        });
+    });
+
+    document.querySelectorAll('.asset-recovery-form').forEach((form) => {
+        const actionInput = form.querySelector('.asset-recovery-action-input');
+        const actionSelect = form.querySelector('.asset-recovery-select');
+        const quantityInput = form.querySelector('.asset-action-qty');
+
+        if (!actionInput || !actionSelect || !quantityInput) {
+            return;
+        }
+
+        const syncRecoveryQuantity = () => {
+            const selectedOption = actionSelect.options[actionSelect.selectedIndex];
+            const maxQuantity = Number(selectedOption?.getAttribute('data-max-qty') || '1');
+            quantityInput.max = String(Math.max(1, maxQuantity));
+            if (Number(quantityInput.value) > maxQuantity) {
+                quantityInput.value = String(Math.max(1, maxQuantity));
+            }
+        };
+
+        actionSelect.addEventListener('change', syncRecoveryQuantity);
+        syncRecoveryQuantity();
+
+        form.addEventListener('submit', () => {
+            actionInput.value = actionSelect.value;
         });
     });
 });

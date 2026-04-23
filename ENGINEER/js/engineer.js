@@ -1,6 +1,6 @@
 const setSidebarState = (isShrink) => {
     const sidebar = document.querySelector('.sidebar');
-    const mainContent = document.querySelector('.main-content');
+    const mainContent = document.querySelector('.main-content, .dashboard-main');
     const toggleButton = document.querySelector('[data-sidebar-toggle]');
 
     if (!sidebar || !mainContent) {

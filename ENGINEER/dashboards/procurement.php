@@ -199,9 +199,15 @@ if ($requestsStmt) {
 $pendingCount = 0;
 $approvedCount = 0;
 $rejectedCount = 0;
+$assignedProjectCount = 0;
+$assignedProjectIds = [];
 
 foreach ($requests as $request) {
     $status = (string)($request['status'] ?? '');
+    $projectName = trim((string)($request['project_name'] ?? ''));
+    if ($projectName !== '') {
+        $assignedProjectIds[$projectName] = true;
+    }
     if (in_array($status, ['submitted', 'engineer_review'], true)) {
         $pendingCount++;
     } elseif ($status === 'engineer_approved') {
@@ -210,6 +216,7 @@ foreach ($requests as $request) {
         $rejectedCount++;
     }
 }
+$assignedProjectCount = count($assignedProjectIds);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -221,10 +228,31 @@ foreach ($requests as $request) {
     <link rel="stylesheet" href="../css/engineer.css">
 </head>
 <body>
+
+<button class="sidebar-mobile-toggle" type="button" aria-label="Toggle menu" data-sidebar-mobile-toggle>
+    <span></span>
+    <span></span>
+    <span></span>
+</button>
+
+<div class="sidebar-overlay" data-sidebar-overlay></div>
+
 <div class="dashboard-layout">
     <?php include __DIR__ . '/../sidebar/sidebar_engineer.php'; ?>
 
     <main class="dashboard-main">
+        <section class="procurement-hero">
+            <div class="procurement-hero__content">
+                <span class="section-kicker">Engineer Workflow</span>
+                <h1>Procurement Reviews</h1>
+                <p class="procurement-hero__copy">Validate field requests here before Super Admin handles supplier selection and purchasing.</p>
+            </div>
+            <div class="procurement-hero__meta">
+                <span class="procurement-hero__chip">Assigned Projects: <?php echo $assignedProjectCount; ?></span>
+                <span class="procurement-hero__chip">Pending Technical Review: <?php echo $pendingCount; ?></span>
+            </div>
+        </section>
+
         <section class="stats-grid" aria-label="Procurement review metrics">
             <article class="metric-card">
                 <span>Total Requests</span>
@@ -253,9 +281,10 @@ foreach ($requests as $request) {
         <section class="content-panel">
             <div class="panel-header">
                 <div>
-                    <h1>Procurement Reviews</h1>
-                    <p>Engineer validation happens here before Super Admin handles supplier and purchasing.</p>
+                    <h2>Requests For Validation</h2>
+                    <p>Review scope, quantity, and timing before a request moves forward to procurement.</p>
                 </div>
+                <div class="workflow-note">Flow: Foreman requests, Engineer validates, Super Admin purchases.</div>
             </div>
 
             <?php if (empty($requests)): ?>
@@ -269,20 +298,41 @@ foreach ($requests as $request) {
                                 <div>
                                     <p class="project-card-kicker"><?php echo htmlspecialchars((string)($request['request_no'] ?? '')); ?></p>
                                     <h2><?php echo htmlspecialchars((string)($request['item_description'] ?? 'Request Item')); ?></h2>
+                                    <p class="project-card-subtitle"><?php echo htmlspecialchars((string)($request['project_name'] ?? 'Unassigned Project')); ?></p>
                                 </div>
                                 <span class="status <?php echo htmlspecialchars(str_replace('_', '-', $status)); ?>">
                                     <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $status))); ?>
                                 </span>
                             </div>
 
-                            <div class="project-card-body">
-                                <p><strong>Project:</strong> <?php echo htmlspecialchars((string)($request['project_name'] ?? 'N/A')); ?></p>
-                                <p><strong>Requested By:</strong> <?php echo htmlspecialchars((string)($request['requested_by_name'] ?? 'N/A')); ?></p>
-                                <p><strong>Type:</strong> <?php echo htmlspecialchars(ucfirst((string)($request['request_type'] ?? 'material'))); ?></p>
-                                <p><strong>Qty:</strong> <?php echo htmlspecialchars((string)($request['quantity_requested'] ?? '0')); ?> <?php echo htmlspecialchars((string)($request['unit'] ?? '')); ?></p>
-                                <p><strong>Specification:</strong> <?php echo htmlspecialchars((string)($request['specification'] ?? 'Not set')); ?></p>
-                                <p><strong>Needed Date:</strong> <?php echo htmlspecialchars((string)($request['needed_date'] ?? 'Not set')); ?></p>
-                                <p><strong>Site Location:</strong> <?php echo htmlspecialchars((string)($request['site_location'] ?? 'Not set')); ?></p>
+                            <div class="project-card-body procurement-card-grid">
+                                <div class="procurement-meta-card">
+                                    <span class="procurement-meta-card__label">Requested By</span>
+                                    <strong><?php echo htmlspecialchars((string)($request['requested_by_name'] ?? 'N/A')); ?></strong>
+                                </div>
+                                <div class="procurement-meta-card">
+                                    <span class="procurement-meta-card__label">Type</span>
+                                    <strong><?php echo htmlspecialchars(ucfirst((string)($request['request_type'] ?? 'material'))); ?></strong>
+                                </div>
+                                <div class="procurement-meta-card">
+                                    <span class="procurement-meta-card__label">Quantity</span>
+                                    <strong><?php echo htmlspecialchars((string)($request['quantity_requested'] ?? '0')); ?> <?php echo htmlspecialchars((string)($request['unit'] ?? '')); ?></strong>
+                                </div>
+                                <div class="procurement-meta-card">
+                                    <span class="procurement-meta-card__label">Needed Date</span>
+                                    <strong><?php echo htmlspecialchars((string)($request['needed_date'] ?? 'Not set')); ?></strong>
+                                </div>
+                                <div class="procurement-meta-card">
+                                    <span class="procurement-meta-card__label">Site Location</span>
+                                    <strong><?php echo htmlspecialchars((string)($request['site_location'] ?? 'Not set')); ?></strong>
+                                </div>
+                                <div class="procurement-meta-card">
+                                    <span class="procurement-meta-card__label">Specification</span>
+                                    <strong><?php echo htmlspecialchars((string)($request['specification'] ?? 'Not set')); ?></strong>
+                                </div>
+                            </div>
+
+                            <div class="procurement-notes">
                                 <p><strong>Request Note:</strong> <?php echo htmlspecialchars((string)($request['remarks'] ?? 'None')); ?></p>
                                 <?php if (!empty($request['engineer_review_notes'])): ?>
                                     <p><strong>Latest Review Note:</strong> <?php echo htmlspecialchars((string)$request['engineer_review_notes']); ?></p>
@@ -311,9 +361,14 @@ foreach ($requests as $request) {
                                     </div>
 
                                     <div class="task-update-actions">
-                                        <button type="submit">Save Review</button>
+                                        <button type="submit" class="btn">Save Review</button>
                                     </div>
                                 </form>
+                            <?php else: ?>
+                                <div class="procurement-review-stamp">
+                                    <span class="procurement-review-stamp__label">Latest Engineer Review</span>
+                                    <strong><?php echo htmlspecialchars((string)($request['engineer_reviewed_at'] ?? 'Already finalized')); ?></strong>
+                                </div>
                             <?php endif; ?>
                         </article>
                     <?php endforeach; ?>
@@ -322,5 +377,6 @@ foreach ($requests as $request) {
         </section>
     </main>
 </div>
+<script src="../js/engineer.js"></script>
 </body>
 </html>

@@ -191,11 +191,14 @@ function foreman_profile_initials(string $name): string
     return $initials !== '' ? $initials : 'FO';
 }
 
-function foreman_asset_status_expression(mysqli $conn): string
+function foreman_asset_status_expression(mysqli $conn, string $tableAlias = 'assets'): string
 {
+    $qualifiedStatus = $tableAlias . '.status';
+    $qualifiedAssetStatus = $tableAlias . '.asset_status';
+
     return foreman_column_exists($conn, 'assets', 'status')
-        ? "COALESCE(NULLIF(status, ''), asset_status)"
-        : 'asset_status';
+        ? "COALESCE(NULLIF({$qualifiedStatus}, ''), {$qualifiedAssetStatus})"
+        : $qualifiedAssetStatus;
 }
 
 function foreman_fetch_profile(mysqli $conn, int $userId): array
@@ -233,7 +236,7 @@ function foreman_fetch_profile(mysqli $conn, int $userId): array
 
 function foreman_fetch_dashboard_data(mysqli $conn, int $userId): array
 {
-    $assetStatusExpression = foreman_asset_status_expression($conn);
+    $assetStatusExpression = foreman_asset_status_expression($conn, 'assets');
 
     $data = [
         'asset_summary' => [
@@ -449,7 +452,7 @@ function foreman_fetch_dashboard_data(mysqli $conn, int $userId): array
                 a.asset_name,
                 a.asset_type,
                 au.unit_code,
-                {$assetStatusExpression} AS resolved_status
+                " . foreman_asset_status_expression($conn, 'a') . " AS resolved_status
              FROM asset_usage_logs aul
              INNER JOIN assets a ON a.id = aul.asset_id
              LEFT JOIN asset_units au ON au.id = aul.asset_unit_id

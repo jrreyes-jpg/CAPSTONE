@@ -208,6 +208,7 @@
     font-weight: 600;
     cursor: pointer;
     transition: 0.2s ease;
+    white-space: nowrap;
 }
 
 .asset-filter-tab strong {
@@ -321,6 +322,7 @@
     padding: 6px 10px;
     border-radius: 999px;
     font-size: 0.82rem;
+    white-space: nowrap;
 }
 
 .asset-meta-pill {
@@ -335,25 +337,35 @@
 }
 
 .asset-info-card__footer {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
+    display: block;
 }
 
-.asset-meta-stack {
-    display: grid;
-    gap: 6px;
+.asset-meta-inline {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 18px;
     padding: 12px 14px;
     border-radius: 14px;
     background: #f8fafc;
 }
 
-.asset-meta-label {
-    color: #64748b;
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    font-weight: 700;
+.asset-meta-inline__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #475569;
+    font-size: 0.86rem;
+    white-space: nowrap;
+}
+
+.asset-meta-inline__item strong {
+    color: #0f172a;
+    font-size: 0.82rem;
+}
+
+.asset-meta-inline__item--status .status-pill {
+    margin-left: 2px;
 }
 
 .asset-status {
@@ -435,6 +447,7 @@
     border-radius: 999px;
     font-size: 0.84rem;
     font-weight: 700;
+    white-space: nowrap;
 }
 
 .stock-chip strong {
@@ -547,6 +560,7 @@
 .asset-action-controls {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
 }
 
@@ -564,6 +578,14 @@
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
+}
+
+.asset-row-actions__secondary .btn-secondary,
+.asset-row-actions__secondary .btn-danger,
+.asset-qr-actions .btn-secondary,
+.asset-qr-actions .asset-link-btn,
+.asset-action-controls .btn-secondary {
+    white-space: nowrap;
 }
 
 .asset-qr-modal__panel {
@@ -655,19 +677,18 @@
 
     .asset-filter-tab {
         justify-content: space-between;
-        width: 100%;
+        width: auto;
+        max-width: 100%;
     }
 
     .asset-section-actions,
-    .asset-section-actions .btn-secondary,
     .asset-qr-actions,
     .asset-row-actions,
-    .asset-row-actions__secondary,
-    .asset-action-controls,
     .assets-content .btn-primary,
     .assets-content .btn-secondary,
     .asset-link-btn,
-    .btn-danger {
+    .btn-danger,
+    .asset-inline-form {
         width: 100%;
     }
 
@@ -675,6 +696,40 @@
     .asset-row-actions {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .asset-row-actions__secondary,
+    .asset-action-controls {
+        width: 100%;
+    }
+
+    .asset-action-controls {
+        flex-direction: row;
+        align-items: stretch;
+    }
+
+    .asset-action-controls .asset-action-qty {
+        width: 92px;
+        flex: 0 0 auto;
+    }
+
+    .asset-action-controls .asset-action-select {
+        min-width: 0;
+        flex: 1 1 180px;
+    }
+
+    .asset-action-controls .btn-secondary {
+        width: auto;
+        flex: 0 0 auto;
+    }
+
+    .asset-section-actions .btn-secondary,
+    .asset-qr-actions .btn-secondary,
+    .asset-qr-actions .asset-link-btn,
+    .asset-row-actions__secondary .btn-secondary,
+    .asset-row-actions__secondary .btn-danger {
+        width: auto;
+        max-width: 100%;
     }
 
     .asset-info-card,
@@ -688,6 +743,10 @@
     .asset-info-card__footer {
         grid-template-columns: 1fr;
         display: grid;
+    }
+
+    .asset-meta-inline {
+        gap: 10px 14px;
     }
 }
 
@@ -707,7 +766,37 @@
     .asset-meta-pill,
     .asset-meta-text,
     .stock-chip {
+        width: auto;
+        max-width: 100%;
+    }
+
+    .asset-meta-inline {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .asset-meta-inline__item {
         width: 100%;
-        justify-content: space-between;
+        white-space: normal;
+    }
+
+    .asset-filter-tab,
+    .asset-section-actions .btn-secondary,
+    .asset-qr-actions .btn-secondary,
+    .asset-qr-actions .asset-link-btn,
+    .asset-row-actions__secondary .btn-secondary,
+    .asset-row-actions__secondary .btn-danger {
+        width: 100%;
+    }
+
+    .asset-action-controls {
+        flex-wrap: wrap;
+    }
+
+    .asset-action-controls .asset-action-qty,
+    .asset-action-controls .asset-action-select,
+    .asset-action-controls .btn-secondary {
+        width: 100%;
+        flex: 1 1 100%;
     }
 }
