@@ -775,9 +775,34 @@ if ($projectId > 0) {
                                 </div>
                                 <div class="form-grid">
                                     <div class="input-group">
-                                        <label for="project_name">Project Title</label>
-                                        <input type="text" id="project_name" name="project_name" value="<?php echo htmlspecialchars($project['project_name']); ?>" required readonly data-project-editable>
+                                        <label for="client_id">Client</label>
+                                        <select id="client_id" name="client_id" required disabled>
+                                            <?php foreach ($clients as $client): ?>
+                                                <option value="<?php echo (int)$client['id']; ?>" <?php echo (int)$project['client_id'] === (int)$client['id'] ? 'selected' : ''; ?>>
+                                                    <?php echo htmlspecialchars($client['full_name']); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
                                     </div>
+
+                                    <div class="input-group">
+                                        <label for="project_name">Project Title</label>
+                                        <input type="text" id="project_name" name="project_name" value="<?php echo htmlspecialchars($project['project_name']); ?>" required readonly>
+                                    </div>
+
+                                    <?php if ($hasProjectCodeColumn): ?>
+                                        <div class="input-group">
+                                            <label for="project_code">Project Code <span class="required-indicator" aria-hidden="true">*</span></label>
+                                            <input type="text" id="project_code" name="project_code" value="<?php echo htmlspecialchars($project['project_code'] ?? ''); ?>" required readonly>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <?php if ($hasProjectSiteColumn): ?>
+                                        <div class="input-group">
+                                            <label for="project_site">Project Site <span class="required-indicator" aria-hidden="true">*</span></label>
+                                            <input type="text" id="project_site" name="project_site" value="<?php echo htmlspecialchars($project['project_site'] ?? ''); ?>" readonly>
+                                        </div>
+                                    <?php endif; ?>
 
                                     <?php if ($hasContactPersonColumn): ?>
                                         <div class="input-group">
@@ -805,20 +830,6 @@ if ($projectId > 0) {
                                         </div>
                                     <?php endif; ?>
 
-                                    <?php if ($hasProjectEmailColumn): ?>
-                                        <div class="input-group">
-                                            <label for="project_email">Email Address <span class="optional-indicator">(Optional)</span></label>
-                                            <input type="email" id="project_email" name="project_email" value="<?php echo htmlspecialchars($project['project_email'] ?? ''); ?>" readonly data-project-editable>
-                                        </div>
-                                    <?php endif; ?>
-
-                                    <?php if ($hasProjectCodeColumn): ?>
-                                        <div class="input-group">
-                                            <label for="project_code">Project Code <span class="required-indicator" aria-hidden="true">*</span></label>
-                                            <input type="text" id="project_code" name="project_code" value="<?php echo htmlspecialchars($project['project_code'] ?? ''); ?>" required readonly data-project-editable>
-                                        </div>
-                                    <?php endif; ?>
-
                                     <?php if ($hasPoNumberColumn): ?>
                                         <div class="input-group">
                                             <div class="field-label-row">
@@ -828,21 +839,26 @@ if ($projectId > 0) {
                                                     <span class="field-tip__bubble">Enter the purchase order reference number. Required when the project status is Pending or Ongoing.</span>
                                                 </button>
                                             </div>
-                                            <input type="text" id="po_number" name="po_number" value="<?php echo htmlspecialchars($project['po_number'] ?? ''); ?>" readonly data-project-editable>
+                                            <input type="text" id="po_number" name="po_number" value="<?php echo htmlspecialchars($project['po_number'] ?? ''); ?>" readonly>
                                         </div>
                                     <?php endif; ?>
 
-                                    <?php if ($hasProjectSiteColumn): ?>
+                                    <div class="input-group">
+                                        <label for="start_date">P.O Date</label>
+                                        <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($project['start_date'] ?? ''); ?>" max="<?php echo htmlspecialchars($todayDate); ?>" readonly>
+                                    </div>
+
+                                    <?php if ($hasProjectEmailColumn): ?>
                                         <div class="input-group">
-                                            <label for="project_site">Project Site <span class="required-indicator" aria-hidden="true">*</span></label>
-                                            <input type="text" id="project_site" name="project_site" value="<?php echo htmlspecialchars($project['project_site'] ?? ''); ?>" readonly data-project-editable>
+                                            <label for="project_email">Email Address <span class="optional-indicator">(Optional)</span></label>
+                                            <input type="email" id="project_email" name="project_email" value="<?php echo htmlspecialchars($project['project_email'] ?? ''); ?>" readonly data-project-editable>
                                         </div>
                                     <?php endif; ?>
 
                                     <?php if ($hasProjectAddressColumn): ?>
                                         <div class="input-group input-group-wide">
                                             <label for="project_address">Address</label>
-                                            <textarea id="project_address" name="project_address" rows="2" readonly data-project-editable><?php echo htmlspecialchars($project['project_address'] ?? ''); ?></textarea>
+                                            <textarea id="project_address" name="project_address" rows="2" readonly><?php echo htmlspecialchars($project['project_address'] ?? ''); ?></textarea>
                                         </div>
                                     <?php endif; ?>
 
@@ -859,10 +875,6 @@ if ($projectId > 0) {
                                     <h3>Key project dates</h3>
                                 </div>
                                 <div class="form-grid">
-                                    <div class="input-group">
-                                        <label for="start_date">P.O Date</label>
-                                        <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($project['start_date'] ?? ''); ?>" max="<?php echo htmlspecialchars($todayDate); ?>" readonly data-project-editable>
-                                    </div>
                                     <div class="input-group">
                                         <label>Completed On</label>
                                         <div class="project-form-static-field"><?php echo htmlspecialchars(pm_format_date($project['end_date'] ?? null)); ?></div>
@@ -881,19 +893,8 @@ if ($projectId > 0) {
                                 </div>
                                 <div class="form-grid">
                                     <div class="input-group">
-                                        <label for="client_id">Client</label>
-                                        <select id="client_id" name="client_id" required disabled data-project-editable>
-                                            <?php foreach ($clients as $client): ?>
-                                                <option value="<?php echo (int)$client['id']; ?>" <?php echo (int)$project['client_id'] === (int)$client['id'] ? 'selected' : ''; ?>>
-                                                    <?php echo htmlspecialchars($client['full_name']); ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-
-                                    <div class="input-group">
                                         <label for="engineer_ids">Assigned Engineer/s</label>
-                                        <select id="engineer_ids" name="engineer_ids[]" required multiple size="<?php echo min(6, max(3, count($engineers))); ?>" disabled data-project-editable>
+                                        <select id="engineer_ids" name="engineer_ids[]" required multiple size="<?php echo min(6, max(3, count($engineers))); ?>" disabled>
                                             <?php foreach ($engineers as $engineer): ?>
                                                 <option value="<?php echo (int)$engineer['id']; ?>" <?php echo in_array((int)$engineer['id'], $assignedEngineerIds, true) ? 'selected' : ''; ?>>
                                                     <?php echo htmlspecialchars($engineer['full_name']); ?>

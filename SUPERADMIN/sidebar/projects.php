@@ -471,7 +471,31 @@ function fetchRecentProjectCostEntries(mysqli $conn, array $projectIds, int $lim
 }
 
 function getProjectSnapshot(mysqli $conn, int $projectId): ?array {
-    $stmt = $conn->prepare('SELECT id, project_name, status, start_date FROM projects WHERE id = ? LIMIT 1');
+    $stmt = $conn->prepare(
+        'SELECT
+            p.id,
+            p.project_name,
+            p.description,
+            p.client_id,
+            p.contact_person,
+            p.contact_number,
+            p.project_site,
+            p.project_address,
+            p.project_email,
+            p.project_code,
+            p.po_number,
+            p.start_date,
+            p.end_date,
+            p.status,
+            (
+                SELECT GROUP_CONCAT(pa.engineer_id ORDER BY pa.engineer_id SEPARATOR ",")
+                FROM project_assignments pa
+                WHERE pa.project_id = p.id
+            ) AS engineer_ids_csv
+         FROM projects p
+         WHERE p.id = ?
+         LIMIT 1'
+    );
     if (!$stmt) {
         return null;
     }
@@ -1290,18 +1314,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'update_project_details') {
         $projectId = (int)($_POST['project_id'] ?? 0);
-        $projectName = normalize_text($_POST['project_name'] ?? '');
         $description = normalize_text($_POST['description'] ?? '');
         $contactPerson = $hasContactPersonColumn ? normalize_text_or_null($_POST['contact_person'] ?? null) : null;
         $contactNumber = $hasContactNumberColumn ? normalize_text_or_null($_POST['contact_number'] ?? null) : null;
-        $projectSite = $hasProjectSiteColumn ? normalize_text_or_null($_POST['project_site'] ?? null) : null;
-        $projectAddress = $hasProjectAddressColumn ? normalize_text_or_null($_POST['project_address'] ?? null) : null;
         $projectEmail = $hasProjectEmailColumn ? normalize_text_or_null($_POST['project_email'] ?? null) : null;
-        $projectCode = $hasProjectCodeColumn ? normalize_text_or_null($_POST['project_code'] ?? null) : null;
-        $poNumber = $hasPoNumberColumn ? normalize_text_or_null($_POST['po_number'] ?? null) : null;
-        $clientId = (int)($_POST['client_id'] ?? 0);
-        $engineerIds = normalize_engineer_ids($_POST['engineer_ids'] ?? []);
-        $startDate = normalize_date_or_null($_POST['start_date'] ?? null);
         $endDate = null;
         $project = $projectId > 0 ? getProjectSnapshot($conn, $projectId) : null;
         $updatedBy = (int)($_SESSION['user_id'] ?? 0);
@@ -1315,6 +1331,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_projects_flash('error', 'Completed projects are locked. Reopen first before editing details.');
             redirect_projects_page();
         }
+
+        $projectName = normalize_text((string)($project['project_name'] ?? ''));
+        $projectSite = $hasProjectSiteColumn ? normalize_text_or_null($project['project_site'] ?? null) : null;
+        $projectAddress = $hasProjectAddressColumn ? normalize_text_or_null($project['project_address'] ?? null) : null;
+        $projectCode = $hasProjectCodeColumn ? normalize_text_or_null($project['project_code'] ?? null) : null;
+        $poNumber = $hasPoNumberColumn ? normalize_text_or_null($project['po_number'] ?? null) : null;
+        $clientId = (int)($project['client_id'] ?? 0);
+        $engineerIds = normalize_engineer_ids(explode(',', (string)($project['engineer_ids_csv'] ?? '')));
+        $startDate = normalize_date_or_null($project['start_date'] ?? null);
 
         if ($projectName === '' || $clientId <= 0 || $engineerIds === []) {
             set_projects_flash('error', 'Project title, client, and assigned engineer/s are required.');
