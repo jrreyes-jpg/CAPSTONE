@@ -434,13 +434,16 @@
 
 .asset-stock-panel__chips {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 10px;
+    overflow-x: auto;
+    scrollbar-width: thin;
 }
 
 .stock-chip {
     display: inline-flex;
     align-items: center;
+    flex: 0 0 auto;
     gap: 8px;
     min-height: 36px;
     padding: 8px 12px;
@@ -768,6 +771,10 @@
     .stock-chip {
         width: auto;
         max-width: 100%;
+    }
+
+    .asset-stock-panel__chips {
+        flex-wrap: nowrap;
     }
 
     .asset-meta-inline {

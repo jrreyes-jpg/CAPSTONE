@@ -1439,7 +1439,17 @@ if ($createdAssetId > 0) {
                                     </td>
                                     <td data-label="Stock / Usage Information">
                                         <div class="asset-stock-panel">
-                                          
+                                            <div class="asset-stock-panel__chips">
+                                                <span class="stock-chip stock-chip--available">Available <strong><?php echo $availableUnits; ?></strong></span>
+                                                <span class="stock-chip stock-chip--in-use">In Use <strong><?php echo $deployedUnits; ?></strong></span>
+                                                <span class="stock-chip stock-chip--maintenance">Maintenance <strong><?php echo $maintenanceUnits; ?></strong></span>
+                                                <span class="stock-chip stock-chip--lost">Lost <strong><?php echo $lostUnits; ?></strong></span>
+                                            </div>
+                                            <div class="asset-distribution">
+                                                <div class="asset-distribution__label-row">
+                                                    <span>Stock distribution</span>
+                                                    <strong><?php echo $availableUnits + $deployedUnits + $maintenanceUnits + $lostUnits; ?> total tracked</strong>
+                                                </div>
                                                 <div class="asset-distribution__bar" aria-hidden="true">
                                                     <span class="asset-distribution__segment asset-distribution__segment--available" style="width: <?php echo round($availableWidth, 2); ?>%"></span>
                                                     <span class="asset-distribution__segment asset-distribution__segment--in-use" style="width: <?php echo round($deployedWidth, 2); ?>%"></span>
