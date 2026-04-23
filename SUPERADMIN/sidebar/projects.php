@@ -42,6 +42,26 @@ function table_has_column(mysqli $conn, string $tableName, string $columnName): 
     return get_column_type($conn, $tableName, $columnName) !== null;
 }
 
+function table_exists(mysqli $conn, string $tableName): bool {
+    $stmt = $conn->prepare(
+        'SELECT 1
+         FROM INFORMATION_SCHEMA.TABLES
+         WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = ?
+         LIMIT 1'
+    );
+
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param('s', $tableName);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result !== false && $result->num_rows > 0;
+}
+
 function enum_supports_value(mysqli $conn, string $tableName, string $columnName, string $value): bool {
     $columnType = get_column_type($conn, $tableName, $columnName);
 
@@ -1985,6 +2005,239 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect_projects_page();
     }
 
+    if ($action === 'permanently_delete_supplier') {
+        $supplierId = (int)($_POST['supplier_id'] ?? 0);
+        $deletedBy = (int)($_SESSION['user_id'] ?? 0);
+
+        if ($supplierId <= 0 || !table_exists($conn, 'suppliers')) {
+            set_projects_flash('error', 'Trashed supplier not found.');
+            redirect_projects_page();
+        }
+
+        $supplierStmt = $conn->prepare(
+            "SELECT id, supplier_code, supplier_name, contact_person, status
+             FROM suppliers s
+             WHERE id = ?
+             AND status = 'inactive'
+             LIMIT 1"
+        );
+        $supplier = null;
+        if ($supplierStmt) {
+            $supplierStmt->bind_param('i', $supplierId);
+            $supplierStmt->execute();
+            $supplierResult = $supplierStmt->get_result();
+            $supplier = $supplierResult ? $supplierResult->fetch_assoc() : null;
+        }
+
+        if (!$supplier) {
+            set_projects_flash('error', 'Trashed supplier not found.');
+            redirect_projects_page();
+        }
+
+        $linkedOrders = 0;
+        if (table_exists($conn, 'purchase_orders')) {
+            $linkedOrderStmt = $conn->prepare('SELECT COUNT(*) AS total FROM purchase_orders WHERE supplier_id = ?');
+            if ($linkedOrderStmt) {
+                $linkedOrderStmt->bind_param('i', $supplierId);
+                $linkedOrderStmt->execute();
+                $linkedOrderResult = $linkedOrderStmt->get_result();
+                $linkedOrders = (int)(($linkedOrderResult ? $linkedOrderResult->fetch_assoc() : [])['total'] ?? 0);
+            }
+        }
+
+        if ($linkedOrders > 0) {
+            set_projects_flash('error', 'Supplier cannot be permanently deleted because it is linked to purchase orders.');
+            redirect_projects_page();
+        }
+
+        $deleteSupplier = $conn->prepare("DELETE FROM suppliers WHERE id = ? AND status = 'inactive'");
+        if ($deleteSupplier && $deleteSupplier->bind_param('i', $supplierId) && $deleteSupplier->execute() && $deleteSupplier->affected_rows > 0) {
+            audit_log_event(
+                $conn,
+                $deletedBy,
+                'permanently_delete_supplier',
+                'supplier',
+                $supplierId,
+                $supplier,
+                ['deleted_forever_at' => date('Y-m-d H:i:s')]
+            );
+            set_projects_flash('success', 'Supplier permanently deleted from trash bin.');
+        } else {
+            set_projects_flash('error', 'Failed to permanently delete supplier.');
+        }
+
+        redirect_projects_page();
+    }
+
+    if ($action === 'restore_supplier') {
+        $supplierId = (int)($_POST['supplier_id'] ?? 0);
+        $restoredBy = (int)($_SESSION['user_id'] ?? 0);
+
+        if ($supplierId <= 0 || !table_exists($conn, 'suppliers')) {
+            set_projects_flash('error', 'Trashed supplier not found.');
+            redirect_projects_page();
+        }
+
+        $supplierStmt = $conn->prepare(
+            "SELECT id, supplier_code, supplier_name, contact_person, status
+             FROM suppliers
+             WHERE id = ?
+             AND status = 'inactive'
+             LIMIT 1"
+        );
+        $supplier = null;
+        if ($supplierStmt) {
+            $supplierStmt->bind_param('i', $supplierId);
+            $supplierStmt->execute();
+            $supplierResult = $supplierStmt->get_result();
+            $supplier = $supplierResult ? $supplierResult->fetch_assoc() : null;
+        }
+
+        if (!$supplier) {
+            set_projects_flash('error', 'Trashed supplier not found.');
+            redirect_projects_page();
+        }
+
+        $restoreSupplier = $conn->prepare("UPDATE suppliers SET status = 'active' WHERE id = ? AND status = 'inactive'");
+        if ($restoreSupplier && $restoreSupplier->bind_param('i', $supplierId) && $restoreSupplier->execute() && $restoreSupplier->affected_rows > 0) {
+            audit_log_event(
+                $conn,
+                $restoredBy,
+                'restore_supplier',
+                'supplier',
+                $supplierId,
+                $supplier,
+                [
+                    'supplier_code' => $supplier['supplier_code'] ?? null,
+                    'supplier_name' => $supplier['supplier_name'] ?? null,
+                    'status' => 'active',
+                    'restored_at' => date('Y-m-d H:i:s'),
+                ]
+            );
+            set_projects_flash('success', 'Supplier restored from trash.');
+        } else {
+            set_projects_flash('error', 'Failed to restore supplier.');
+        }
+
+        redirect_projects_page();
+    }
+
+    if ($action === 'permanently_delete_purchase_request') {
+        $purchaseRequestId = (int)($_POST['purchase_request_id'] ?? 0);
+        $deletedBy = (int)($_SESSION['user_id'] ?? 0);
+
+        if ($purchaseRequestId <= 0 || !table_exists($conn, 'purchase_requests')) {
+            set_projects_flash('error', 'Trashed purchase request not found.');
+            redirect_projects_page();
+        }
+
+        $requestStmt = $conn->prepare(
+            "SELECT id, request_no, status
+             FROM purchase_requests
+             WHERE id = ?
+             AND status = 'cancelled'
+             LIMIT 1"
+        );
+        $request = null;
+        if ($requestStmt) {
+            $requestStmt->bind_param('i', $purchaseRequestId);
+            $requestStmt->execute();
+            $requestResult = $requestStmt->get_result();
+            $request = $requestResult ? $requestResult->fetch_assoc() : null;
+        }
+
+        if (!$request) {
+            set_projects_flash('error', 'Trashed purchase request not found.');
+            redirect_projects_page();
+        }
+
+        $linkedOrders = 0;
+        if (table_exists($conn, 'purchase_orders')) {
+            $linkedOrderStmt = $conn->prepare('SELECT COUNT(*) AS total FROM purchase_orders WHERE purchase_request_id = ?');
+            if ($linkedOrderStmt) {
+                $linkedOrderStmt->bind_param('i', $purchaseRequestId);
+                $linkedOrderStmt->execute();
+                $linkedOrderResult = $linkedOrderStmt->get_result();
+                $linkedOrders = (int)(($linkedOrderResult ? $linkedOrderResult->fetch_assoc() : [])['total'] ?? 0);
+            }
+        }
+
+        if ($linkedOrders > 0) {
+            set_projects_flash('error', 'Purchase request cannot be permanently deleted because it already has a purchase order.');
+            redirect_projects_page();
+        }
+
+        $deleteRequest = $conn->prepare("DELETE FROM purchase_requests WHERE id = ? AND status = 'cancelled'");
+        if ($deleteRequest && $deleteRequest->bind_param('i', $purchaseRequestId) && $deleteRequest->execute() && $deleteRequest->affected_rows > 0) {
+            audit_log_event(
+                $conn,
+                $deletedBy,
+                'permanently_delete_purchase_request',
+                'purchase_request',
+                $purchaseRequestId,
+                $request,
+                ['deleted_forever_at' => date('Y-m-d H:i:s')]
+            );
+            set_projects_flash('success', 'Purchase request permanently deleted from trash bin.');
+        } else {
+            set_projects_flash('error', 'Failed to permanently delete purchase request.');
+        }
+
+        redirect_projects_page();
+    }
+
+    if ($action === 'restore_purchase_request') {
+        $purchaseRequestId = (int)($_POST['purchase_request_id'] ?? 0);
+        $restoredBy = (int)($_SESSION['user_id'] ?? 0);
+
+        if ($purchaseRequestId <= 0 || !table_exists($conn, 'purchase_requests')) {
+            set_projects_flash('error', 'Trashed purchase request not found.');
+            redirect_projects_page();
+        }
+
+        $requestStmt = $conn->prepare(
+            "SELECT id, request_no, status
+             FROM purchase_requests
+             WHERE id = ?
+             AND status = 'cancelled'
+             LIMIT 1"
+        );
+        $request = null;
+        if ($requestStmt) {
+            $requestStmt->bind_param('i', $purchaseRequestId);
+            $requestStmt->execute();
+            $requestResult = $requestStmt->get_result();
+            $request = $requestResult ? $requestResult->fetch_assoc() : null;
+        }
+
+        if (!$request) {
+            set_projects_flash('error', 'Trashed purchase request not found.');
+            redirect_projects_page();
+        }
+
+        $restoreRequest = $conn->prepare("UPDATE purchase_requests SET status = 'submitted' WHERE id = ? AND status = 'cancelled'");
+        if ($restoreRequest && $restoreRequest->bind_param('i', $purchaseRequestId) && $restoreRequest->execute() && $restoreRequest->affected_rows > 0) {
+            audit_log_event(
+                $conn,
+                $restoredBy,
+                'restore_purchase_request',
+                'purchase_request',
+                $purchaseRequestId,
+                $request,
+                [
+                    'request_no' => $request['request_no'] ?? null,
+                    'status' => 'submitted',
+                    'restored_at' => date('Y-m-d H:i:s'),
+                ]
+            );
+            set_projects_flash('success', 'Purchase request restored from trash.');
+        } else {
+            set_projects_flash('error', 'Failed to restore purchase request.');
+        }
+
+        redirect_projects_page();
+    }
+
     if ($action === 'deploy_inventory_to_project') {
         $projectId = (int)($_POST['project_id'] ?? 0);
         $inventoryId = (int)($_POST['inventory_id'] ?? 0);
@@ -2332,6 +2585,74 @@ $trashMetricsResult = $conn->query("
 ");
 $trashMetrics = $trashMetricsResult ? $trashMetricsResult->fetch_assoc() : [];
 $trashedProjects = (int)($trashMetrics['total_trashed'] ?? 0);
+$trashedSuppliers = 0;
+$trashedPurchaseRequests = 0;
+$trashedSupplierRows = [];
+$trashedPurchaseRequestRows = [];
+
+if (table_exists($conn, 'suppliers')) {
+    $trashedSupplierMetrics = $conn->query("SELECT COUNT(*) AS total_trashed FROM suppliers WHERE status = 'inactive'");
+    $trashedSuppliers = (int)(($trashedSupplierMetrics ? $trashedSupplierMetrics->fetch_assoc() : [])['total_trashed'] ?? 0);
+
+    if ($isTrashView) {
+        $trashedSupplierResult = $conn->query(
+            "SELECT
+                s.id,
+                s.supplier_code,
+                s.supplier_name,
+                s.contact_person,
+                s.contact_number,
+                s.email,
+                s.address,
+                s.description,
+                s.updated_at,
+                (SELECT COUNT(*) FROM purchase_orders po WHERE po.supplier_id = s.id) AS linked_purchase_orders
+             FROM suppliers s
+             WHERE s.status = 'inactive'
+             ORDER BY s.updated_at DESC, s.id DESC
+             LIMIT 24"
+        );
+        if ($trashedSupplierResult) {
+            $trashedSupplierRows = $trashedSupplierResult->fetch_all(MYSQLI_ASSOC);
+        }
+    }
+}
+
+if (table_exists($conn, 'purchase_requests')) {
+    $trashedRequestMetrics = $conn->query("SELECT COUNT(*) AS total_trashed FROM purchase_requests WHERE status = 'cancelled'");
+    $trashedPurchaseRequests = (int)(($trashedRequestMetrics ? $trashedRequestMetrics->fetch_assoc() : [])['total_trashed'] ?? 0);
+
+    if ($isTrashView) {
+        $trashedRequestResult = $conn->query(
+            "SELECT
+                pr.id,
+                pr.request_no,
+                pr.request_type,
+                pr.needed_date,
+                pr.site_location,
+                pr.remarks,
+                pr.updated_at,
+                p.project_name,
+                u.full_name AS requested_by_name,
+                pri.item_description,
+                pri.unit,
+                pri.quantity_requested,
+                (SELECT COUNT(*) FROM purchase_orders po WHERE po.purchase_request_id = pr.id) AS linked_purchase_orders
+             FROM purchase_requests pr
+             INNER JOIN projects p ON p.id = pr.project_id
+             INNER JOIN users u ON u.id = pr.requested_by
+             LEFT JOIN purchase_request_items pri ON pri.purchase_request_id = pr.id
+             WHERE pr.status = 'cancelled'
+             ORDER BY pr.updated_at DESC, pri.id ASC
+             LIMIT 24"
+        );
+        if ($trashedRequestResult) {
+            $trashedPurchaseRequestRows = $trashedRequestResult->fetch_all(MYSQLI_ASSOC);
+        }
+    }
+}
+
+$trashBinTotal = $trashedProjects + $trashedSuppliers + $trashedPurchaseRequests;
 
 $filteredProjects = project_search_fetch_count($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter, $trashFilterSql);
 
@@ -2668,14 +2989,14 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
             >
                 <div class="projects-section-heading">
                     <div>
-                        <h2 class="section-title-inline"><?php echo $isTrashView ? 'Project Trash' : 'Projects'; ?></h2>
+                        <h2 class="section-title-inline"><?php echo $isTrashView ? 'Trash Bin' : 'Projects'; ?></h2>
                         <p class="projects-section-subtitle">
-                            <?php echo $isTrashView ? 'Deleted projects stay here for 30 days before permanent removal.' : 'Manage active and completed projects, then send old ones to trash when needed.'; ?>
+                            <?php echo $isTrashView ? 'Deleted records stay here before permanent removal. Projects auto-purge after 30 days.' : 'Manage active and completed projects, then send old ones to trash when needed.'; ?>
                         </p>
                     </div>
                     <div class="projects-view-switch">
                         <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="project-view-chip<?php echo !$isTrashView ? ' is-active' : ''; ?>">All Projects</a>
-                        <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash" class="project-view-chip<?php echo $isTrashView ? ' is-active' : ''; ?>">Trash (<?php echo $trashedProjects; ?>)</a>
+                        <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash" class="project-view-chip<?php echo $isTrashView ? ' is-active' : ''; ?>">Trash (<?php echo $trashBinTotal; ?>)</a>
                     </div>
                 </div>
                 <div class="project-controls">
@@ -2748,7 +3069,13 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                     <div class="empty-state">
                         <?php
                         if ($isTrashView) {
-                            echo $searchQuery !== '' || $statusFilter !== '' ? 'No matching trashed projects found.' : 'Trash is empty.';
+                            if ($searchQuery !== '' || $statusFilter !== '') {
+                                echo 'No matching trashed projects found.';
+                            } elseif ($trashBinTotal > 0) {
+                                echo 'No trashed projects found right now.';
+                            } else {
+                                echo 'Trash is empty.';
+                            }
                         } else {
                             echo $searchQuery !== '' || $statusFilter !== '' ? 'No matching projects found.' : 'No projects yet. Create your first project above.';
                         }
@@ -2961,6 +3288,118 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             <?php endfor; ?>
                         </div>
                     <?php endif; ?>
+                <?php endif; ?>
+
+                <?php if ($isTrashView): ?>
+                    <section class="page-stack" style="margin-top: 24px;">
+                        <h3 class="section-title-inline">Trashed Purchase Requests</h3>
+                        <?php if (empty($trashedPurchaseRequestRows)): ?>
+                            <div class="empty-state">No trashed purchase requests.</div>
+                        <?php else: ?>
+                            <div class="projects-grid">
+                                <?php foreach ($trashedPurchaseRequestRows as $trashedRequest): ?>
+                                    <article class="project-card">
+                                        <div class="card-split">
+                                            <div>
+                                                <div class="project-card__eyebrow-row">
+                                                    <span class="project-card__eyebrow">Purchase Request</span>
+                                                    <span class="project-card__reference"><?php echo htmlspecialchars((string)($trashedRequest['request_no'] ?? '')); ?></span>
+                                                </div>
+                                                <h3><?php echo htmlspecialchars((string)($trashedRequest['item_description'] ?? 'Request Item')); ?></h3>
+                                                <div class="status-pill-wrap">
+                                                    <span class="status-pill status-cancelled">Cancelled</span>
+                                                </div>
+                                            </div>
+                                            <div class="project-meta">
+                                                <div><strong>Project:</strong> <?php echo htmlspecialchars((string)($trashedRequest['project_name'] ?? 'N/A')); ?></div>
+                                                <div><strong>Requested By:</strong> <?php echo htmlspecialchars((string)($trashedRequest['requested_by_name'] ?? 'N/A')); ?></div>
+                                                <div><strong>Type:</strong> <?php echo htmlspecialchars(ucfirst((string)($trashedRequest['request_type'] ?? 'material'))); ?></div>
+                                                <div><strong>Qty:</strong> <?php echo htmlspecialchars((string)($trashedRequest['quantity_requested'] ?? '0')); ?> <?php echo htmlspecialchars((string)($trashedRequest['unit'] ?? '')); ?></div>
+                                                <div><strong>Needed Date:</strong> <?php echo htmlspecialchars((string)($trashedRequest['needed_date'] ?? 'Not set')); ?></div>
+                                                <div><strong>Site:</strong> <?php echo htmlspecialchars((string)($trashedRequest['site_location'] ?? 'Not set')); ?></div>
+                                                <div><strong>Moved To Trash:</strong> <?php echo htmlspecialchars((string)($trashedRequest['updated_at'] ?? '')); ?></div>
+                                            </div>
+                                        </div>
+                                        <?php if (!empty($trashedRequest['remarks'])): ?>
+                                            <div class="lock-note"><strong>Remarks:</strong> <?php echo htmlspecialchars((string)$trashedRequest['remarks']); ?></div>
+                                        <?php endif; ?>
+                                        <div class="form-actions project-card__actions">
+                                            <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Restore this purchase request from trash?');">
+                                                <input type="hidden" name="action" value="restore_purchase_request">
+                                                <input type="hidden" name="purchase_request_id" value="<?php echo (int)$trashedRequest['id']; ?>">
+                                                <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
+                                                <button type="submit" class="btn-secondary">Restore</button>
+                                            </form>
+                                            <?php if ((int)($trashedRequest['linked_purchase_orders'] ?? 0) > 0): ?>
+                                                <div class="lock-note">Cannot permanently delete. This request already has a purchase order.</div>
+                                            <?php else: ?>
+                                                <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Permanently delete this purchase request? This cannot be undone.');">
+                                                    <input type="hidden" name="action" value="permanently_delete_purchase_request">
+                                                    <input type="hidden" name="purchase_request_id" value="<?php echo (int)$trashedRequest['id']; ?>">
+                                                    <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
+                                                    <button type="submit" class="btn-danger">Delete Permanently</button>
+                                                </form>
+                                            <?php endif; ?>
+                                        </div>
+                                    </article>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </section>
+
+                    <section class="page-stack" style="margin-top: 24px;">
+                        <h3 class="section-title-inline">Trashed Suppliers</h3>
+                        <?php if (empty($trashedSupplierRows)): ?>
+                            <div class="empty-state">No trashed suppliers.</div>
+                        <?php else: ?>
+                            <div class="projects-grid">
+                                <?php foreach ($trashedSupplierRows as $trashedSupplier): ?>
+                                    <article class="project-card">
+                                        <div class="card-split">
+                                            <div>
+                                                <div class="project-card__eyebrow-row">
+                                                    <span class="project-card__eyebrow">Supplier</span>
+                                                    <span class="project-card__reference"><?php echo htmlspecialchars((string)($trashedSupplier['supplier_code'] ?? '')); ?></span>
+                                                </div>
+                                                <h3><?php echo htmlspecialchars((string)($trashedSupplier['supplier_name'] ?? 'Supplier')); ?></h3>
+                                                <div class="status-pill-wrap">
+                                                    <span class="status-pill status-inactive">Inactive</span>
+                                                </div>
+                                            </div>
+                                            <div class="project-meta">
+                                                <div><strong>Contact:</strong> <?php echo htmlspecialchars((string)($trashedSupplier['contact_person'] ?? 'Not set')); ?></div>
+                                                <div><strong>Number:</strong> <?php echo htmlspecialchars((string)($trashedSupplier['contact_number'] ?? 'Not set')); ?></div>
+                                                <div><strong>Email:</strong> <?php echo htmlspecialchars((string)($trashedSupplier['email'] ?? 'Not set')); ?></div>
+                                                <div><strong>Address:</strong> <?php echo htmlspecialchars((string)($trashedSupplier['address'] ?? 'Not set')); ?></div>
+                                                <div><strong>Moved To Trash:</strong> <?php echo htmlspecialchars((string)($trashedSupplier['updated_at'] ?? '')); ?></div>
+                                            </div>
+                                        </div>
+                                        <?php if (!empty($trashedSupplier['description'])): ?>
+                                            <div class="lock-note"><strong>Description:</strong> <?php echo htmlspecialchars((string)$trashedSupplier['description']); ?></div>
+                                        <?php endif; ?>
+                                        <div class="form-actions project-card__actions">
+                                            <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Restore this supplier from trash?');">
+                                                <input type="hidden" name="action" value="restore_supplier">
+                                                <input type="hidden" name="supplier_id" value="<?php echo (int)$trashedSupplier['id']; ?>">
+                                                <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
+                                                <button type="submit" class="btn-secondary">Restore</button>
+                                            </form>
+                                            <?php if ((int)($trashedSupplier['linked_purchase_orders'] ?? 0) > 0): ?>
+                                                <div class="lock-note">Cannot permanently delete. This supplier is linked to purchase orders.</div>
+                                            <?php else: ?>
+                                                <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Permanently delete this supplier? This cannot be undone.');">
+                                                    <input type="hidden" name="action" value="permanently_delete_supplier">
+                                                    <input type="hidden" name="supplier_id" value="<?php echo (int)$trashedSupplier['id']; ?>">
+                                                    <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
+                                                    <button type="submit" class="btn-danger">Delete Permanently</button>
+                                                </form>
+                                            <?php endif; ?>
+                                        </div>
+                                    </article>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </section>
                 <?php endif; ?>
             </section>
         </div>

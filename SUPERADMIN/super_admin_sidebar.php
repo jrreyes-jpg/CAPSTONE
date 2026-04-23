@@ -429,23 +429,6 @@ $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName
             </a>
         </li>
         <li>
-            <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash" class="menu-link<?php echo $isProjectsTrash ? ' active' : ''; ?>">
-                <span class="menu-visual" aria-hidden="true">
-                    <span class="menu-icon">
-                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                            <path d="M5 7h14"></path>
-                            <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"></path>
-                            <path d="M7 7l.8 11a2 2 0 0 0 2 1.85h4.4a2 2 0 0 0 2-1.85L17 7"></path>
-                            <path d="M10 11v5"></path>
-                            <path d="M14 11v5"></path>
-                        </svg>
-                    </span>
-                    <span class="menu-mini-label">Trash</span>
-                </span>
-                <span class="menu-text">Project Trash</span>
-            </a>
-        </li>
-        <li>
             <a href="/codesamplecaps/SUPERADMIN/sidebar/procurement.php" class="menu-link<?php echo $isProcurement ? ' active' : ''; ?>">
                 <span class="menu-visual" aria-hidden="true">
                     <span class="menu-icon">
@@ -524,6 +507,23 @@ $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName
                     <span class="menu-mini-label">Audit</span>
                 </span>
                 <span class="menu-text">Activity History</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash" class="menu-link<?php echo $isProjectsTrash ? ' active' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M5 7h14"></path>
+                            <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"></path>
+                            <path d="M7 7l.8 11a2 2 0 0 0 2 1.85h4.4a2 2 0 0 0 2-1.85L17 7"></path>
+                            <path d="M10 11v5"></path>
+                            <path d="M14 11v5"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Trash</span>
+                </span>
+                <span class="menu-text">Trash Bin</span>
             </a>
         </li>
         <li>

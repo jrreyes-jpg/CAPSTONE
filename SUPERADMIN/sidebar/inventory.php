@@ -49,6 +49,16 @@ function getInventoryItemSnapshot(mysqli $conn, int $inventoryId): ?array {
     return $result ? $result->fetch_assoc() : null;
 }
 
+function inventory_table_exists(mysqli $conn, string $table): bool {
+    $safeTable = preg_replace('/[^A-Za-z0-9_]/', '', $table);
+    if ($safeTable === '') {
+        return false;
+    }
+
+    $result = $conn->query("SHOW TABLES LIKE '{$safeTable}'");
+    return $result instanceof mysqli_result && $result->num_rows > 0;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -190,6 +200,12 @@ if ($assetsWithoutInventoryResult) {
 }
 
 $inventoryItems = [];
+$hasDeploymentTables = inventory_table_exists($conn, 'project_inventory_deployments')
+    && inventory_table_exists($conn, 'project_inventory_return_logs')
+    && inventory_table_exists($conn, 'projects');
+$hasUsageLogsTable = inventory_table_exists($conn, 'asset_usage_logs');
+$hasScanHistoryTable = inventory_table_exists($conn, 'asset_scan_history');
+
 $inventoryQuery = "SELECT
         i.id,
         i.asset_id,
@@ -199,9 +215,122 @@ $inventoryQuery = "SELECT
         i.updated_at,
         a.asset_name,
         a.asset_type,
-        a.serial_number
+        a.serial_number";
+
+if ($hasDeploymentTables) {
+    $inventoryQuery .= ",
+        active_deployment.project_name AS assigned_project_name,
+        active_deployment.remaining_quantity AS assigned_project_quantity,
+        active_deployment.deployed_at AS assigned_project_deployed_at,
+        active_deployment.deployed_by_name AS assigned_project_deployed_by";
+} else {
+    $inventoryQuery .= ",
+        NULL AS assigned_project_name,
+        NULL AS assigned_project_quantity,
+        NULL AS assigned_project_deployed_at,
+        NULL AS assigned_project_deployed_by";
+}
+
+if ($hasUsageLogsTable) {
+    $inventoryQuery .= ",
+        latest_usage.worker_name AS latest_worker_name,
+        latest_usage.used_at AS latest_used_at,
+        latest_usage.notes AS latest_usage_notes,
+        latest_usage.foreman_name AS latest_usage_foreman_name";
+} else {
+    $inventoryQuery .= ",
+        NULL AS latest_worker_name,
+        NULL AS latest_used_at,
+        NULL AS latest_usage_notes,
+        NULL AS latest_usage_foreman_name";
+}
+
+if ($hasScanHistoryTable) {
+    $inventoryQuery .= ",
+        latest_scan.scan_time AS latest_scan_time,
+        latest_scan.scan_device AS latest_scan_device,
+        latest_scan.scanned_by_name AS latest_scan_by_name";
+} else {
+    $inventoryQuery .= ",
+        NULL AS latest_scan_time,
+        NULL AS latest_scan_device,
+        NULL AS latest_scan_by_name";
+}
+
+$inventoryQuery .= "
      FROM inventory i
      INNER JOIN assets a ON a.id = i.asset_id";
+
+if ($hasDeploymentTables) {
+    $inventoryQuery .= "
+     LEFT JOIN (
+        SELECT
+            pid.inventory_id,
+            p.project_name,
+            (pid.quantity - COALESCE(returns.returned_quantity, 0)) AS remaining_quantity,
+            pid.deployed_at,
+            deployer.full_name AS deployed_by_name
+        FROM project_inventory_deployments pid
+        INNER JOIN projects p ON p.id = pid.project_id
+        LEFT JOIN users deployer ON deployer.id = pid.deployed_by
+        LEFT JOIN (
+            SELECT deployment_id, SUM(quantity) AS returned_quantity
+            FROM project_inventory_return_logs
+            GROUP BY deployment_id
+        ) returns ON returns.deployment_id = pid.id
+        INNER JOIN (
+            SELECT
+                pid_inner.inventory_id,
+                MAX(pid_inner.id) AS latest_deployment_id
+            FROM project_inventory_deployments pid_inner
+            LEFT JOIN (
+                SELECT deployment_id, SUM(quantity) AS returned_quantity
+                FROM project_inventory_return_logs
+                GROUP BY deployment_id
+            ) inner_returns ON inner_returns.deployment_id = pid_inner.id
+            WHERE (pid_inner.quantity - COALESCE(inner_returns.returned_quantity, 0)) > 0
+            GROUP BY pid_inner.inventory_id
+        ) latest_active_deployment ON latest_active_deployment.latest_deployment_id = pid.id
+        WHERE (pid.quantity - COALESCE(returns.returned_quantity, 0)) > 0
+     ) active_deployment ON active_deployment.inventory_id = i.id";
+}
+
+if ($hasUsageLogsTable) {
+    $inventoryQuery .= "
+     LEFT JOIN (
+        SELECT
+            aul.asset_id,
+            aul.worker_name,
+            aul.notes,
+            aul.used_at,
+            u.full_name AS foreman_name
+        FROM asset_usage_logs aul
+        LEFT JOIN users u ON u.id = aul.foreman_id
+        INNER JOIN (
+            SELECT asset_id, MAX(id) AS latest_usage_id
+            FROM asset_usage_logs
+            GROUP BY asset_id
+        ) latest_usage ON latest_usage.latest_usage_id = aul.id
+     ) latest_usage ON latest_usage.asset_id = a.id";
+}
+
+if ($hasScanHistoryTable) {
+    $inventoryQuery .= "
+     LEFT JOIN (
+        SELECT
+            ash.asset_id,
+            ash.scan_time,
+            ash.scan_device,
+            u.full_name AS scanned_by_name
+        FROM asset_scan_history ash
+        LEFT JOIN users u ON u.id = ash.foreman_id
+        INNER JOIN (
+            SELECT asset_id, MAX(id) AS latest_scan_id
+            FROM asset_scan_history
+            GROUP BY asset_id
+        ) latest_scan ON latest_scan.latest_scan_id = ash.id
+     ) latest_scan ON latest_scan.asset_id = a.id";
+}
 $whereSql = '';
 if ($statusFilter === 'attention') {
     $whereSql = " WHERE i.status IN ('low-stock', 'out-of-stock')";
@@ -350,8 +479,51 @@ foreach ($inventoryItems as $item) {
                                         <div><strong>Available Qty:</strong> <?php echo (int)$item['quantity']; ?></div>
                                         <div><strong>Min Stock:</strong> <?php echo $item['min_stock'] !== null ? (int)$item['min_stock'] : 'Not set'; ?></div>
                                         <div><strong>Updated:</strong> <?php echo htmlspecialchars($item['updated_at']); ?></div>
+                                        <div><strong>Last QR Scan By:</strong> <?php echo htmlspecialchars((string)($item['latest_scan_by_name'] ?? 'No scan yet')); ?></div>
+                                        <div><strong>Last Scan Time:</strong> <?php echo htmlspecialchars((string)($item['latest_scan_time'] ?? 'No scan yet')); ?></div>
+                                        <div><strong>Scan Device:</strong> <?php echo htmlspecialchars((string)($item['latest_scan_device'] ?? 'Not recorded')); ?></div>
+                                        <div>
+                                            <strong>Assigned To:</strong>
+                                            <?php
+                                            if (!empty($item['assigned_project_name'])) {
+                                                echo htmlspecialchars((string)$item['assigned_project_name'] . ' | Remaining deployed qty: ' . (int)($item['assigned_project_quantity'] ?? 0));
+                                            } elseif (!empty($item['latest_worker_name'])) {
+                                                echo htmlspecialchars((string)$item['latest_worker_name']);
+                                            } else {
+                                                echo 'Available in stock';
+                                            }
+                                            ?>
+                                        </div>
+                                        <div>
+                                            <strong>Handled By:</strong>
+                                            <?php
+                                            if (!empty($item['assigned_project_name'])) {
+                                                echo htmlspecialchars((string)($item['assigned_project_deployed_by'] ?? 'Unknown'));
+                                            } elseif (!empty($item['latest_usage_foreman_name'])) {
+                                                echo htmlspecialchars((string)$item['latest_usage_foreman_name']);
+                                            } else {
+                                                echo 'N/A';
+                                            }
+                                            ?>
+                                        </div>
+                                        <div>
+                                            <strong>Assignment Time:</strong>
+                                            <?php
+                                            if (!empty($item['assigned_project_name'])) {
+                                                echo htmlspecialchars((string)($item['assigned_project_deployed_at'] ?? 'Not recorded'));
+                                            } elseif (!empty($item['latest_used_at'])) {
+                                                echo htmlspecialchars((string)$item['latest_used_at']);
+                                            } else {
+                                                echo 'N/A';
+                                            }
+                                            ?>
+                                        </div>
                                     </div>
                                 </div>
+
+                                <?php if (!empty($item['latest_usage_notes'])): ?>
+                                    <div class="lock-note"><strong>Latest Usage Note:</strong> <?php echo htmlspecialchars((string)$item['latest_usage_notes']); ?></div>
+                                <?php endif; ?>
 
                                 <form method="POST" class="mini-form">
                                     <input type="hidden" name="action" value="update_inventory_item">
