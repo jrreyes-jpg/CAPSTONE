@@ -402,7 +402,8 @@ function getDeactivationBlockers(mysqli $conn, int $userId, string $role): array
              FROM project_assignments pa
              INNER JOIN projects p ON p.id = pa.project_id
              WHERE pa.engineer_id = ?
-             AND p.status IN ('pending', 'ongoing', 'on-hold')",
+             AND p.status IN ('pending', 'ongoing', 'on-hold')" . (hasColumn($conn, 'projects', 'deleted_at') ? "
+             AND p.deleted_at IS NULL" : ''),
             $userId
         );
 
@@ -430,7 +431,8 @@ function getDeactivationBlockers(mysqli $conn, int $userId, string $role): array
             "SELECT COUNT(*) AS total
              FROM projects
              WHERE client_id = ?
-             AND status IN ('pending', 'ongoing', 'on-hold')",
+             AND status IN ('pending', 'ongoing', 'on-hold')" . (hasColumn($conn, 'projects', 'deleted_at') ? "
+             AND deleted_at IS NULL" : ''),
             $userId
         );
 
@@ -821,6 +823,7 @@ $currentAdminPhotoUrl = $currentAdminPhoto !== ''
     ? profile_photo_public_url($currentAdminPhoto)
     : '';
 $currentAdminPhotoPreviewUrl = $currentAdminPhotoUrl !== '' ? $currentAdminPhotoUrl : $defaultAdminPhotoUrl;
+$projectVisibilitySql = hasColumn($conn, 'projects', 'deleted_at') ? ' WHERE deleted_at IS NULL' : '';
 
 $projectMetrics = $conn->query(
     "SELECT
@@ -829,7 +832,7 @@ $projectMetrics = $conn->query(
         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_projects,
         SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_projects,
         SUM(CASE WHEN status = 'on-hold' THEN 1 ELSE 0 END) AS on_hold_projects
-     FROM projects"
+     FROM projects" . $projectVisibilitySql
 );
 $projectMetricRow = $projectMetrics ? $projectMetrics->fetch_assoc() : [];
 

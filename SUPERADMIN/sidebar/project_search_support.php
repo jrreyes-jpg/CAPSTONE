@@ -119,10 +119,14 @@ if (!function_exists('project_search_assignment_summary_sql')) {
 }
 
 if (!function_exists('project_search_build_filter')) {
-    function project_search_build_filter(bool $hasProjectAddressColumn, bool $hasProjectEmailColumn, bool $hasProjectCodeColumn, bool $hasPoNumberColumn, bool $hasProjectSiteColumn, bool $hasContactPersonColumn, bool $hasContactNumberColumn, string $searchQuery, string $statusFilter): array {
+    function project_search_build_filter(bool $hasProjectAddressColumn, bool $hasProjectEmailColumn, bool $hasProjectCodeColumn, bool $hasPoNumberColumn, bool $hasProjectSiteColumn, bool $hasContactPersonColumn, bool $hasContactNumberColumn, string $searchQuery, string $statusFilter, string $trashFilterSql = 'p.deleted_at IS NULL'): array {
         $conditions = [];
         $types = '';
         $params = [];
+
+        if ($trashFilterSql !== '') {
+            $conditions[] = $trashFilterSql;
+        }
 
         if ($searchQuery !== '') {
             $likeValue = $searchQuery . '%';
@@ -187,8 +191,8 @@ if (!function_exists('project_search_build_filter')) {
 }
 
 if (!function_exists('project_search_fetch_count')) {
-    function project_search_fetch_count(mysqli $conn, bool $hasProjectAddressColumn, bool $hasProjectEmailColumn, bool $hasProjectCodeColumn, bool $hasPoNumberColumn, bool $hasProjectSiteColumn, bool $hasContactPersonColumn, bool $hasContactNumberColumn, string $searchQuery, string $statusFilter): int {
-        [$whereSql, $types, $params] = project_search_build_filter($hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter);
+    function project_search_fetch_count(mysqli $conn, bool $hasProjectAddressColumn, bool $hasProjectEmailColumn, bool $hasProjectCodeColumn, bool $hasPoNumberColumn, bool $hasProjectSiteColumn, bool $hasContactPersonColumn, bool $hasContactNumberColumn, string $searchQuery, string $statusFilter, string $trashFilterSql = 'p.deleted_at IS NULL'): int {
+        [$whereSql, $types, $params] = project_search_build_filter($hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter, $trashFilterSql);
 
         $sql = "
             SELECT COUNT(*) AS total
@@ -223,9 +227,10 @@ if (!function_exists('project_search_fetch_page')) {
         string $searchQuery,
         string $statusFilter,
         int $limit,
-        int $offset
+        int $offset,
+        string $trashFilterSql = 'p.deleted_at IS NULL'
     ): array {
-        [$whereSql, $types, $params] = project_search_build_filter($hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter);
+        [$whereSql, $types, $params] = project_search_build_filter($hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter, $trashFilterSql);
         $projectSiteSelect = $hasProjectSiteColumn ? 'p.project_site,' : 'NULL AS project_site,';
         $projectAddressSelect = $hasProjectAddressColumn ? 'p.project_address,' : 'NULL AS project_address,';
         $projectEmailSelect = $hasProjectEmailColumn ? 'p.project_email,' : 'NULL AS project_email,';
@@ -250,6 +255,8 @@ if (!function_exists('project_search_fetch_page')) {
                 p.start_date,
                 p.end_date,
                 p.status,
+                p.deleted_at,
+                p.delete_scheduled_at,
                 p.created_at,
                 client.full_name AS client_name,
                 client.email AS client_email,
@@ -318,9 +325,10 @@ if (!function_exists('project_search_fetch_suggestions')) {
         bool $hasContactNumberColumn,
         string $searchQuery,
         string $statusFilter,
-        int $limit = 8
+        int $limit = 8,
+        string $trashFilterSql = 'p.deleted_at IS NULL'
     ): array {
-        [$whereSql, $types, $params] = project_search_build_filter($hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter);
+        [$whereSql, $types, $params] = project_search_build_filter($hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter, $trashFilterSql);
         $projectSiteSelect = $hasProjectSiteColumn ? 'p.project_site,' : 'NULL AS project_site,';
         $projectAddressSelect = $hasProjectAddressColumn ? 'p.project_address,' : 'NULL AS project_address,';
         $projectEmailSelect = $hasProjectEmailColumn ? 'p.project_email,' : 'NULL AS project_email,';

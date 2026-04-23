@@ -9,6 +9,8 @@ header('Content-Type: application/json; charset=UTF-8');
 
 $searchQuery = trim((string)($_GET['q'] ?? ''));
 $statusFilter = trim((string)($_GET['status'] ?? ''));
+$view = trim((string)($_GET['view'] ?? ''));
+$trashFilterSql = $view === 'trash' ? 'p.deleted_at IS NOT NULL' : 'p.deleted_at IS NULL';
 $limit = min(10, max(1, (int)($_GET['limit'] ?? 8)));
 $hasProjectSiteColumn = project_search_table_has_column($conn, 'projects', 'project_site');
 $hasProjectAddressColumn = project_search_table_has_column($conn, 'projects', 'project_address');
@@ -29,7 +31,7 @@ if (mb_strlen($searchQuery) < 2) {
     exit();
 }
 
-$results = project_search_fetch_suggestions($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter, $limit);
+$results = project_search_fetch_suggestions($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter, $limit, $trashFilterSql);
 $payload = array_map(
     static function (array $project): array {
         return [

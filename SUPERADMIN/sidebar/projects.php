@@ -204,6 +204,50 @@ function ensure_estimated_completion_date_column(mysqli $conn): void {
     }
 }
 
+function ensure_project_soft_delete_columns(mysqli $conn): void {
+    if (!table_has_column($conn, 'projects', 'deleted_at')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN deleted_at DATETIME DEFAULT NULL AFTER status");
+    }
+
+    if (!table_has_column($conn, 'projects', 'deleted_by')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN deleted_by INT(11) DEFAULT NULL AFTER deleted_at");
+    }
+
+    if (!table_has_column($conn, 'projects', 'delete_scheduled_at')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN delete_scheduled_at DATETIME DEFAULT NULL AFTER deleted_by");
+    }
+
+    if (!table_has_column($conn, 'projects', 'restored_at')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN restored_at DATETIME DEFAULT NULL AFTER delete_scheduled_at");
+    }
+
+    if (!table_has_column($conn, 'projects', 'restored_by')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN restored_by INT(11) DEFAULT NULL AFTER restored_at");
+    }
+
+    $indexResult = $conn->query("SHOW INDEX FROM projects WHERE Key_name = 'idx_projects_deleted_at'");
+    if (!$indexResult || (int)$indexResult->num_rows === 0) {
+        $conn->query("ALTER TABLE projects ADD INDEX idx_projects_deleted_at (deleted_at, delete_scheduled_at, status)");
+    }
+}
+
+function purge_expired_deleted_projects(mysqli $conn): void {
+    if (!table_has_column($conn, 'projects', 'deleted_at') || !table_has_column($conn, 'projects', 'delete_scheduled_at')) {
+        return;
+    }
+
+    $purgeStmt = $conn->prepare(
+        'DELETE FROM projects
+         WHERE deleted_at IS NOT NULL
+         AND delete_scheduled_at IS NOT NULL
+         AND delete_scheduled_at <= NOW()'
+    );
+
+    if ($purgeStmt) {
+        $purgeStmt->execute();
+    }
+}
+
 function normalize_positive_int($value): int {
     $normalized = (int)$value;
     return $normalized > 0 ? $normalized : 0;
@@ -289,6 +333,7 @@ ensure_project_contact_person_column($conn);
 ensure_project_contact_number_column($conn);
 ensure_project_start_date_column($conn);
 ensure_estimated_completion_date_column($conn);
+ensure_project_soft_delete_columns($conn);
 $hasProjectSiteColumn = table_has_column($conn, 'projects', 'project_site');
 $hasProjectAddressColumn = table_has_column($conn, 'projects', 'project_address');
 $hasProjectEmailColumn = table_has_column($conn, 'projects', 'project_email');
@@ -320,6 +365,7 @@ ensure_project_inventory_return_logs_table($conn);
 ensure_project_budget_profiles_table($conn);
 ensure_project_cost_entries_table($conn);
 ensure_project_payments_table($conn);
+purge_expired_deleted_projects($conn);
 
 function get_projects_redirect_target(): string {
     $redirectTo = $_POST['redirect_to'] ?? $_GET['redirect_to'] ?? '';
@@ -398,6 +444,7 @@ function getProjectFinancialSnapshot(mysqli $conn, int $projectId): ?array {
              GROUP BY project_id
          ) cost_totals ON cost_totals.project_id = p.id
          WHERE p.id = ?
+         AND p.deleted_at IS NULL
          LIMIT 1'
     );
 
@@ -432,6 +479,7 @@ function getProjectPaymentSnapshot(mysqli $conn, int $projectId): ?array {
              GROUP BY project_id
          ) payment_totals ON payment_totals.project_id = p.id
          WHERE p.id = ?
+         AND p.deleted_at IS NULL
          LIMIT 1'
     );
 
@@ -512,8 +560,40 @@ function getProjectSnapshot(mysqli $conn, int $projectId): ?array {
             ) AS engineer_ids_csv
          FROM projects p
          WHERE p.id = ?
+         AND p.deleted_at IS NULL
          LIMIT 1'
     );
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('i', $projectId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result ? $result->fetch_assoc() : null;
+}
+
+function getDeletedProjectSnapshot(mysqli $conn, int $projectId): ?array {
+    $stmt = $conn->prepare(
+        'SELECT
+            p.id,
+            p.project_name,
+            p.status,
+            p.deleted_at,
+            p.delete_scheduled_at,
+            (
+                SELECT COUNT(*)
+                FROM tasks t
+                WHERE t.project_id = p.id
+                AND t.status IN ("pending", "ongoing", "delayed")
+            ) AS open_tasks
+         FROM projects p
+         WHERE p.id = ?
+         AND p.deleted_at IS NOT NULL
+         LIMIT 1'
+    );
+
     if (!$stmt) {
         return null;
     }
@@ -537,6 +617,7 @@ function projectNameExists(mysqli $conn, string $projectName, ?int $excludeProje
             'SELECT id
              FROM projects
              WHERE LOWER(TRIM(project_name)) = ?
+             AND deleted_at IS NULL
              AND id <> ?
              LIMIT 1'
         );
@@ -551,6 +632,7 @@ function projectNameExists(mysqli $conn, string $projectName, ?int $excludeProje
             'SELECT id
              FROM projects
              WHERE LOWER(TRIM(project_name)) = ?
+             AND deleted_at IS NULL
              LIMIT 1'
         );
 
@@ -579,6 +661,7 @@ function projectFieldValueExists(mysqli $conn, string $columnName, string $value
             "SELECT id
              FROM projects
              WHERE LOWER(TRIM({$columnName})) = ?
+             AND deleted_at IS NULL
              AND id <> ?
              LIMIT 1"
         );
@@ -593,6 +676,7 @@ function projectFieldValueExists(mysqli $conn, string $columnName, string $value
             "SELECT id
              FROM projects
              WHERE LOWER(TRIM({$columnName})) = ?
+             AND deleted_at IS NULL
              LIMIT 1"
         );
 
@@ -1697,6 +1781,97 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect_projects_page();
     }
 
+    if ($action === 'delete_project') {
+        $projectId = (int)($_POST['project_id'] ?? 0);
+        $deletedBy = (int)($_SESSION['user_id'] ?? 0);
+        $project = $projectId > 0 ? getProjectSnapshot($conn, $projectId) : null;
+
+        if ($projectId <= 0 || !$project) {
+            set_projects_flash('error', 'Project not found.');
+            redirect_projects_page();
+        }
+
+        $deleteProject = $conn->prepare(
+            'UPDATE projects
+             SET deleted_at = NOW(),
+                 deleted_by = ?,
+                 delete_scheduled_at = DATE_ADD(NOW(), INTERVAL 30 DAY),
+                 restored_at = NULL,
+                 restored_by = NULL
+             WHERE id = ?
+             AND deleted_at IS NULL'
+        );
+
+        if ($deleteProject && $deleteProject->bind_param('ii', $deletedBy, $projectId) && $deleteProject->execute() && $deleteProject->affected_rows > 0) {
+            audit_log_event(
+                $conn,
+                $deletedBy,
+                'delete_project',
+                'project',
+                $projectId,
+                [
+                    'project_name' => $project['project_name'] ?? null,
+                    'status' => $project['status'] ?? null,
+                ],
+                [
+                    'deleted_at' => date('Y-m-d H:i:s'),
+                    'delete_scheduled_at' => date('Y-m-d H:i:s', strtotime('+30 days')),
+                ]
+            );
+            set_projects_flash('success', 'Project moved to trash. It will be permanently deleted after 30 days.');
+        } else {
+            set_projects_flash('error', 'Failed to move project to trash.');
+        }
+
+        redirect_projects_page();
+    }
+
+    if ($action === 'restore_project') {
+        $projectId = (int)($_POST['project_id'] ?? 0);
+        $restoredBy = (int)($_SESSION['user_id'] ?? 0);
+        $project = $projectId > 0 ? getDeletedProjectSnapshot($conn, $projectId) : null;
+
+        if ($projectId <= 0 || !$project) {
+            set_projects_flash('error', 'Trashed project not found.');
+            redirect_projects_page();
+        }
+
+        $restoreProject = $conn->prepare(
+            'UPDATE projects
+             SET deleted_at = NULL,
+                 deleted_by = NULL,
+                 delete_scheduled_at = NULL,
+                 restored_at = NOW(),
+                 restored_by = ?
+             WHERE id = ?
+             AND deleted_at IS NOT NULL'
+        );
+
+        if ($restoreProject && $restoreProject->bind_param('ii', $restoredBy, $projectId) && $restoreProject->execute() && $restoreProject->affected_rows > 0) {
+            audit_log_event(
+                $conn,
+                $restoredBy,
+                'restore_project',
+                'project',
+                $projectId,
+                [
+                    'deleted_at' => $project['deleted_at'] ?? null,
+                    'delete_scheduled_at' => $project['delete_scheduled_at'] ?? null,
+                ],
+                [
+                    'project_name' => $project['project_name'] ?? null,
+                    'status' => $project['status'] ?? null,
+                    'restored_at' => date('Y-m-d H:i:s'),
+                ]
+            );
+            set_projects_flash('success', 'Project restored from trash.');
+        } else {
+            set_projects_flash('error', 'Failed to restore project.');
+        }
+
+        redirect_projects_page();
+    }
+
     if ($action === 'deploy_inventory_to_project') {
         $projectId = (int)($_POST['project_id'] ?? 0);
         $inventoryId = (int)($_POST['inventory_id'] ?? 0);
@@ -1997,6 +2172,9 @@ $statusFilter = trim((string)($_GET['status'] ?? ''));
 if (!in_array($statusFilter, $statusOptions, true)) {
     $statusFilter = '';
 }
+$view = trim((string)($_GET['view'] ?? ''));
+$isTrashView = $view === 'trash';
+$trashFilterSql = $isTrashView ? 'p.deleted_at IS NOT NULL' : 'p.deleted_at IS NULL';
 $currentPage = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 8;
 $offset = ($currentPage - 1) * $perPage;
@@ -2007,6 +2185,7 @@ $projectMetricsResult = $conn->query("
         SUM(CASE WHEN p.status = 'ongoing' THEN 1 ELSE 0 END) AS ongoing_projects,
         SUM(CASE WHEN p.status = 'completed' THEN 1 ELSE 0 END) AS completed_projects
     FROM projects p
+    WHERE p.deleted_at IS NULL
 ");
 $projectMetrics = $projectMetricsResult ? $projectMetricsResult->fetch_assoc() : [];
 $totalProjects = (int)($projectMetrics['total_projects'] ?? 0);
@@ -2021,6 +2200,7 @@ $statusCounts = array_fill_keys($statusOptions, 0);
 $statusCountsResult = $conn->query("
     SELECT p.status, COUNT(*) AS total
     FROM projects p
+    WHERE p.deleted_at IS NULL
     GROUP BY p.status
 ");
 if ($statusCountsResult) {
@@ -2032,7 +2212,15 @@ if ($statusCountsResult) {
     }
 }
 
-$filteredProjects = project_search_fetch_count($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter);
+$trashMetricsResult = $conn->query("
+    SELECT COUNT(*) AS total_trashed
+    FROM projects
+    WHERE deleted_at IS NOT NULL
+");
+$trashMetrics = $trashMetricsResult ? $trashMetricsResult->fetch_assoc() : [];
+$trashedProjects = (int)($trashMetrics['total_trashed'] ?? 0);
+
+$filteredProjects = project_search_fetch_count($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter, $trashFilterSql);
 
 $totalPages = max(1, (int)ceil($filteredProjects / $perPage));
 if ($currentPage > $totalPages) {
@@ -2040,7 +2228,7 @@ if ($currentPage > $totalPages) {
     $offset = ($currentPage - 1) * $perPage;
 }
 
-$projects = project_search_fetch_page($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter, $perPage, $offset);
+$projects = project_search_fetch_page($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter, $perPage, $offset, $trashFilterSql);
 $projectIds = array_map(static fn(array $project): int => (int)($project['id'] ?? 0), $projects);
 $recentProjectCosts = fetchRecentProjectCostEntries($conn, $projectIds);
 $financialSummaryResult = $conn->query(
@@ -2099,6 +2287,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                 </article>
             </section>
 
+            <?php if (!$isTrashView): ?>
             <section class="form-panel">
                 <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px;">
                     <div>
@@ -2347,43 +2536,69 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                         </div>
                 </form>
             </section>
+            <?php endif; ?>
 
             <section
                 class="page-stack"
                 id="projects-list-section"
-                data-reset-url="/codesamplecaps/SUPERADMIN/sidebar/projects.php<?php echo $statusFilter !== '' ? '?' . http_build_query(['status' => $statusFilter]) : ''; ?>"
+                data-reset-url="/codesamplecaps/SUPERADMIN/sidebar/projects.php<?php
+                    $resetParams = [];
+                    if ($statusFilter !== '') {
+                        $resetParams['status'] = $statusFilter;
+                    }
+                    if ($isTrashView) {
+                        $resetParams['view'] = 'trash';
+                    }
+                    echo $resetParams ? '?' . http_build_query($resetParams) : '';
+                ?>"
                 data-search-endpoint="/codesamplecaps/SUPERADMIN/sidebar/project_search_api.php"
             >
-                <h2 class="section-title-inline">Projects</h2>
-                <div class="project-controls">
-                    <div class="project-filter-chips">
-                        <?php
-                        $chipOptions = ['' => 'All'];
-                        foreach ($statusOptions as $statusOption) {
-                            $chipOptions[$statusOption] = ucfirst($statusOption);
-                        }
-                        foreach ($chipOptions as $chipValue => $chipLabel):
-                            $chipParams = [];
-                            if ($searchQuery !== '') {
-                                $chipParams['q'] = $searchQuery;
-                            }
-                            if ($chipValue !== '') {
-                                $chipParams['status'] = $chipValue;
-                            }
-                            $chipLink = '/codesamplecaps/SUPERADMIN/sidebar/projects.php' . ($chipParams ? '?' . http_build_query($chipParams) : '');
-                            $isActiveChip = $statusFilter === $chipValue;
-                            $chipTone = $chipValue === '' ? 'all' : str_replace('_', '-', $chipValue);
-                        ?>
-                            <a href="<?php echo htmlspecialchars($chipLink); ?>" class="project-filter-chip project-filter-chip--<?php echo htmlspecialchars($chipTone); ?><?php echo $isActiveChip ? ' is-active' : ''; ?>">
-                                <?php
-                                $chipCount = $chipValue === '' ? $totalProjects : (int)($statusCounts[$chipValue] ?? 0);
-                                echo htmlspecialchars($chipLabel . ' (' . $chipCount . ')');
-                                ?>
-                            </a>
-                        <?php endforeach; ?>
+                <div class="projects-section-heading">
+                    <div>
+                        <h2 class="section-title-inline"><?php echo $isTrashView ? 'Project Trash' : 'Projects'; ?></h2>
+                        <p class="projects-section-subtitle">
+                            <?php echo $isTrashView ? 'Deleted projects stay here for 30 days before permanent removal.' : 'Manage active and completed projects, then send old ones to trash when needed.'; ?>
+                        </p>
                     </div>
+                    <div class="projects-view-switch">
+                        <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="project-view-chip<?php echo !$isTrashView ? ' is-active' : ''; ?>">All Projects</a>
+                        <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash" class="project-view-chip<?php echo $isTrashView ? ' is-active' : ''; ?>">Trash (<?php echo $trashedProjects; ?>)</a>
+                    </div>
+                </div>
+                <div class="project-controls">
+                    <?php if (!$isTrashView): ?>
+                        <div class="project-filter-chips">
+                            <?php
+                            $chipOptions = ['' => 'All'];
+                            foreach ($statusOptions as $statusOption) {
+                                $chipOptions[$statusOption] = ucfirst($statusOption);
+                            }
+                            foreach ($chipOptions as $chipValue => $chipLabel):
+                                $chipParams = [];
+                                if ($searchQuery !== '') {
+                                    $chipParams['q'] = $searchQuery;
+                                }
+                                if ($chipValue !== '') {
+                                    $chipParams['status'] = $chipValue;
+                                }
+                                $chipLink = '/codesamplecaps/SUPERADMIN/sidebar/projects.php' . ($chipParams ? '?' . http_build_query($chipParams) : '');
+                                $isActiveChip = $statusFilter === $chipValue;
+                                $chipTone = $chipValue === '' ? 'all' : str_replace('_', '-', $chipValue);
+                            ?>
+                                <a href="<?php echo htmlspecialchars($chipLink); ?>" class="project-filter-chip project-filter-chip--<?php echo htmlspecialchars($chipTone); ?><?php echo $isActiveChip ? ' is-active' : ''; ?>">
+                                    <?php
+                                    $chipCount = $chipValue === '' ? $totalProjects : (int)($statusCounts[$chipValue] ?? 0);
+                                    echo htmlspecialchars($chipLabel . ' (' . $chipCount . ')');
+                                    ?>
+                                </a>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
 
                     <form method="GET" class="project-toolbar" id="project-search-form">
+                        <?php if ($isTrashView): ?>
+                            <input type="hidden" name="view" value="trash">
+                        <?php endif; ?>
                         <?php if ($statusFilter !== ''): ?>
                             <input type="hidden" name="status" value="<?php echo htmlspecialchars($statusFilter); ?>">
                         <?php endif; ?>
@@ -2395,7 +2610,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                     id="project-search"
                                     name="q"
                                     value="<?php echo htmlspecialchars($searchQuery); ?>"
-                                    placeholder="Search project, client, engineer, or site"
+                                    placeholder="<?php echo $isTrashView ? 'Search trashed project, client, engineer, or site' : 'Search project, client, engineer, or site'; ?>"
                                     autocomplete="off"
                                     aria-autocomplete="list"
                                     aria-haspopup="listbox"
@@ -2418,11 +2633,17 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
 
                 <?php if (empty($projects)): ?>
                     <div class="empty-state">
-                        <?php echo $searchQuery !== '' || $statusFilter !== '' ? 'No matching projects found.' : 'No projects yet. Create your first project above.'; ?>
+                        <?php
+                        if ($isTrashView) {
+                            echo $searchQuery !== '' || $statusFilter !== '' ? 'No matching trashed projects found.' : 'Trash is empty.';
+                        } else {
+                            echo $searchQuery !== '' || $statusFilter !== '' ? 'No matching projects found.' : 'No projects yet. Create your first project above.';
+                        }
+                        ?>
                     </div>
                 <?php else: ?>
                     <div class="project-results-meta">
-                        <span>Showing <?php echo count($projects); ?> of <?php echo $filteredProjects; ?> matching projects</span>
+                        <span>Showing <?php echo count($projects); ?> of <?php echo $filteredProjects; ?> matching <?php echo $isTrashView ? 'trashed projects' : 'projects'; ?></span>
                         <span>Page <?php echo $currentPage; ?> of <?php echo $totalPages; ?></span>
                     </div>
 
@@ -2445,6 +2666,18 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             $projectSite = trim((string)($project['project_site'] ?? ''));
                             $projectEmail = trim((string)($project['project_email'] ?? ''));
                             $assignedEngineerNames = trim((string)($project['engineer_names'] ?? ''));
+                            $deletedAt = trim((string)($project['deleted_at'] ?? ''));
+                            $deleteScheduledAt = trim((string)($project['delete_scheduled_at'] ?? ''));
+                            $daysUntilPurge = null;
+                            if ($deleteScheduledAt !== '') {
+                                try {
+                                    $purgeDate = new DateTimeImmutable($deleteScheduledAt);
+                                    $today = new DateTimeImmutable('today');
+                                    $daysUntilPurge = max(0, (int)$today->diff($purgeDate)->format('%r%a'));
+                                } catch (Throwable $exception) {
+                                    $daysUntilPurge = null;
+                                }
+                            }
                             $searchText = strtolower(trim(implode(' ', [
                                 $project['project_name'] ?? '',
                                 $projectCode,
@@ -2503,6 +2736,14 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                     <div class="empty-state empty-state-solid project-card__description"><?php echo nl2br(htmlspecialchars($project['description'])); ?></div>
                                 <?php endif; ?>
 
+                                <?php if ($isTrashView): ?>
+                                    <section class="project-trash-panel">
+                                        <div><strong>Deleted:</strong> <?php echo htmlspecialchars($deletedAt !== '' ? $deletedAt : 'N/A'); ?></div>
+                                        <div><strong>Permanent delete:</strong> <?php echo htmlspecialchars($deleteScheduledAt !== '' ? $deleteScheduledAt : 'N/A'); ?></div>
+                                        <div><strong>Days left:</strong> <?php echo $daysUntilPurge !== null ? $daysUntilPurge : 'N/A'; ?></div>
+                                    </section>
+                                <?php endif; ?>
+
                                 <section class="budget-panel budget-panel--<?php echo htmlspecialchars($budgetHealth['status']); ?>">
                                     <div class="budget-panel__header">
                                         <div>
@@ -2557,7 +2798,22 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                 </section>
 
                                 <div class="form-actions project-card__actions">
-                                    <a href="<?php echo htmlspecialchars($detailsPath); ?>" class="btn-primary project-card__details-btn">View Details</a>
+                                    <?php if ($isTrashView): ?>
+                                        <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Restore this project from trash?');">
+                                            <input type="hidden" name="action" value="restore_project">
+                                            <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
+                                            <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
+                                            <button type="submit" class="btn-secondary">Restore</button>
+                                        </form>
+                                    <?php else: ?>
+                                        <a href="<?php echo htmlspecialchars($detailsPath); ?>" class="btn-primary project-card__details-btn">View Details</a>
+                                        <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Move this project to trash? It will be permanently deleted after 30 days.');">
+                                            <input type="hidden" name="action" value="delete_project">
+                                            <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
+                                            <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars('/codesamplecaps/SUPERADMIN/sidebar/projects.php' . ($statusFilter !== '' || $searchQuery !== '' ? '?' . http_build_query(array_filter(['q' => $searchQuery, 'status' => $statusFilter])) : '')); ?>">
+                                            <button type="submit" class="btn-danger">Delete</button>
+                                        </form>
+                                    <?php endif; ?>
                                 </div>
                             </article>
                         <?php endforeach; ?>
@@ -2573,6 +2829,9 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                 }
                                 if ($statusFilter !== '') {
                                     $pageParams['status'] = $statusFilter;
+                                }
+                                if ($isTrashView) {
+                                    $pageParams['view'] = 'trash';
                                 }
                                 $pageParams['page'] = $page;
                                 $pageLink = '/codesamplecaps/SUPERADMIN/sidebar/projects.php?' . http_build_query($pageParams);
@@ -2598,6 +2857,7 @@ function initProjectSearchUI() {
     const searchDropdown = document.getElementById('project-search-dropdown');
     const projectCards = Array.from(document.querySelectorAll('[data-project-card]'));
     const statusInput = searchForm?.querySelector('input[name="status"]');
+    const viewInput = searchForm?.querySelector('input[name="view"]');
     let activeSuggestionIndex = -1;
     let searchDebounceId = null;
     const savedFocusState = window.__projectSearchFocusState || null;
@@ -2789,6 +3049,10 @@ function initProjectSearchUI() {
 
         if (statusValue !== '') {
             params.set('status', statusValue);
+        }
+
+        if (viewInput && String(viewInput.value || '').trim() !== '') {
+            params.set('view', String(viewInput.value || '').trim());
         }
 
         const queryString = params.toString();

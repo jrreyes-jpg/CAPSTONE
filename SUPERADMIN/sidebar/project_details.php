@@ -224,6 +224,20 @@ function pm_ensure_project_contact_number_column(mysqli $conn): void {
     }
 }
 
+function pm_ensure_project_soft_delete_columns(mysqli $conn): void {
+    if (!pm_table_has_column($conn, 'projects', 'deleted_at')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN deleted_at DATETIME DEFAULT NULL AFTER status");
+    }
+
+    if (!pm_table_has_column($conn, 'projects', 'deleted_by')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN deleted_by INT(11) DEFAULT NULL AFTER deleted_at");
+    }
+
+    if (!pm_table_has_column($conn, 'projects', 'delete_scheduled_at')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN delete_scheduled_at DATETIME DEFAULT NULL AFTER deleted_by");
+    }
+}
+
 function pm_get_project_financial_snapshot(mysqli $conn, int $projectId): ?array {
     $stmt = $conn->prepare(
         'SELECT
@@ -240,6 +254,7 @@ function pm_get_project_financial_snapshot(mysqli $conn, int $projectId): ?array
              GROUP BY project_id
          ) cost_totals ON cost_totals.project_id = p.id
          WHERE p.id = ?
+         AND p.deleted_at IS NULL
          LIMIT 1'
     );
 
@@ -273,6 +288,7 @@ function pm_get_project_payment_snapshot(mysqli $conn, int $projectId): ?array {
              GROUP BY project_id
          ) payment_totals ON payment_totals.project_id = p.id
          WHERE p.id = ?
+         AND p.deleted_at IS NULL
          LIMIT 1'
     );
 
@@ -346,6 +362,7 @@ pm_ensure_project_code_column($conn);
 pm_ensure_project_po_number_column($conn);
 pm_ensure_project_contact_person_column($conn);
 pm_ensure_project_contact_number_column($conn);
+pm_ensure_project_soft_delete_columns($conn);
 $hasProjectSiteColumn = pm_table_has_column($conn, 'projects', 'project_site');
 $hasProjectAddressColumn = pm_table_has_column($conn, 'projects', 'project_address');
 $hasProjectEmailColumn = pm_table_has_column($conn, 'projects', 'project_email');
@@ -451,6 +468,7 @@ if ($projectId > 0) {
             GROUP BY project_id
         ) task_totals ON task_totals.project_id = p.id
         WHERE p.id = ?
+        AND p.deleted_at IS NULL
         LIMIT 1
     ");
 

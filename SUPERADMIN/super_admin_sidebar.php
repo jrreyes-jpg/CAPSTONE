@@ -9,6 +9,7 @@ $isDashboard = $isDashboardPage && ($currentQuery === '' || str_contains($curren
 $isCreate = $isDashboardPage && str_contains($currentQuery, 'tab=create');
 $isUsers = $isDashboardPage && str_contains($currentQuery, 'tab=users');
 $isProjects = str_contains($currentPath, '/SUPERADMIN/sidebar/projects.php');
+$isProjectsTrash = $isProjects && str_contains($currentQuery, 'view=trash');
 $isInventory = str_contains($currentPath, '/SUPERADMIN/sidebar/inventory.php');
 $isAssets = str_contains($currentPath, '/SUPERADMIN/sidebar/assets.php');
 $isScanHistory = str_contains($currentPath, '/SUPERADMIN/sidebar/scan_history.php');
@@ -139,6 +140,8 @@ if (!function_exists('super_admin_fetch_notification_data')) {
         $stockAlerts = [];
         $inactiveAssignmentAlerts = [];
         $recentActivity = [];
+        $projectsSoftDeleteSupported = super_admin_sidebar_column_exists($conn, 'projects', 'deleted_at');
+        $projectVisibilityWhere = $projectsSoftDeleteSupported ? ' AND p.deleted_at IS NULL' : '';
 
         $projectRiskCountResult = $conn->query(
             "SELECT COUNT(*) AS total
@@ -151,7 +154,7 @@ if (!function_exists('super_admin_fetch_notification_data')) {
                  FROM tasks
                  GROUP BY project_id
              ) task_totals ON task_totals.project_id = p.id
-             WHERE p.status IN ('pending', 'ongoing', 'on-hold')
+             WHERE p.status IN ('pending', 'ongoing', 'on-hold')" . $projectVisibilityWhere . "
              AND COALESCE(task_totals.delayed_tasks, 0) > 0"
         );
         if ($projectRiskCountResult) {
@@ -172,7 +175,7 @@ if (!function_exists('super_admin_fetch_notification_data')) {
                  FROM tasks
                  GROUP BY project_id
              ) task_totals ON task_totals.project_id = p.id
-             WHERE p.status IN ('pending', 'ongoing', 'on-hold')
+             WHERE p.status IN ('pending', 'ongoing', 'on-hold')" . $projectVisibilityWhere . "
              AND COALESCE(task_totals.delayed_tasks, 0) > 0
              ORDER BY COALESCE(task_totals.delayed_tasks, 0) DESC, p.updated_at DESC
              LIMIT 4"
@@ -208,7 +211,7 @@ if (!function_exists('super_admin_fetch_notification_data')) {
                  SELECT u.id
                  FROM users u
                  LEFT JOIN project_assignments pa ON pa.engineer_id = u.id
-                 LEFT JOIN projects p ON p.id = pa.project_id AND p.status IN ('pending', 'ongoing', 'on-hold')
+                 LEFT JOIN projects p ON p.id = pa.project_id AND p.status IN ('pending', 'ongoing', 'on-hold')" . ($projectsSoftDeleteSupported ? " AND p.deleted_at IS NULL" : '') . "
                  WHERE u.status = 'inactive'
                  AND u.role IN ('engineer', 'foreman', 'client')
                  GROUP BY u.id
@@ -226,7 +229,7 @@ if (!function_exists('super_admin_fetch_notification_data')) {
                 COUNT(DISTINCT p.id) AS active_projects
              FROM users u
              LEFT JOIN project_assignments pa ON pa.engineer_id = u.id
-             LEFT JOIN projects p ON p.id = pa.project_id AND p.status IN ('pending', 'ongoing', 'on-hold')
+             LEFT JOIN projects p ON p.id = pa.project_id AND p.status IN ('pending', 'ongoing', 'on-hold')" . ($projectsSoftDeleteSupported ? " AND p.deleted_at IS NULL" : '') . "
              WHERE u.status = 'inactive'
              AND u.role IN ('engineer', 'foreman', 'client')
              GROUP BY u.id, u.full_name, u.role
@@ -411,7 +414,7 @@ $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName
             </a>
         </li>
         <li>
-            <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="menu-link<?php echo $isProjects ? ' active' : ''; ?>">
+            <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="menu-link<?php echo $isProjects && !$isProjectsTrash ? ' active' : ''; ?>">
                 <span class="menu-visual" aria-hidden="true">
                     <span class="menu-icon">
                         <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
@@ -422,6 +425,23 @@ $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName
                     <span class="menu-mini-label">Proj</span>
                 </span>
                 <span class="menu-text">Projects</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash" class="menu-link<?php echo $isProjectsTrash ? ' active' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M5 7h14"></path>
+                            <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"></path>
+                            <path d="M7 7l.8 11a2 2 0 0 0 2 1.85h4.4a2 2 0 0 0 2-1.85L17 7"></path>
+                            <path d="M10 11v5"></path>
+                            <path d="M14 11v5"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Trash</span>
+                </span>
+                <span class="menu-text">Project Trash</span>
             </a>
         </li>
         <li>
