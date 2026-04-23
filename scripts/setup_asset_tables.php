@@ -9,9 +9,11 @@ $stmts = [
     "CREATE TABLE IF NOT EXISTS `assets` (
         `id` int(11) NOT NULL AUTO_INCREMENT,
         `asset_name` varchar(255) NOT NULL,
+        `asset_category` varchar(80) DEFAULT NULL,
         `asset_type` varchar(150) DEFAULT NULL,
         `serial_number` varchar(150) DEFAULT NULL,
         `asset_status` enum('available','in_use','maintenance') NOT NULL DEFAULT 'available',
+        `criticality` varchar(30) DEFAULT NULL,
         `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
         `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
         PRIMARY KEY (`id`),
