@@ -3438,9 +3438,20 @@ tbody tr:hover {
 }
 
 .btn-back-projects {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 999px;
     background: linear-gradient(135deg, #0f766e, #115e59);
     color: #ffffff;
+    font-size: 28px;
+    line-height: 1;
     box-shadow: 0 14px 28px rgba(15, 118, 110, 0.24);
+    text-align: center;
 }
 
 .btn-back-projects:hover,
@@ -4526,7 +4537,8 @@ tbody tr:hover {
     top: 88px;
     z-index: 8;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 14px;
     padding: 12px 0 16px;
     background: linear-gradient(180deg, rgba(240, 253, 250, 0.98), rgba(240, 253, 250, 0.9));
@@ -4930,8 +4942,7 @@ input[data-inline-editable]:disabled {
     }
 
     .btn-back-projects {
-        width: 100%;
-        text-align: center;
+        width: 44px;
     }
 
     .project-details-hero {

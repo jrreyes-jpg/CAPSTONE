@@ -652,6 +652,8 @@ if ($projectId > 0) {
                         <div class="project-details-hero__main">
                             <div class="project-details-hero__headline">
                                 <div class="project-details-hero__eyebrow-row">
+                                                        <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="btn-secondary btn-back-projects" aria-label="Back to Projects" title="Back to Projects">&#8592;</a>
+
                                     <span class="project-details-hero__eyebrow">Project Overview</span>
                                     <?php if ($projectCode !== ''): ?>
                                         <span class="project-details-hero__reference"><?php echo htmlspecialchars($projectCode); ?></span>
@@ -738,7 +740,6 @@ if ($projectId > 0) {
                 </section>
 
                 <div class="project-details-sticky-bar">
-                    <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="btn-secondary btn-back-projects">Back to Projects</a>
                     <nav class="project-details-tabs" aria-label="Project detail sections">
                         <button type="button" class="project-details-tab is-active" data-project-tab="overview">Overview</button>
                         <button type="button" class="project-details-tab" data-project-tab="finance">Budget / Cost / Payment</button>
