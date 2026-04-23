@@ -82,6 +82,18 @@ function activity_history_build_details(array $entry): string {
         return (string)($newValues['project_name'] ?? 'Project') . ' | by ' . $actorName;
     }
 
+    if ($action === 'delete_project') {
+        return (string)($oldValues['project_name'] ?? 'Project') . ' | moved to trash by ' . $actorName;
+    }
+
+    if ($action === 'restore_project') {
+        return (string)($newValues['project_name'] ?? $oldValues['project_name'] ?? 'Project') . ' | restored by ' . $actorName;
+    }
+
+    if ($action === 'permanently_delete_project') {
+        return (string)($oldValues['project_name'] ?? 'Project') . ' | permanently deleted by ' . $actorName;
+    }
+
     if ($action === 'add_task') {
         return (string)($newValues['task_name'] ?? 'Task') . ' | ' . (string)($newValues['project_name'] ?? 'Project');
     }

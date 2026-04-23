@@ -1872,6 +1872,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect_projects_page();
     }
 
+    if ($action === 'permanently_delete_project') {
+        $projectId = (int)($_POST['project_id'] ?? 0);
+        $deletedBy = (int)($_SESSION['user_id'] ?? 0);
+        $project = $projectId > 0 ? getDeletedProjectSnapshot($conn, $projectId) : null;
+
+        if ($projectId <= 0 || !$project) {
+            set_projects_flash('error', 'Trashed project not found.');
+            redirect_projects_page();
+        }
+
+        $deleteForever = $conn->prepare(
+            'DELETE FROM projects
+             WHERE id = ?
+             AND deleted_at IS NOT NULL'
+        );
+
+        if ($deleteForever && $deleteForever->bind_param('i', $projectId) && $deleteForever->execute() && $deleteForever->affected_rows > 0) {
+            audit_log_event(
+                $conn,
+                $deletedBy,
+                'permanently_delete_project',
+                'project',
+                $projectId,
+                [
+                    'project_name' => $project['project_name'] ?? null,
+                    'status' => $project['status'] ?? null,
+                    'deleted_at' => $project['deleted_at'] ?? null,
+                    'delete_scheduled_at' => $project['delete_scheduled_at'] ?? null,
+                ],
+                [
+                    'deleted_forever_at' => date('Y-m-d H:i:s'),
+                ]
+            );
+            set_projects_flash('success', 'Project permanently deleted.');
+        } else {
+            set_projects_flash('error', 'Failed to permanently delete project.');
+        }
+
+        redirect_projects_page();
+    }
+
     if ($action === 'deploy_inventory_to_project') {
         $projectId = (int)($_POST['project_id'] ?? 0);
         $inventoryId = (int)($_POST['inventory_id'] ?? 0);
@@ -2804,6 +2845,12 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                                             <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
                                             <button type="submit" class="btn-secondary">Restore</button>
+                                        </form>
+                                        <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Permanently delete this project? This cannot be undone.');">
+                                            <input type="hidden" name="action" value="permanently_delete_project">
+                                            <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
+                                            <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
+                                            <button type="submit" class="btn-danger">Delete Permanently</button>
                                         </form>
                                     <?php else: ?>
                                         <a href="<?php echo htmlspecialchars($detailsPath); ?>" class="btn-primary project-card__details-btn">View Details</a>

@@ -350,6 +350,15 @@ function buildAuditSummary(array $entry): array {
     } elseif ($action === 'update_project_details') {
         $title = 'Project details updated';
         $details = (string)($newValues['project_name'] ?? 'Project') . ' • by ' . $actorName;
+    } elseif ($action === 'delete_project') {
+        $title = 'Project moved to trash';
+        $details = (string)($oldValues['project_name'] ?? 'Project') . ' • by ' . $actorName;
+    } elseif ($action === 'restore_project') {
+        $title = 'Project restored';
+        $details = (string)($newValues['project_name'] ?? $oldValues['project_name'] ?? 'Project') . ' • by ' . $actorName;
+    } elseif ($action === 'permanently_delete_project') {
+        $title = 'Project permanently deleted';
+        $details = (string)($oldValues['project_name'] ?? 'Project') . ' • by ' . $actorName;
     } elseif ($action === 'update_project_budget') {
         $title = 'Project budget updated';
         $details = (string)($newValues['project_name'] ?? 'Project') . ' â€¢ ' . number_format((float)($newValues['budget_amount'] ?? 0), 2);
