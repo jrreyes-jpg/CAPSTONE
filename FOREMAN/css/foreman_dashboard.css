@@ -487,6 +487,70 @@ body {
     color: var(--text-light);
 }
 
+.foreman-flash {
+    padding: 16px 18px;
+    border-radius: 18px;
+    font-weight: 600;
+}
+
+.foreman-flash--success {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #86efac;
+}
+
+.foreman-flash--error {
+    background: #fee2e2;
+    color: #b91c1c;
+    border: 1px solid #fca5a5;
+}
+
+.foreman-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.foreman-input-group {
+    display: grid;
+    gap: 8px;
+}
+
+.foreman-input-group--wide,
+.foreman-form-actions {
+    grid-column: 1 / -1;
+}
+
+.foreman-input-group label {
+    color: #0f172a;
+    font-size: 0.92rem;
+    font-weight: 700;
+}
+
+.foreman-input-group input,
+.foreman-input-group select,
+.foreman-input-group textarea {
+    width: 100%;
+    min-height: 46px;
+    padding: 12px 14px;
+    border: 1px solid #cbd5e1;
+    border-radius: 14px;
+    background: #ffffff;
+    color: #0f172a;
+    font: inherit;
+}
+
+.foreman-input-group textarea {
+    min-height: 110px;
+    resize: vertical;
+}
+
+.foreman-form-actions {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: 4px;
+}
+
 .table-wrap {
     overflow-x: auto;
 }
@@ -539,6 +603,7 @@ body {
     }
 
     .metrics-grid,
+    .foreman-form-grid,
     .quick-links-grid,
     .status-grid,
     .activity-meta,
