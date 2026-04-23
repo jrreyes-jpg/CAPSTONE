@@ -1117,14 +1117,6 @@ if ($createdAssetId > 0) {
             </div>
         </section>
 
-        <div class="asset-section-header asset-view-switch">
-            <h2 class="dashboard-section-title"><?php echo $isTrashView ? 'Shared Trash Bin' : 'Asset Registry'; ?></h2>
-            <div class="asset-section-actions">
-                <a href="/codesamplecaps/SUPERADMIN/sidebar/assets.php" class="btn-secondary">Active Assets</a>
-                <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash" class="btn-secondary">Open Trash Bin</a>
-            </div>
-        </div>
-
         <?php if ($qrPreview !== '' && !$isTrashView): ?>
             <section class="form-section asset-preview-section">
                 <h2 class="dashboard-section-title">QR Preview (Newest Asset)</h2>
