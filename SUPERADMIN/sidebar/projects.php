@@ -2195,7 +2195,36 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($createProjectValues['start_date']); ?>" max="<?php echo htmlspecialchars($todayDate); ?>">
                         </div>
 
+                    
+
+                       
+
                         <div class="input-group">
+                            <label for="budget_amount">Project Budget</label>
+                            <div style="position: relative;">
+                                <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #5f6b7a; font-weight: 600; pointer-events: none;">PHP</span>
+                                <input
+                                    type="text"
+                                    id="budget_amount"
+                                    name="budget_amount"
+                                    inputmode="decimal"
+                                    autocomplete="off"
+                                    placeholder="0.00"
+                                    value="<?php echo htmlspecialchars($createProjectValues['budget_amount']); ?>"
+                                    data-currency-input="php"
+                                    style="padding-left: 52px;"
+                                >
+                            </div>
+                        </div>
+                        
+                        <?php if ($hasProjectEmailColumn): ?>
+                            <div class="input-group">
+                                <label for="project_email">Email Address <span class="optional-indicator">(Optional)</span></label>
+                                <input type="email" id="project_email" name="project_email" value="<?php echo htmlspecialchars($createProjectValues['project_email']); ?>" placeholder="project@example.com">
+                            </div>
+                        <?php endif; ?> 
+                        
+                            <div class="input-group">
                             <div class="field-label-row">
                                 <label for="project_start_date">Project Start Date <span class="required-indicator" aria-hidden="true">*</span></label>
                                 <button type="button" class="field-tip" aria-label="Project start date help">
@@ -2217,32 +2246,6 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             <input type="date" id="estimated_completion_date" name="estimated_completion_date" value="<?php echo htmlspecialchars($createProjectValues['estimated_completion_date']); ?>" required>
                         </div>
 
-                        <?php if ($hasProjectEmailColumn): ?>
-                            <div class="input-group">
-                                <label for="project_email">Email Address <span class="optional-indicator">(Optional)</span></label>
-                                <input type="email" id="project_email" name="project_email" value="<?php echo htmlspecialchars($createProjectValues['project_email']); ?>" placeholder="project@example.com">
-                            </div>
-                        <?php endif; ?>
-
-                       
-
-                        <div class="input-group">
-                            <label for="budget_amount">Project Budget</label>
-                            <div style="position: relative;">
-                                <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #5f6b7a; font-weight: 600; pointer-events: none;">PHP</span>
-                                <input
-                                    type="text"
-                                    id="budget_amount"
-                                    name="budget_amount"
-                                    inputmode="decimal"
-                                    autocomplete="off"
-                                    placeholder="0.00"
-                                    value="<?php echo htmlspecialchars($createProjectValues['budget_amount']); ?>"
-                                    data-currency-input="php"
-                                    style="padding-left: 52px;"
-                                >
-                            </div>
-                        </div>
 
                          <div class="input-group">
                             <div class="field-label-row">
