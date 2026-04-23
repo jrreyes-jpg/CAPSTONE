@@ -1398,6 +1398,11 @@ body.page-loaded {
     color: #991b1b;
 }
 
+.alert-warning {
+    background: #fef3c7;
+    color: #92400e;
+}
+
 /* ===============================
    STAT CARDS
 ================================= */

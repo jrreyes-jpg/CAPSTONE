@@ -632,7 +632,7 @@ if ($projectId > 0) {
     <main class="main-content">
         <div class="page-stack">
             <?php if ($flash): ?>
-                <div class="alert <?php echo $flash['type'] === 'success' ? 'alert-success' : 'alert-error'; ?>">
+                <div class="alert <?php echo ($flash['type'] ?? '') === 'success' ? 'alert-success' : (($flash['type'] ?? '') === 'warning' ? 'alert-warning' : 'alert-error'); ?>">
                     <?php echo htmlspecialchars($flash['message']); ?>
                 </div>
             <?php endif; ?>
@@ -664,6 +664,7 @@ if ($projectId > 0) {
                 $costEntryCount = (int)($projectFinancials['cost_entry_count'] ?? 0);
                 $budgetUsage = $budgetAmount > 0 ? min(100, round(($totalCost / $budgetAmount) * 100)) : 0;
                 $budgetHealth = pm_build_budget_health($budgetAmount, $totalCost);
+                $hasBudget = $budgetAmount > 0;
                 $amountPaid = (float)($projectPaymentSnapshot['amount_paid'] ?? 0);
                 $paymentEntryCount = (int)($projectPaymentSnapshot['payment_entry_count'] ?? 0);
                 $remainingBalance = max(0, $totalCost - $amountPaid);
@@ -779,7 +780,7 @@ if ($projectId > 0) {
 
                 <div class="project-details-sticky-bar">
                     <nav class="project-details-tabs" aria-label="Project detail sections">
-                        <button type="button" class="project-details-tab is-active" data-project-tab="overview">Overview</button>
+                        <button type="button" class="project-details-tab is-active" data-project-tab="details">Edit Details</button>
                         <button type="button" class="project-details-tab" data-project-tab="finance">Budget / Cost / Payment</button>
                         <button type="button" class="project-details-tab" data-project-tab="status">Status</button>
                         <button type="button" class="project-details-tab" data-project-tab="tasks">Tasks</button>
@@ -789,15 +790,17 @@ if ($projectId > 0) {
                 </div>
 
                 <div class="project-details-panels">
-                <section class="form-panel project-details-panel is-active" data-project-panel="overview">
+                <section class="form-panel project-details-panel is-active" data-project-panel="details">
                     <div class="project-details-panel__header">
-                        <h2 class="section-title-inline">Project Details</h2>
+                        <h2 class="section-title-inline">Editable Project Details</h2>
                         <?php if (!$isCompleted): ?>
                             <div class="project-edit-actions">
                                 <button type="button" class="btn-secondary project-edit-toggle project-edit-toggle--edit" data-project-edit-toggle>Edit</button>
                                 <button type="submit" form="project-details-edit-form" class="btn-primary project-edit-toggle project-edit-toggle--update hidden" data-project-update-button>Update</button>
                                 <button type="button" class="btn-secondary project-edit-toggle project-edit-toggle--cancel hidden" data-project-cancel-button>Cancel</button>
                             </div>
+                        <?php else: ?>
+                            <span class="project-readonly-badge">Read Only</span>
                         <?php endif; ?>
                     </div>
                     <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" data-project-edit-form id="project-details-edit-form">
@@ -808,40 +811,10 @@ if ($projectId > 0) {
                         <div class="project-details-form-sections">
                             <section class="project-form-section">
                                 <div class="project-form-section__header">
-                                    <span class="project-form-section__eyebrow">Project Info</span>
-                                    <h3>Core project details</h3>
+                                    <span class="project-form-section__eyebrow">Editable Info</span>
+                                    <h3>Update contact and notes only</h3>
                                 </div>
                                 <div class="form-grid">
-                                    <div class="input-group">
-                                        <label for="client_id">Client</label>
-                                        <select id="client_id" name="client_id" required disabled>
-                                            <?php foreach ($clients as $client): ?>
-                                                <option value="<?php echo (int)$client['id']; ?>" <?php echo (int)$project['client_id'] === (int)$client['id'] ? 'selected' : ''; ?>>
-                                                    <?php echo htmlspecialchars($client['full_name']); ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-
-                                    <div class="input-group">
-                                        <label for="project_name">Project Title</label>
-                                        <input type="text" id="project_name" name="project_name" value="<?php echo htmlspecialchars($project['project_name']); ?>" required readonly>
-                                    </div>
-
-                                    <?php if ($hasProjectCodeColumn): ?>
-                                        <div class="input-group">
-                                            <label for="project_code">Project Code <span class="required-indicator" aria-hidden="true">*</span></label>
-                                            <input type="text" id="project_code" name="project_code" value="<?php echo htmlspecialchars($project['project_code'] ?? ''); ?>" required readonly>
-                                        </div>
-                                    <?php endif; ?>
-
-                                    <?php if ($hasProjectSiteColumn): ?>
-                                        <div class="input-group">
-                                            <label for="project_site">Project Site <span class="required-indicator" aria-hidden="true">*</span></label>
-                                            <input type="text" id="project_site" name="project_site" value="<?php echo htmlspecialchars($project['project_site'] ?? ''); ?>" readonly>
-                                        </div>
-                                    <?php endif; ?>
-
                                     <?php if ($hasContactPersonColumn): ?>
                                         <div class="input-group">
                                             <div class="field-label-row">
@@ -868,35 +841,10 @@ if ($projectId > 0) {
                                         </div>
                                     <?php endif; ?>
 
-                                    <?php if ($hasPoNumberColumn): ?>
-                                        <div class="input-group">
-                                            <div class="field-label-row">
-                                                <label for="po_number">P.O Number</label>
-                                                <button type="button" class="field-tip" aria-label="P.O number help">
-                                                    <span class="field-tip__icon" aria-hidden="true">i</span>
-                                                    <span class="field-tip__bubble">Enter the purchase order reference number. Required when the project status is Pending or Ongoing.</span>
-                                                </button>
-                                            </div>
-                                            <input type="text" id="po_number" name="po_number" value="<?php echo htmlspecialchars($project['po_number'] ?? ''); ?>" readonly>
-                                        </div>
-                                    <?php endif; ?>
-
-                                    <div class="input-group">
-                                        <label for="start_date">P.O Date</label>
-                                        <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($project['start_date'] ?? ''); ?>" max="<?php echo htmlspecialchars($todayDate); ?>" readonly>
-                                    </div>
-
                                     <?php if ($hasProjectEmailColumn): ?>
                                         <div class="input-group">
                                             <label for="project_email">Email Address <span class="optional-indicator">(Optional)</span></label>
                                             <input type="email" id="project_email" name="project_email" value="<?php echo htmlspecialchars($project['project_email'] ?? ''); ?>" readonly data-project-editable>
-                                        </div>
-                                    <?php endif; ?>
-
-                                    <?php if ($hasProjectAddressColumn): ?>
-                                        <div class="input-group input-group-wide">
-                                            <label for="project_address">Address</label>
-                                            <textarea id="project_address" name="project_address" rows="2" readonly><?php echo htmlspecialchars($project['project_address'] ?? ''); ?></textarea>
                                         </div>
                                     <?php endif; ?>
 
@@ -986,7 +934,7 @@ if ($projectId > 0) {
                                             <div class="engineer-picker__selected" data-engineer-selected>
                                                 <?php if ($assignedEngineerIds !== []): ?>
                                                     <?php foreach ($engineers as $engineer): ?>
-                                                        <?php if (in_array((int)$engineer['id'], $assignedEngineerIds, true)): ?>
+                                                        <?php if (in_array((int)$engineer['id'],    $assignedEngineerIds, true)): ?>
                                                             <button
                                                                 type="button"
                                                                 class="engineer-chip"
@@ -1023,6 +971,7 @@ if ($projectId > 0) {
                         <h2 class="section-title-inline">Budget / Cost / Payment Management</h2>
                     </div>
 
+
                   
 
                     <section class="budget-panel budget-panel--<?php echo htmlspecialchars($budgetHealth['status']); ?>">
@@ -1055,8 +1004,14 @@ if ($projectId > 0) {
                             <div class="budget-progress__track">
                                 <span class="budget-progress__fill budget-progress__fill--<?php echo htmlspecialchars($budgetHealth['status']); ?>" style="width: <?php echo $budgetUsage; ?>%;"></span>
                             </div>
-                            <small><?php echo $budgetAmount > 0 ? $budgetUsage . '% spent' : 'Set a budget to track project variance'; ?></small>
+                            <small><?php echo $budgetAmount > 0 ? $budgetUsage . '% spent' : 'Budget is optional. Actual costs can be logged anytime.'; ?></small>
                         </div>
+
+                        <?php if (!$hasBudget): ?>
+                            <div class="alert alert-warning">
+                                No budget is set for this project. You can still move it to Ongoing, log actual expenses, and add payments after costs exist.
+                            </div>
+                        <?php endif; ?>
 
                         <?php if ($budgetNotes !== ''): ?>
                             <div class="budget-notes"><?php echo nl2br(htmlspecialchars($budgetNotes)); ?></div>
@@ -1155,7 +1110,7 @@ if ($projectId > 0) {
                             <div class="form-grid">
                                 <div class="input-group">
                                     <label for="budget_amount">Budget Amount</label>
-                                    <input type="number" id="budget_amount" name="budget_amount" min="0" step="0.01" value="<?php echo htmlspecialchars(number_format($budgetAmount, 2, '.', '')); ?>" required data-inline-editable>
+                                    <input type="number" id="budget_amount" name="budget_amount" min="0" step="0.01" value="<?php echo $hasBudget ? htmlspecialchars(number_format($budgetAmount, 2, '.', '')) : ''; ?>" placeholder="Optional" data-inline-editable>
                                 </div>
                                 <div class="input-group">
                                     <label for="budget_notes">Notes</label>
@@ -1250,6 +1205,9 @@ if ($projectId > 0) {
                             </div>
                         </form>
                     <?php else: ?>
+                        <?php if (!$hasBudget): ?>
+                            <div class="alert alert-warning">Moving this project to Ongoing without a budget is allowed. Set a budget later if you want planned versus actual tracking.</div>
+                        <?php endif; ?>
                         <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form" data-inline-edit-form>
                             <input type="hidden" name="action" value="update_project_status">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
@@ -1536,7 +1494,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     tabs.forEach(function (tab) {
         tab.addEventListener('click', function () {
-            const tabName = tab.getAttribute('data-project-tab') || 'overview';
+            const tabName = tab.getAttribute('data-project-tab') || 'details';
             setActiveProjectTab(tabName);
         });
     });
@@ -1547,7 +1505,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const cancelButton = document.querySelector('[data-project-cancel-button]');
     const editableFields = Array.from(document.querySelectorAll('[data-project-editable]'));
     const editableControls = Array.from(document.querySelectorAll('[data-project-editable-control]'));
-    const overviewPanel = document.querySelector('[data-project-panel="overview"]');
+    const overviewPanel = document.querySelector('[data-project-panel="details"]');
 
     if (editForm && editToggle && updateButton && cancelButton && editableFields.length > 0) {
         const fieldSnapshots = editableFields.map(function (field) {

@@ -309,6 +309,10 @@ function determine_payment_status(float $totalCost, float $amountPaid): array {
     return ['status' => 'paid', 'label' => 'Paid'];
 }
 
+function project_has_budget(?array $projectFinancials): bool {
+    return $projectFinancials !== null && (float)($projectFinancials['budget_amount'] ?? 0) > 0;
+}
+
 function determine_inventory_status(int $quantity, ?int $minStock): string {
     if ($quantity <= 0) {
         return 'out-of-stock';
@@ -938,6 +942,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
+        if ($startDate !== null && $projectStartDate !== null && $projectStartDate < $startDate) {
+            set_projects_old_input($createProjectInput, 'project_start_date');
+            set_projects_flash('error', 'Project Start Date must be the same as or later than P.O Date.');
+            redirect_projects_page();
+        }
+
         if ($hasEstimatedCompletionDateColumn && $estimatedCompletionDate === null) {
             set_projects_old_input($createProjectInput, 'estimated_completion_date');
             set_projects_flash('error', 'Estimated Completion Date is required.');
@@ -1135,7 +1145,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]
             );
             clear_projects_old_input();
-            set_projects_flash('success', 'Project created successfully.');
+            if ($status === 'ongoing' && ($budgetAmount ?? 0) <= 0) {
+                set_projects_flash('warning', 'Project created and moved to Ongoing without a budget. Actual expenses can still be tracked.');
+            } else {
+                set_projects_flash('success', 'Project created successfully.');
+            }
         } catch (Throwable $exception) {
             $conn->rollback();
             set_projects_old_input($createProjectInput);
@@ -1163,9 +1177,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
-        if ($budgetAmount === null || $budgetAmount < 0) {
-            set_projects_flash('error', 'Budget cannot be blank or negative.');
+        if ($budgetAmount !== null && $budgetAmount < 0) {
+            set_projects_flash('error', 'Budget cannot be negative.');
             redirect_projects_page();
+        }
+
+        if ($budgetAmount === null) {
+            $budgetAmount = 0.00;
         }
 
         $saveBudget = $conn->prepare(
@@ -1224,11 +1242,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($costDate === null || $costCategory === '') {
             set_projects_flash('error', 'Cost date and category are required.');
-            redirect_projects_page();
-        }
-
-        if (empty($projectFinancials['budget_amount']) || (float)$projectFinancials['budget_amount'] <= 0) {
-            set_projects_flash('error', 'Set a project budget first before logging costs.');
             redirect_projects_page();
         }
 
@@ -1436,7 +1449,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'end_date' => $completedAt,
                 ]
             );
-            set_projects_flash('success', 'Project status updated.');
+            if ($status === 'ongoing' && !project_has_budget(getProjectFinancialSnapshot($conn, $projectId))) {
+                set_projects_flash('warning', 'Project status updated. No budget is set yet, but actual expenses can still be tracked.');
+            } else {
+                set_projects_flash('success', 'Project status updated.');
+            }
         } else {
             set_projects_flash('error', 'Failed to update project status.');
         }
@@ -1484,6 +1501,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($engineerIds === []) {
             $engineerIds = normalize_engineer_ids(explode(',', (string)($project['engineer_ids_csv'] ?? '')));
+        }
+
+        if ($projectSite === null) {
+            $projectSite = $hasProjectSiteColumn ? normalize_text_or_null($project['project_site'] ?? null) : null;
+        }
+
+        if ($projectAddress === null) {
+            $projectAddress = $hasProjectAddressColumn ? normalize_text_or_null($project['project_address'] ?? null) : null;
+        }
+
+        if ($projectCode === null) {
+            $projectCode = $hasProjectCodeColumn ? normalize_text_or_null($project['project_code'] ?? null) : null;
+        }
+
+        if ($poNumber === null) {
+            $poNumber = $hasPoNumberColumn ? normalize_text_or_null($project['po_number'] ?? null) : null;
+        }
+
+        if ($startDate === null) {
+            $startDate = normalize_date_or_null($project['start_date'] ?? null);
         }
 
         if ($projectName === '' || $clientId <= 0 || $engineerIds === []) {
@@ -1548,6 +1585,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($hasProjectStartDateColumn && $projectStartDate === null) {
             set_projects_flash('error', 'Project Start Date is required.');
+            redirect_projects_page();
+        }
+
+        if ($startDate !== null && $projectStartDate !== null && $projectStartDate < $startDate) {
+            set_projects_flash('error', 'Project Start Date must be the same as or later than P.O Date.');
             redirect_projects_page();
         }
 
@@ -2334,7 +2376,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
     <main class="main-content projects-content">
         <div class="page-stack">
             <?php if ($flash): ?>
-                <div class="alert <?php echo $flash['type'] === 'success' ? 'alert-success' : 'alert-error'; ?>">
+                <div class="alert <?php echo ($flash['type'] ?? '') === 'success' ? 'alert-success' : (($flash['type'] ?? '') === 'warning' ? 'alert-warning' : 'alert-error'); ?>">
                     <?php echo htmlspecialchars($flash['message']); ?>
                 </div>
             <?php endif; ?>
@@ -2843,7 +2885,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                         <div class="budget-progress__track">
                                             <span class="budget-progress__fill budget-progress__fill--<?php echo htmlspecialchars($budgetHealth['status']); ?>" style="width: <?php echo $budgetUsage; ?>%;"></span>
                                         </div>
-                                        <small><?php echo $budgetAmount > 0 ? $budgetUsage . '% spent' : 'Set a budget to track project variance'; ?></small>
+                                        <small><?php echo $budgetAmount > 0 ? $budgetUsage . '% spent' : 'Budget is optional; actual costs can still be tracked.'; ?></small>
                                     </div>
                                     <?php if ($budgetNotes !== ''): ?>
                                         <div class="budget-notes"><?php echo nl2br(htmlspecialchars($budgetNotes)); ?></div>
