@@ -192,6 +192,18 @@ function ensure_project_contact_number_column(mysqli $conn): void {
     }
 }
 
+function ensure_project_start_date_column(mysqli $conn): void {
+    if (!table_has_column($conn, 'projects', 'project_start_date')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN project_start_date DATE DEFAULT NULL AFTER start_date");
+    }
+}
+
+function ensure_estimated_completion_date_column(mysqli $conn): void {
+    if (!table_has_column($conn, 'projects', 'estimated_completion_date')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN estimated_completion_date DATE DEFAULT NULL AFTER project_start_date");
+    }
+}
+
 function normalize_positive_int($value): int {
     $normalized = (int)$value;
     return $normalized > 0 ? $normalized : 0;
@@ -275,6 +287,8 @@ ensure_project_code_column($conn);
 ensure_project_po_number_column($conn);
 ensure_project_contact_person_column($conn);
 ensure_project_contact_number_column($conn);
+ensure_project_start_date_column($conn);
+ensure_estimated_completion_date_column($conn);
 $hasProjectSiteColumn = table_has_column($conn, 'projects', 'project_site');
 $hasProjectAddressColumn = table_has_column($conn, 'projects', 'project_address');
 $hasProjectEmailColumn = table_has_column($conn, 'projects', 'project_email');
@@ -282,6 +296,8 @@ $hasProjectCodeColumn = table_has_column($conn, 'projects', 'project_code');
 $hasPoNumberColumn = table_has_column($conn, 'projects', 'po_number');
 $hasContactPersonColumn = table_has_column($conn, 'projects', 'contact_person');
 $hasContactNumberColumn = table_has_column($conn, 'projects', 'contact_number');
+$hasProjectStartDateColumn = table_has_column($conn, 'projects', 'project_start_date');
+$hasEstimatedCompletionDateColumn = table_has_column($conn, 'projects', 'estimated_completion_date');
 ensure_project_search_indexes($conn, $hasProjectAddressColumn, $hasProjectSiteColumn);
 $statusOptions = [];
 if ($supportsDraftStatus) {
@@ -343,6 +359,8 @@ function set_projects_old_input(array $input, ?string $focusField = null): void 
         'engineer_ids' => array_values(array_map('strval', is_array($input['engineer_ids'] ?? null) ? $input['engineer_ids'] : [])),
         'status' => trim((string)($input['status'] ?? '')),
         'start_date' => trim((string)($input['start_date'] ?? '')),
+        'project_start_date' => trim((string)($input['project_start_date'] ?? '')),
+        'estimated_completion_date' => trim((string)($input['estimated_completion_date'] ?? '')),
         'budget_amount' => trim((string)($input['budget_amount'] ?? '')),
         'budget_notes' => trim((string)($input['budget_notes'] ?? '')),
         'focus_field' => $focusField,
@@ -703,6 +721,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $engineerIds = normalize_engineer_ids($_POST['engineer_ids'] ?? []);
         $status = normalize_text($_POST['status'] ?? 'pending');
         $startDate = normalize_date_or_null($_POST['start_date'] ?? null);
+        $projectStartDate = $hasProjectStartDateColumn ? normalize_date_or_null($_POST['project_start_date'] ?? null) : null;
+        $estimatedCompletionDate = $hasEstimatedCompletionDateColumn ? normalize_date_or_null($_POST['estimated_completion_date'] ?? null) : null;
         $endDate = null;
         $budgetAmount = normalize_money_or_null($_POST['budget_amount'] ?? null);
         $budgetNotes = normalize_text_or_null($_POST['budget_notes'] ?? null);
@@ -721,6 +741,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'engineer_ids' => $_POST['engineer_ids'] ?? [],
             'status' => $_POST['status'] ?? 'pending',
             'start_date' => $_POST['start_date'] ?? '',
+            'project_start_date' => $_POST['project_start_date'] ?? '',
+            'estimated_completion_date' => $_POST['estimated_completion_date'] ?? '',
             'budget_amount' => $_POST['budget_amount'] ?? '',
             'budget_notes' => $_POST['budget_notes'] ?? '',
         ];
@@ -826,6 +848,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_projects_page();
         }
 
+        if ($hasProjectStartDateColumn && $projectStartDate === null) {
+            set_projects_old_input($createProjectInput, 'project_start_date');
+            set_projects_flash('error', 'Project Start Date is required.');
+            redirect_projects_page();
+        }
+
+        if ($hasEstimatedCompletionDateColumn && $estimatedCompletionDate === null) {
+            set_projects_old_input($createProjectInput, 'estimated_completion_date');
+            set_projects_flash('error', 'Estimated Completion Date is required.');
+            redirect_projects_page();
+        }
+
+        if ($projectStartDate !== null && $estimatedCompletionDate !== null && $estimatedCompletionDate < $projectStartDate) {
+            set_projects_old_input($createProjectInput, 'estimated_completion_date');
+            set_projects_flash('error', 'Estimated Completion Date must be the same as or later than Project Start Date.');
+            redirect_projects_page();
+        }
+
         if (($_POST['budget_amount'] ?? '') !== '' && $budgetAmount === null) {
             set_projects_old_input($createProjectInput, 'budget_amount');
             set_projects_flash('error', 'Budget must be a valid amount.');
@@ -845,25 +885,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($hasProjectEmailColumn) {
                     if ($hasProjectCodeColumn && $hasPoNumberColumn) {
                         $createProject = $conn->prepare(
-                            'INSERT INTO projects (project_name, description, client_id, contact_person, contact_number, project_site, project_address, project_email, project_code, po_number, start_date, end_date, status, created_by)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                            'INSERT INTO projects (project_name, description, client_id, contact_person, contact_number, project_site, project_address, project_email, project_code, po_number, start_date, project_start_date, estimated_completion_date, end_date, status, created_by)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
                         );
                     } else {
                         $createProject = $conn->prepare(
-                            'INSERT INTO projects (project_name, description, client_id, contact_person, contact_number, project_site, project_address, project_email, start_date, end_date, status, created_by)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                            'INSERT INTO projects (project_name, description, client_id, contact_person, contact_number, project_site, project_address, project_email, start_date, project_start_date, estimated_completion_date, end_date, status, created_by)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
                         );
                     }
                 } else {
                     $createProject = $conn->prepare(
-                        'INSERT INTO projects (project_name, description, client_id, contact_person, contact_number, project_site, project_address, start_date, end_date, status, created_by)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                        'INSERT INTO projects (project_name, description, client_id, contact_person, contact_number, project_site, project_address, start_date, project_start_date, estimated_completion_date, end_date, status, created_by)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
                     );
                 }
             } else {
                 $createProject = $conn->prepare(
-                    'INSERT INTO projects (project_name, description, client_id, contact_person, contact_number, start_date, end_date, status, created_by)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                    'INSERT INTO projects (project_name, description, client_id, contact_person, contact_number, start_date, project_start_date, estimated_completion_date, end_date, status, created_by)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
                 );
             }
 
@@ -875,7 +915,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($hasProjectEmailColumn) {
                     if ($hasProjectCodeColumn && $hasPoNumberColumn) {
                         $createProject->bind_param(
-                            'ssissssssssssi',
+                            'ssissssssssssssi',
                             $projectName,
                             $description,
                             $clientId,
@@ -887,13 +927,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $projectCode,
                             $poNumber,
                             $startDate,
+                            $projectStartDate,
+                            $estimatedCompletionDate,
                             $endDate,
                             $status,
                             $createdBy
                         );
                     } else {
                         $createProject->bind_param(
-                            'ssissssssssi',
+                            'ssissssssssssi',
                             $projectName,
                             $description,
                             $clientId,
@@ -903,6 +945,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $projectAddress,
                             $projectEmail,
                             $startDate,
+                            $projectStartDate,
+                            $estimatedCompletionDate,
                             $endDate,
                             $status,
                             $createdBy
@@ -910,7 +954,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 } else {
                     $createProject->bind_param(
-                        'ssissssssi',
+                        'ssisssssssssi',
                         $projectName,
                         $description,
                         $clientId,
@@ -919,6 +963,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $projectSite,
                         $projectAddress,
                         $startDate,
+                        $projectStartDate,
+                        $estimatedCompletionDate,
                         $endDate,
                         $status,
                         $createdBy
@@ -926,13 +972,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             } else {
                 $createProject->bind_param(
-                    'ssisssssi',
+                    'ssisssssssi',
                     $projectName,
                     $description,
                     $clientId,
                     $contactPerson,
                     $contactNumber,
                     $startDate,
+                    $projectStartDate,
+                    $estimatedCompletionDate,
                     $endDate,
                     $status,
                     $createdBy
@@ -1920,6 +1968,8 @@ $createProjectValues = [
     'engineer_ids' => array_values(array_map('strval', is_array($createProjectOldInput['engineer_ids'] ?? null) ? $createProjectOldInput['engineer_ids'] : [])),
     'status' => (string)($createProjectOldInput['status'] ?? 'pending'),
     'start_date' => array_key_exists('start_date', $createProjectOldInput) ? (string)$createProjectOldInput['start_date'] : $todayDate,
+    'project_start_date' => (string)($createProjectOldInput['project_start_date'] ?? ''),
+    'estimated_completion_date' => (string)($createProjectOldInput['estimated_completion_date'] ?? ''),
     'budget_amount' => (string)($createProjectOldInput['budget_amount'] ?? ''),
     'budget_notes' => (string)($createProjectOldInput['budget_notes'] ?? ''),
 ];
@@ -2145,6 +2195,28 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             <input type="date" id="start_date" name="start_date" value="<?php echo htmlspecialchars($createProjectValues['start_date']); ?>" max="<?php echo htmlspecialchars($todayDate); ?>">
                         </div>
 
+                        <div class="input-group">
+                            <div class="field-label-row">
+                                <label for="project_start_date">Project Start Date <span class="required-indicator" aria-hidden="true">*</span></label>
+                                <button type="button" class="field-tip" aria-label="Project start date help">
+                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                    <span class="field-tip__bubble">Set the planned date when project work should begin.</span>
+                                </button>
+                            </div>
+                            <input type="date" id="project_start_date" name="project_start_date" value="<?php echo htmlspecialchars($createProjectValues['project_start_date']); ?>" required>
+                        </div>
+
+                        <div class="input-group">
+                            <div class="field-label-row">
+                                <label for="estimated_completion_date">Estimated Completion Date <span class="required-indicator" aria-hidden="true">*</span></label>
+                                <button type="button" class="field-tip" aria-label="Estimated completion date help">
+                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                    <span class="field-tip__bubble">Set the expected completion date. This cannot be earlier than the Project Start Date.</span>
+                                </button>
+                            </div>
+                            <input type="date" id="estimated_completion_date" name="estimated_completion_date" value="<?php echo htmlspecialchars($createProjectValues['estimated_completion_date']); ?>" required>
+                        </div>
+
                         <?php if ($hasProjectEmailColumn): ?>
                             <div class="input-group">
                                 <label for="project_email">Email Address <span class="optional-indicator">(Optional)</span></label>
@@ -2152,7 +2224,27 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             </div>
                         <?php endif; ?>
 
+                       
+
                         <div class="input-group">
+                            <label for="budget_amount">Project Budget</label>
+                            <div style="position: relative;">
+                                <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #5f6b7a; font-weight: 600; pointer-events: none;">PHP</span>
+                                <input
+                                    type="text"
+                                    id="budget_amount"
+                                    name="budget_amount"
+                                    inputmode="decimal"
+                                    autocomplete="off"
+                                    placeholder="0.00"
+                                    value="<?php echo htmlspecialchars($createProjectValues['budget_amount']); ?>"
+                                    data-currency-input="php"
+                                    style="padding-left: 52px;"
+                                >
+                            </div>
+                        </div>
+
+                         <div class="input-group">
                             <div class="field-label-row">
                                 <label for="status">Initial Status <span class="required-indicator" aria-hidden="true">*</span></label>
                                 <button type="button" class="field-tip" aria-label="Project status reminder">
@@ -2173,24 +2265,6 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                     </option>
                                 <?php endforeach; ?>
                             </select>
-                        </div>
-
-                        <div class="input-group">
-                            <label for="budget_amount">Project Budget</label>
-                            <div style="position: relative;">
-                                <span style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #5f6b7a; font-weight: 600; pointer-events: none;">PHP</span>
-                                <input
-                                    type="text"
-                                    id="budget_amount"
-                                    name="budget_amount"
-                                    inputmode="decimal"
-                                    autocomplete="off"
-                                    placeholder="0.00"
-                                    value="<?php echo htmlspecialchars($createProjectValues['budget_amount']); ?>"
-                                    data-currency-input="php"
-                                    style="padding-left: 52px;"
-                                >
-                            </div>
                         </div>
                     </div>
 
@@ -2861,6 +2935,30 @@ function initCreateProjectForm() {
         }
     });
 
+    const projectStartDateField = createProjectForm.elements.namedItem('project_start_date');
+    const estimatedCompletionDateField = createProjectForm.elements.namedItem('estimated_completion_date');
+
+    function syncProjectTimelineValidation() {
+        if (!projectStartDateField || !estimatedCompletionDateField) {
+            return;
+        }
+
+        const projectStartDate = String(projectStartDateField.value || '');
+        estimatedCompletionDateField.min = projectStartDate;
+
+        if (projectStartDate !== '' && String(estimatedCompletionDateField.value || '') !== '' && estimatedCompletionDateField.value < projectStartDate) {
+            estimatedCompletionDateField.setCustomValidity('Estimated Completion Date must be the same as or later than Project Start Date.');
+        } else {
+            estimatedCompletionDateField.setCustomValidity('');
+        }
+    }
+
+    if (projectStartDateField && estimatedCompletionDateField) {
+        projectStartDateField.addEventListener('input', syncProjectTimelineValidation);
+        estimatedCompletionDateField.addEventListener('input', syncProjectTimelineValidation);
+        syncProjectTimelineValidation();
+    }
+
     if (focusFieldName !== '') {
         const targetField = createProjectForm.elements.namedItem(focusFieldName) || document.getElementById(focusFieldName);
 
@@ -2890,6 +2988,8 @@ function initCreateProjectDraft() {
         engineer_ids: [],
         status: 'pending',
         start_date: <?php echo json_encode($todayDate, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+        project_start_date: '',
+        estimated_completion_date: '',
         project_email: '',
         project_site: '',
         budget_amount: '',
@@ -2983,6 +3083,8 @@ function initCreateProjectDraft() {
             engineer_ids: getEngineerIds(),
             status: String(createProjectForm.elements.namedItem('status')?.value || defaultDraft.status),
             start_date: String(createProjectForm.elements.namedItem('start_date')?.value || ''),
+            project_start_date: String(createProjectForm.elements.namedItem('project_start_date')?.value || ''),
+            estimated_completion_date: String(createProjectForm.elements.namedItem('estimated_completion_date')?.value || ''),
             project_email: String(createProjectForm.elements.namedItem('project_email')?.value || ''),
             project_site: String(createProjectForm.elements.namedItem('project_site')?.value || ''),
             budget_amount: String(createProjectForm.elements.namedItem('budget_amount')?.value || ''),
