@@ -43,10 +43,6 @@ $projectRoleSummary = project_role_summary_label('foreman');
             <div class="page-hero__content">
                 <span class="page-hero__eyebrow">Overview</span>
                 <h1 class="page-hero__title"><?php echo htmlspecialchars($foremanProfileName); ?></h1>
-                <p class="page-hero__copy">
-                    Simple field dashboard for scanning assets, checking current site status,
-                    and reviewing worker activity without repeating the full details from other pages.
-                </p>
                 <p class="page-hero__copy page-hero__copy--compact"><?php echo htmlspecialchars($projectRoleSummary); ?></p>
                 <div class="hero-actions">
                     <button class="btn-primary" type="button" data-open-qr-scanner>Scan Asset</button>

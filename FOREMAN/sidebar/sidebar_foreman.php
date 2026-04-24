@@ -198,6 +198,7 @@ $isWorkers = $currentFile === 'worker_summary.php';
     <div class="global-topbar__actions">
         <div class="topbar-notifications" data-notification-root>
             <button
+                title="Notifications"
                 id="topbarNotificationToggle"
                 class="topbar-notifications__toggle"
                 type="button"
