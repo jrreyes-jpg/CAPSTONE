@@ -871,7 +871,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($engineerIds === []) {
             set_projects_old_input($createProjectInput, 'engineer_ids');
-            set_projects_flash('error', 'Project title, client, and assigned engineer/s are required.');
+            set_projects_flash('error', 'Project title, client, and assigned team member/s are required.');
             redirect_projects_page();
         }
 
@@ -1115,14 +1115,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
 
             if (!$assignEngineer) {
-                throw new RuntimeException('Failed to prepare engineer assignment.');
+                throw new RuntimeException('Failed to prepare project team assignment.');
             }
 
             foreach ($engineerIds as $engineerId) {
                 $assignEngineer->bind_param('iii', $projectId, $engineerId, $createdBy);
 
                 if (!$assignEngineer->execute()) {
-                    throw new RuntimeException('Failed to assign engineer to project.');
+                    throw new RuntimeException('Failed to assign team member to project.');
                 }
             }
 
@@ -1546,7 +1546,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($projectName === '' || $clientId <= 0 || $engineerIds === []) {
-            set_projects_flash('error', 'Project title, client, and assigned engineer/s are required.');
+            set_projects_flash('error', 'Project title, client, and assigned team member/s are required.');
             redirect_projects_page();
         }
 
@@ -1700,14 +1700,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $clearAssignments = $conn->prepare('DELETE FROM project_assignments WHERE project_id = ?');
 
             if (!$clearAssignments) {
-                throw new RuntimeException('Failed to prepare engineer reassignment reset.');
+                throw new RuntimeException('Failed to prepare project team reassignment reset.');
             }
 
             if (
                 !$clearAssignments->bind_param('i', $projectId) ||
                 !$clearAssignments->execute()
             ) {
-                throw new RuntimeException('Failed to reset current engineer assignments.');
+                throw new RuntimeException('Failed to reset current project team assignments.');
             }
 
             $reassignEngineer = $conn->prepare(
@@ -1716,7 +1716,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
 
             if (!$reassignEngineer) {
-                throw new RuntimeException('Failed to prepare engineer reassignment.');
+                throw new RuntimeException('Failed to prepare project team reassignment.');
             }
 
             foreach ($engineerIds as $engineerId) {
@@ -1724,7 +1724,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     !$reassignEngineer->bind_param('iii', $projectId, $engineerId, $updatedBy) ||
                     !$reassignEngineer->execute()
                 ) {
-                    throw new RuntimeException('Failed to update engineer assignment.');
+                    throw new RuntimeException('Failed to update project team assignment.');
                 }
             }
 
@@ -2539,7 +2539,7 @@ if ($clientResult) {
     $clients = $clientResult->fetch_all(MYSQLI_ASSOC);
 }
 
-$engineerResult = $conn->query("SELECT id, full_name FROM users WHERE role = 'engineer' AND status = 'active' ORDER BY full_name ASC");
+$engineerResult = $conn->query("SELECT id, full_name, role FROM users WHERE role IN ('engineer', 'foreman') AND status = 'active' ORDER BY full_name ASC");
 if ($engineerResult) {
     $engineers = $engineerResult->fetch_all(MYSQLI_ASSOC);
 }
@@ -2954,21 +2954,21 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
 
                         <div class="input-group project-create-engineers-group">
                             <div class="field-label-row">
-                                <label for="engineer_ids">Assigned Engineer/s <span class="required-indicator" aria-hidden="true">*</span></label>
-                                <button type="button" class="field-tip" aria-label="Assigned engineers help">
+                                <label for="engineer_ids">Assigned Team Member/s <span class="required-indicator" aria-hidden="true">*</span></label>
+                                <button type="button" class="field-tip" aria-label="Assigned team members help">
                                     <span class="field-tip__icon" aria-hidden="true">i</span>
-                                    <span class="field-tip__bubble">Pick an engineer from the dropdown, then press the plus button to add. Press the same button again to remove the selected engineer, Add one or more engineers depending on the project workload.</span>
+                                    <span class="field-tip__bubble">Pick an engineer or foreman from the dropdown, then press the plus button to add. Press the same button again to remove the selected team member. Add one or more people depending on the project workload.</span>
                                 </button>
                             </div>
                             <div class="engineer-picker" data-engineer-picker>
                                 <div class="engineer-picker__controls">
                                     <select id="engineer_ids" class="engineer-picker__select" data-engineer-select>
-                                        <option value="">Select engineer</option>
+                                        <option value="">Select engineer or foreman</option>
                                         <?php foreach ($engineers as $engineer): ?>
-                                            <option value="<?php echo (int)$engineer['id']; ?>"><?php echo htmlspecialchars($engineer['full_name']); ?></option>
+                                            <option value="<?php echo (int)$engineer['id']; ?>"><?php echo htmlspecialchars($engineer['full_name'] . ' (' . ucfirst((string)($engineer['role'] ?? 'team')) . ')'); ?></option>
                                         <?php endforeach; ?>
                                     </select>
-                                    <button type="button" class="engineer-picker__toggle" data-engineer-toggle aria-label="Add selected engineer">
+                                    <button type="button" class="engineer-picker__toggle" data-engineer-toggle aria-label="Add selected team member">
                                         <span class="engineer-picker__toggle-icon" aria-hidden="true">+</span>
                                         <span class="engineer-picker__toggle-text">Add</span>
                                     </button>
@@ -3216,7 +3216,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                             <div><strong>Project Code:</strong> <?php echo htmlspecialchars($projectCode !== '' ? $projectCode : 'Not set'); ?></div>
                                             <div><strong>P.O Number:</strong> <?php echo htmlspecialchars($projectPoNumber !== '' ? $projectPoNumber : 'Not set'); ?></div>
                                             <div><strong>P.O Date:</strong> <?php echo htmlspecialchars($project['start_date'] ?? 'N/A'); ?></div>
-                                            <div><strong>Assigned Engineer/s:</strong> <?php echo htmlspecialchars($assignedEngineerNames !== '' ? $assignedEngineerNames : 'Not assigned'); ?></div>
+                                            <div><strong>Assigned Team:</strong> <?php echo htmlspecialchars($assignedEngineerNames !== '' ? $assignedEngineerNames : 'Not assigned'); ?></div>
                                             <?php if ($hasProjectSiteColumn): ?>
                                                 <div><strong>Project Site:</strong> <?php echo htmlspecialchars($projectSite !== '' ? $projectSite : 'Not set'); ?></div>
                                             <?php endif; ?>

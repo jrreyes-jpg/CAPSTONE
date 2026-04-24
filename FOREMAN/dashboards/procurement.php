@@ -136,6 +136,48 @@ function foreman_procurement_is_assigned(mysqli $conn, int $projectId, int $fore
     return (bool)$row;
 }
 
+function foreman_procurement_fetch_editable_request(mysqli $conn, int $requestId, int $foremanId): ?array
+{
+    if ($requestId <= 0) {
+        return null;
+    }
+
+    $stmt = $conn->prepare(
+        "SELECT
+            pr.id,
+            pr.project_id,
+            pr.request_no,
+            pr.status,
+            pr.needed_date,
+            pr.request_type,
+            pr.site_location,
+            pr.remarks,
+            pri.item_description,
+            pri.specification,
+            pri.unit,
+            pri.quantity_requested,
+            pri.estimated_unit_cost
+         FROM purchase_requests pr
+         LEFT JOIN purchase_request_items pri ON pri.purchase_request_id = pr.id
+         WHERE pr.id = ?
+         AND pr.requested_by = ?
+         AND pr.status = 'submitted'
+         LIMIT 1"
+    );
+
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('ii', $requestId, $foremanId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result ? $result->fetch_assoc() : null;
+    $stmt->close();
+
+    return $row ?: null;
+}
+
 foreman_procurement_ensure_purchase_requests_table($conn);
 foreman_procurement_ensure_purchase_request_items_table($conn);
 foreman_procurement_ensure_purchase_request_review_columns($conn);
@@ -161,8 +203,9 @@ $flash = foreman_procurement_consume_flash();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
-    if ($action === 'create_purchase_request') {
+    if ($action === 'create_purchase_request' || $action === 'update_purchase_request') {
         $projectId = (int)($_POST['project_id'] ?? 0);
+        $purchaseRequestId = (int)($_POST['purchase_request_id'] ?? 0);
         $neededDate = foreman_procurement_normalize_text_or_null($_POST['needed_date'] ?? null);
         $requestType = foreman_procurement_normalize_text($_POST['request_type'] ?? 'material');
         $siteLocation = foreman_procurement_normalize_text_or_null($_POST['site_location'] ?? null);
@@ -173,6 +216,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $quantityRequested = foreman_procurement_normalize_money_or_null($_POST['quantity_requested'] ?? null);
         $estimatedUnitCost = foreman_procurement_normalize_money_or_null($_POST['estimated_unit_cost'] ?? null);
         $allowedTypes = ['material', 'tool', 'equipment', 'service'];
+        $isUpdate = $action === 'update_purchase_request';
+
+        if ($isUpdate && !foreman_procurement_fetch_editable_request($conn, $purchaseRequestId, $userId)) {
+            foreman_procurement_set_flash('error', 'Only your submitted requests can be edited.');
+            foreman_procurement_redirect();
+        }
 
         if ($projectId <= 0 || $itemDescription === '' || $unit === '' || $quantityRequested === null || $quantityRequested <= 0) {
             foreman_procurement_set_flash('error', 'Project, item, unit, and quantity are required.');
@@ -209,36 +258,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreman_procurement_redirect();
         }
 
-        $requestNo = foreman_procurement_generate_code('PR');
         $conn->begin_transaction();
 
         try {
-            $insertRequest = $conn->prepare(
-                'INSERT INTO purchase_requests (request_no, project_id, requested_by, needed_date, request_type, site_location, remarks, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-            );
-
             $status = 'submitted';
-            if (
-                !$insertRequest ||
-                !$insertRequest->bind_param('siisssss', $requestNo, $projectId, $userId, $neededDate, $requestType, $siteLocation, $remarks, $status) ||
-                !$insertRequest->execute()
-            ) {
-                throw new RuntimeException('Failed to create purchase request.');
-            }
+            if ($isUpdate) {
+                $updateRequest = $conn->prepare(
+                    "UPDATE purchase_requests
+                     SET project_id = ?, needed_date = ?, request_type = ?, site_location = ?, remarks = ?, status = ?
+                     WHERE id = ?
+                     AND requested_by = ?
+                     AND status = 'submitted'"
+                );
 
-            $purchaseRequestId = (int)$insertRequest->insert_id;
-            $insertItem = $conn->prepare(
-                'INSERT INTO purchase_request_items (purchase_request_id, item_description, specification, unit, quantity_requested, estimated_unit_cost)
-                 VALUES (?, ?, ?, ?, ?, ?)'
-            );
+                if (
+                    !$updateRequest ||
+                    !$updateRequest->bind_param('isssssii', $projectId, $neededDate, $requestType, $siteLocation, $remarks, $status, $purchaseRequestId, $userId) ||
+                    !$updateRequest->execute()
+                ) {
+                    throw new RuntimeException('Failed to update purchase request.');
+                }
 
-            if (
-                !$insertItem ||
-                !$insertItem->bind_param('isssdd', $purchaseRequestId, $itemDescription, $specification, $unit, $quantityRequested, $estimatedUnitCost) ||
-                !$insertItem->execute()
-            ) {
-                throw new RuntimeException('Failed to save request item.');
+                $updateItem = $conn->prepare(
+                    'UPDATE purchase_request_items
+                     SET item_description = ?, specification = ?, unit = ?, quantity_requested = ?, estimated_unit_cost = ?
+                     WHERE purchase_request_id = ?'
+                );
+
+                if (
+                    !$updateItem ||
+                    !$updateItem->bind_param('sssddi', $itemDescription, $specification, $unit, $quantityRequested, $estimatedUnitCost, $purchaseRequestId) ||
+                    !$updateItem->execute()
+                ) {
+                    throw new RuntimeException('Failed to update request item.');
+                }
+            } else {
+                $requestNo = foreman_procurement_generate_code('PR');
+                $insertRequest = $conn->prepare(
+                    'INSERT INTO purchase_requests (request_no, project_id, requested_by, needed_date, request_type, site_location, remarks, status)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+                );
+
+                if (
+                    !$insertRequest ||
+                    !$insertRequest->bind_param('siisssss', $requestNo, $projectId, $userId, $neededDate, $requestType, $siteLocation, $remarks, $status) ||
+                    !$insertRequest->execute()
+                ) {
+                    throw new RuntimeException('Failed to create purchase request.');
+                }
+
+                $purchaseRequestId = (int)$insertRequest->insert_id;
+                $insertItem = $conn->prepare(
+                    'INSERT INTO purchase_request_items (purchase_request_id, item_description, specification, unit, quantity_requested, estimated_unit_cost)
+                     VALUES (?, ?, ?, ?, ?, ?)'
+                );
+
+                if (
+                    !$insertItem ||
+                    !$insertItem->bind_param('isssdd', $purchaseRequestId, $itemDescription, $specification, $unit, $quantityRequested, $estimatedUnitCost) ||
+                    !$insertItem->execute()
+                ) {
+                    throw new RuntimeException('Failed to save request item.');
+                }
             }
 
             $conn->commit();
@@ -246,12 +327,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             audit_log_event(
                 $conn,
                 $userId,
-                'create_purchase_request',
+                $isUpdate ? 'update_purchase_request' : 'create_purchase_request',
                 'purchase_request',
                 $purchaseRequestId,
                 null,
                 [
-                    'request_no' => $requestNo,
                     'project_id' => $projectId,
                     'requested_by' => $userId,
                     'request_type' => $requestType,
@@ -260,7 +340,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]
             );
 
-            foreman_procurement_set_flash('success', 'Purchase request submitted for engineer review.');
+            foreman_procurement_set_flash('success', $isUpdate ? 'Purchase request updated.' : 'Purchase request submitted for engineer review.');
         } catch (Throwable $exception) {
             $conn->rollback();
             foreman_procurement_set_flash('error', $exception->getMessage());
@@ -268,7 +348,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         foreman_procurement_redirect();
     }
+
+    if ($action === 'cancel_purchase_request') {
+        $purchaseRequestId = (int)($_POST['purchase_request_id'] ?? 0);
+        $editableRequest = foreman_procurement_fetch_editable_request($conn, $purchaseRequestId, $userId);
+
+        if (!$editableRequest) {
+            foreman_procurement_set_flash('error', 'Only your submitted requests can be cancelled.');
+            foreman_procurement_redirect();
+        }
+
+        $cancelRequest = $conn->prepare(
+            "UPDATE purchase_requests
+             SET status = 'cancelled'
+             WHERE id = ?
+             AND requested_by = ?
+             AND status = 'submitted'"
+        );
+
+        if (
+            $cancelRequest &&
+            $cancelRequest->bind_param('ii', $purchaseRequestId, $userId) &&
+            $cancelRequest->execute() &&
+            (int)$cancelRequest->affected_rows > 0
+        ) {
+            audit_log_event(
+                $conn,
+                $userId,
+                'cancel_purchase_request',
+                'purchase_request',
+                $purchaseRequestId,
+                [
+                    'request_no' => $editableRequest['request_no'] ?? null,
+                    'status' => 'submitted',
+                ],
+                [
+                    'request_no' => $editableRequest['request_no'] ?? null,
+                    'status' => 'cancelled',
+                ]
+            );
+            foreman_procurement_set_flash('success', 'Purchase request cancelled.');
+        } else {
+            foreman_procurement_set_flash('error', 'Failed to cancel purchase request.');
+        }
+
+        foreman_procurement_redirect();
+    }
 }
+
+$editRequestId = max(0, (int)($_GET['edit'] ?? 0));
+$editRequest = foreman_procurement_fetch_editable_request($conn, $editRequestId, $userId);
+$requestFormValues = [
+    'project_id' => (string)($editRequest['project_id'] ?? ''),
+    'request_type' => (string)($editRequest['request_type'] ?? 'material'),
+    'needed_date' => (string)($editRequest['needed_date'] ?? ''),
+    'site_location' => (string)($editRequest['site_location'] ?? ''),
+    'item_description' => (string)($editRequest['item_description'] ?? ''),
+    'specification' => (string)($editRequest['specification'] ?? ''),
+    'unit' => (string)($editRequest['unit'] ?? ''),
+    'quantity_requested' => isset($editRequest['quantity_requested']) ? (string)$editRequest['quantity_requested'] : '',
+    'estimated_unit_cost' => isset($editRequest['estimated_unit_cost']) && $editRequest['estimated_unit_cost'] !== null ? (string)$editRequest['estimated_unit_cost'] : '',
+    'remarks' => (string)($editRequest['remarks'] ?? ''),
+];
 
 $requestRows = [];
 $requestStatement = $conn->prepare(
@@ -382,7 +523,7 @@ foreach ($requestRows as $requestRow) {
             <div class="section-heading">
                 <div>
                     <span class="section-badge">Request Form</span>
-                    <h2>Create Purchase Request</h2>
+                    <h2><?php echo $editRequest ? 'Edit Purchase Request' : 'Create Purchase Request'; ?></h2>
                     <p>Foreman submits the request, Engineer validates it, then Super Admin handles supplier selection and purchase order creation.</p>
                 </div>
             </div>
@@ -391,13 +532,16 @@ foreach ($requestRows as $requestRow) {
                 <div class="empty-state">You need an assigned project first before creating a purchase request.</div>
             <?php else: ?>
                 <form method="POST" class="foreman-form-grid">
-                    <input type="hidden" name="action" value="create_purchase_request">
+                    <input type="hidden" name="action" value="<?php echo $editRequest ? 'update_purchase_request' : 'create_purchase_request'; ?>">
+                    <?php if ($editRequest): ?>
+                        <input type="hidden" name="purchase_request_id" value="<?php echo (int)$editRequest['id']; ?>">
+                    <?php endif; ?>
                     <div class="foreman-input-group">
                         <label for="project_id">Project</label>
                         <select id="project_id" name="project_id" required>
                             <option value="">Select assigned project</option>
                             <?php foreach ($assignedProjects as $project): ?>
-                                <option value="<?php echo (int)($project['id'] ?? 0); ?>">
+                                <option value="<?php echo (int)($project['id'] ?? 0); ?>" <?php echo $requestFormValues['project_id'] === (string)($project['id'] ?? '') ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars((string)($project['project_name'] ?? 'Project')); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -406,46 +550,49 @@ foreach ($requestRows as $requestRow) {
                     <div class="foreman-input-group">
                         <label for="request_type">Type</label>
                         <select id="request_type" name="request_type" required>
-                            <option value="material">Material</option>
-                            <option value="tool">Tool</option>
-                            <option value="equipment">Equipment</option>
-                            <option value="service">Service</option>
+                            <option value="material" <?php echo $requestFormValues['request_type'] === 'material' ? 'selected' : ''; ?>>Material</option>
+                            <option value="tool" <?php echo $requestFormValues['request_type'] === 'tool' ? 'selected' : ''; ?>>Tool</option>
+                            <option value="equipment" <?php echo $requestFormValues['request_type'] === 'equipment' ? 'selected' : ''; ?>>Equipment</option>
+                            <option value="service" <?php echo $requestFormValues['request_type'] === 'service' ? 'selected' : ''; ?>>Service</option>
                         </select>
                     </div>
                     <div class="foreman-input-group">
                         <label for="needed_date">Needed Date</label>
-                        <input type="date" id="needed_date" name="needed_date" required>
+                        <input type="date" id="needed_date" name="needed_date" value="<?php echo htmlspecialchars($requestFormValues['needed_date']); ?>" required>
                     </div>
                     <div class="foreman-input-group">
                         <label for="site_location">Site Location</label>
-                        <input type="text" id="site_location" name="site_location" placeholder="Area, floor, or work zone" required>
+                        <input type="text" id="site_location" name="site_location" value="<?php echo htmlspecialchars($requestFormValues['site_location']); ?>" placeholder="Area, floor, or work zone" required>
                     </div>
                     <div class="foreman-input-group foreman-input-group--wide">
                         <label for="item_description">Item Description</label>
-                        <input type="text" id="item_description" name="item_description" placeholder="Cement, conduit, rebar, hand tool" required>
+                        <input type="text" id="item_description" name="item_description" value="<?php echo htmlspecialchars($requestFormValues['item_description']); ?>" placeholder="Cement, conduit, rebar, hand tool" required>
                     </div>
                     <div class="foreman-input-group">
                         <label for="specification">Specification</label>
-                        <input type="text" id="specification" name="specification" placeholder="Size, grade, brand">
+                        <input type="text" id="specification" name="specification" value="<?php echo htmlspecialchars($requestFormValues['specification']); ?>" placeholder="Size, grade, brand">
                     </div>
                     <div class="foreman-input-group">
                         <label for="unit">Unit</label>
-                        <input type="text" id="unit" name="unit" placeholder="bags, pcs, rolls" required>
+                        <input type="text" id="unit" name="unit" value="<?php echo htmlspecialchars($requestFormValues['unit']); ?>" placeholder="bags, pcs, rolls" required>
                     </div>
                     <div class="foreman-input-group">
                         <label for="quantity_requested">Quantity</label>
-                        <input type="number" id="quantity_requested" name="quantity_requested" min="0.01" step="0.01" required>
+                        <input type="number" id="quantity_requested" name="quantity_requested" min="0.01" step="0.01" value="<?php echo htmlspecialchars($requestFormValues['quantity_requested']); ?>" required>
                     </div>
                     <div class="foreman-input-group">
                         <label for="estimated_unit_cost">Estimated Unit Cost</label>
-                        <input type="number" id="estimated_unit_cost" name="estimated_unit_cost" min="0" step="0.01">
+                        <input type="number" id="estimated_unit_cost" name="estimated_unit_cost" min="0" step="0.01" value="<?php echo htmlspecialchars($requestFormValues['estimated_unit_cost']); ?>">
                     </div>
                     <div class="foreman-input-group foreman-input-group--wide">
                         <label for="remarks">Remarks</label>
-                        <textarea id="remarks" name="remarks" rows="3" placeholder="Why this is needed and what activity it supports"></textarea>
+                        <textarea id="remarks" name="remarks" rows="3" placeholder="Why this is needed and what activity it supports"><?php echo htmlspecialchars($requestFormValues['remarks']); ?></textarea>
                     </div>
                     <div class="foreman-form-actions">
-                        <button type="submit" class="btn-primary">Submit Request</button>
+                        <button type="submit" class="btn-primary"><?php echo $editRequest ? 'Update Request' : 'Submit Request'; ?></button>
+                        <?php if ($editRequest): ?>
+                            <a href="/codesamplecaps/FOREMAN/dashboards/procurement.php#create-purchase-request" class="btn-secondary">Cancel Edit</a>
+                        <?php endif; ?>
                     </div>
                 </form>
             <?php endif; ?>
@@ -513,6 +660,19 @@ foreach ($requestRows as $requestRow) {
 
                             <?php if (!empty($requestRow['engineer_review_notes'])): ?>
                                 <p><strong>Engineer Note:</strong> <?php echo htmlspecialchars((string)$requestRow['engineer_review_notes']); ?></p>
+                            <?php endif; ?>
+
+                            <?php if (($requestRow['status'] ?? '') === 'submitted'): ?>
+                                <div class="project-card__actions">
+                                    <a href="/codesamplecaps/FOREMAN/dashboards/procurement.php?edit=<?php echo (int)$requestRow['id']; ?>#create-purchase-request" class="btn-secondary">Edit</a>
+                                    <form method="POST" onsubmit="return confirm('Cancel this submitted purchase request?');">
+                                        <input type="hidden" name="action" value="cancel_purchase_request">
+                                        <input type="hidden" name="purchase_request_id" value="<?php echo (int)$requestRow['id']; ?>">
+                                        <button type="submit" class="btn-danger">Cancel Request</button>
+                                    </form>
+                                </div>
+                            <?php elseif (($requestRow['status'] ?? '') === 'engineer_review'): ?>
+                                <p class="foreman-inline-note">Engineer review already started, so this request is now locked for editing.</p>
                             <?php endif; ?>
                         </article>
                     <?php endforeach; ?>

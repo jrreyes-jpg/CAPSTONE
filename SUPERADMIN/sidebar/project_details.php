@@ -429,7 +429,7 @@ if ($clientResult) {
     $clients = $clientResult->fetch_all(MYSQLI_ASSOC);
 }
 
-$engineerResult = $conn->query("SELECT id, full_name FROM users WHERE role = 'engineer' AND status = 'active' ORDER BY full_name ASC");
+$engineerResult = $conn->query("SELECT id, full_name, role FROM users WHERE role IN ('engineer', 'foreman') AND status = 'active' ORDER BY full_name ASC");
 if ($engineerResult) {
     $engineers = $engineerResult->fetch_all(MYSQLI_ASSOC);
 }
@@ -757,7 +757,7 @@ if ($projectId > 0) {
                                 <small>Assigned client</small>
                             </div>
                             <div class="project-details-stat">
-                                <span>Assigned Engineer/s</span>
+                                <span>Assigned Team</span>
                                 <strong><?php echo htmlspecialchars($assignedEngineerNames !== '' ? $assignedEngineerNames : 'Not assigned'); ?></strong>
                                 <small>Current assigned team</small>
                             </div>
@@ -933,21 +933,21 @@ if ($projectId > 0) {
                                 <div class="form-grid">
                                     <div class="input-group input-group-wide">
                                         <div class="field-label-row">
-                                            <label for="engineer_ids_picker">Assigned Engineer/s <span class="required-indicator" aria-hidden="true">*</span></label>
-                                            <button type="button" class="field-tip" aria-label="Assigned engineers help">
+                                            <label for="engineer_ids_picker">Assigned Team Member/s <span class="required-indicator" aria-hidden="true">*</span></label>
+                                            <button type="button" class="field-tip" aria-label="Assigned team members help">
                                                 <span class="field-tip__icon" aria-hidden="true">i</span>
-                                                <span class="field-tip__bubble">Pick an engineer from the dropdown, then press the plus button to add. Press the same button again to remove the selected engineer. Add one or more engineers depending on the project workload.</span>
+                                                <span class="field-tip__bubble">Pick an engineer or foreman from the dropdown, then press the plus button to add. Press the same button again to remove the selected team member. Add one or more people depending on the project workload.</span>
                                             </button>
                                         </div>
                                         <div class="engineer-picker" data-engineer-picker>
                                             <div class="engineer-picker__controls">
                                                 <select id="engineer_ids_picker" class="engineer-picker__select" data-engineer-select data-project-editable disabled>
-                                                    <option value="">Select engineer</option>
+                                                    <option value="">Select engineer or foreman</option>
                                                     <?php foreach ($engineers as $engineer): ?>
-                                                        <option value="<?php echo (int)$engineer['id']; ?>"><?php echo htmlspecialchars($engineer['full_name']); ?></option>
+                                                        <option value="<?php echo (int)$engineer['id']; ?>"><?php echo htmlspecialchars($engineer['full_name'] . ' (' . ucfirst((string)($engineer['role'] ?? 'team')) . ')'); ?></option>
                                                     <?php endforeach; ?>
                                                 </select>
-                                                <button type="button" class="engineer-picker__toggle" data-engineer-toggle data-project-editable-control aria-label="Add selected engineer" disabled>
+                                                <button type="button" class="engineer-picker__toggle" data-engineer-toggle data-project-editable-control aria-label="Add selected team member" disabled>
                                                     <span class="engineer-picker__toggle-icon" aria-hidden="true">+</span>
                                                     <span class="engineer-picker__toggle-text">Add</span>
                                                 </button>
