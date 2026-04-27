@@ -472,10 +472,91 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             saveForm.querySelector('[data-save-field="full_name"]').value = byField.full_name || '';
             saveForm.querySelector('[data-save-field="email"]').value = byField.email || '';
-            saveForm.querySelector('[data-save-field="phone"]').value = byField.phone || '';
+            const phoneField = saveForm.querySelector('[data-save-field="phone"]');
+            if (phoneField) {
+                phoneField.value = byField.phone || phoneField.value || '';
+            }
             saveForm.submit();
         });
     });
+
+    const userManagementShell = document.querySelector('[data-user-management-shell]');
+    const createUserModal = document.querySelector('[data-user-create-modal]');
+    if (userManagementShell && createUserModal) {
+        const openButtons = document.querySelectorAll('[data-open-create-modal]');
+        const closeButtons = document.querySelectorAll('[data-close-create-modal]');
+        const initialFocusTarget = createUserModal.querySelector('#full_name');
+        const shouldOpenOnLoad = userManagementShell.getAttribute('data-create-modal-default-open') === 'true';
+
+        const openCreateModal = function () {
+            createUserModal.hidden = false;
+            createUserModal.classList.add('is-open');
+            document.body.style.overflow = 'hidden';
+            if (initialFocusTarget) {
+                window.setTimeout(function () {
+                    initialFocusTarget.focus();
+                }, 50);
+            }
+        };
+
+        const closeCreateModal = function () {
+            createUserModal.hidden = true;
+            createUserModal.classList.remove('is-open');
+            document.body.style.overflow = '';
+        };
+
+        openButtons.forEach(function (button) {
+            button.addEventListener('click', openCreateModal);
+        });
+
+        closeButtons.forEach(function (button) {
+            button.addEventListener('click', closeCreateModal);
+        });
+
+        createUserModal.addEventListener('click', function (event) {
+            if (event.target === createUserModal) {
+                closeCreateModal();
+            }
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && createUserModal.classList.contains('is-open')) {
+                closeCreateModal();
+            }
+        });
+
+        if (shouldOpenOnLoad) {
+            openCreateModal();
+        }
+    }
+
+    const userSearchInput = document.querySelector('[data-user-search]');
+    const userTableBody = document.querySelector('[data-user-table-body]');
+    if (userSearchInput && userTableBody) {
+        const rows = Array.from(userTableBody.querySelectorAll('.user-row'));
+        const emptySearchRow = userTableBody.querySelector('.user-search-empty-row');
+
+        const syncSearchResults = function () {
+            const query = userSearchInput.value.trim().toLowerCase();
+            let visibleCount = 0;
+
+            rows.forEach(function (row) {
+                const haystack = row.getAttribute('data-user-search') || '';
+                const matches = query === '' || haystack.includes(query);
+                row.hidden = !matches;
+                if (matches) {
+                    visibleCount += 1;
+                }
+            });
+
+            if (emptySearchRow) {
+                emptySearchRow.hidden = visibleCount !== 0;
+            }
+        };
+
+        userSearchInput.addEventListener('input', syncSearchResults);
+        syncSearchResults();
+    }
 });
 
 document.addEventListener('DOMContentLoaded', function () {

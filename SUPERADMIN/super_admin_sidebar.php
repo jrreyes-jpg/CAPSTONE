@@ -7,7 +7,7 @@ $currentQuery = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_QUERY) ?? '';
 $isDashboardPage = str_contains($currentPath, '/SUPERADMIN/dashboards/super_admin_dashboard.php');
 $isDashboard = $isDashboardPage && ($currentQuery === '' || str_contains($currentQuery, 'tab=dashboard'));
 $isCreate = $isDashboardPage && str_contains($currentQuery, 'tab=create');
-$isUsers = $isDashboardPage && str_contains($currentQuery, 'tab=users');
+$isUsers = $isDashboardPage && (str_contains($currentQuery, 'tab=users') || $isCreate);
 $isProjects = str_contains($currentPath, '/SUPERADMIN/sidebar/projects.php');
 $isProjectsTrash = $isProjects && str_contains($currentQuery, 'view=trash');
 $isProcurement = str_contains($currentPath, '/SUPERADMIN/sidebar/procurement.php');
@@ -384,21 +384,6 @@ $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName
             </a>
         </li>
         <li>
-            <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=create" class="menu-link<?php echo $isCreate ? ' active' : ''; ?>">
-                <span class="menu-visual" aria-hidden="true">
-                    <span class="menu-icon">
-                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
-                            <path d="M12 5v14"></path>
-                            <path d="M5 12h14"></path>
-                            <path d="M7 19h10"></path>
-                        </svg>
-                    </span>
-                    <span class="menu-mini-label">Create</span>
-                </span>
-                <span class="menu-text">Create Accounts</span>
-            </a>
-        </li>
-        <li>
             <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=users" class="menu-link<?php echo $isUsers ? ' active' : ''; ?>">
                 <span class="menu-visual" aria-hidden="true">
                     <span class="menu-icon">
@@ -411,7 +396,7 @@ $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName
                     </span>
                     <span class="menu-mini-label">Users</span>
                 </span>
-                <span class="menu-text">Manage Users</span>
+                <span class="menu-text">User Management</span>
             </a>
         </li>
         <li>
