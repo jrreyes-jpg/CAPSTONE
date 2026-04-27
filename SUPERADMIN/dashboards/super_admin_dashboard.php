@@ -453,6 +453,34 @@ function getDeactivationBlockers(mysqli $conn, int $userId, string $role): array
     return $blockers;
 }
 
+function ensureDeletedUsersArchiveTable(mysqli $conn): void {
+    static $ensured = false;
+
+    if ($ensured) {
+        return;
+    }
+
+    $conn->query(
+        "CREATE TABLE IF NOT EXISTS deleted_users_archive (
+            id INT(11) NOT NULL AUTO_INCREMENT,
+            original_user_id INT(11) NOT NULL,
+            full_name VARCHAR(150) NOT NULL,
+            email VARCHAR(100) NOT NULL,
+            phone VARCHAR(20) DEFAULT NULL,
+            role VARCHAR(30) NOT NULL,
+            status VARCHAR(20) NOT NULL,
+            deleted_by INT(11) DEFAULT NULL,
+            deleted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            payload_json LONGTEXT DEFAULT NULL,
+            PRIMARY KEY (id),
+            KEY idx_deleted_users_archive_original (original_user_id),
+            KEY idx_deleted_users_archive_deleted_by (deleted_by)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+
+    $ensured = true;
+}
+
 function compareUsersForTable(array $left, array $right): int {
     $leftName = strtolower(trim((string)($left['full_name'] ?? '')));
     $rightName = strtolower(trim((string)($right['full_name'] ?? '')));
@@ -674,13 +702,44 @@ $old['role'] = $role;
             if (!empty($blockers)) {
                 $error = 'Cannot delete ' . $user['full_name'] . ' yet. Reassign ' . implode(' and ', $blockers) . ' first.';
             } else {
-                $stmt = $conn->prepare('DELETE FROM users WHERE id = ? LIMIT 1');
-                $stmt->bind_param('i', $userId);
+                try {
+                    ensureDeletedUsersArchiveTable($conn);
+                    $conn->begin_transaction();
 
-                if ($stmt->execute()) {
+                    $payloadJson = json_encode($user, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    $archiveStmt = $conn->prepare(
+                        'INSERT INTO deleted_users_archive (original_user_id, full_name, email, phone, role, status, deleted_by, payload_json)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+                    );
+                    $deletedBy = (int)($_SESSION['user_id'] ?? 0);
+                    $archiveStmt->bind_param(
+                        'isssssis',
+                        $userId,
+                        $user['full_name'],
+                        $user['email'],
+                        $user['phone'],
+                        $user['role'],
+                        $user['status'],
+                        $deletedBy,
+                        $payloadJson
+                    );
+                    $archiveStmt->execute();
+
+                    $cleanupLoginAttempts = $conn->prepare('DELETE FROM login_attempts WHERE email = ?');
+                    $cleanupLoginAttempts->bind_param('s', $user['email']);
+                    $cleanupLoginAttempts->execute();
+
+                    $stmt = $conn->prepare('DELETE FROM users WHERE id = ? LIMIT 1');
+                    $stmt->bind_param('i', $userId);
+                    $stmt->execute();
+
+                    if ($stmt->affected_rows !== 1) {
+                        throw new RuntimeException('User delete failed.');
+                    }
+
                     audit_log_event(
                         $conn,
-                        (int)($_SESSION['user_id'] ?? 0),
+                        $deletedBy,
                         'delete_user',
                         'user',
                         $userId,
@@ -693,9 +752,12 @@ $old['role'] = $role;
                         ],
                         null
                     );
+
+                    $conn->commit();
                     $message = 'User account deleted successfully.';
-                } else {
-                    $error = 'User could not be deleted because related records still reference this account.';
+                } catch (Throwable $exception) {
+                    $conn->rollback();
+                    $error = 'User could not be deleted yet. Run the user delete schema migration first.';
                 }
             }
         }
