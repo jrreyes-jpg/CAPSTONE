@@ -481,9 +481,64 @@ function ensureDeletedUsersArchiveTable(mysqli $conn): void {
     $ensured = true;
 }
 
+function ensureUserTrashColumns(mysqli $conn): void {
+    static $ensured = false;
+
+    if ($ensured) {
+        return;
+    }
+
+    if (!hasColumn($conn, 'users', 'deleted_at')) {
+        $conn->query("ALTER TABLE users ADD COLUMN deleted_at DATETIME DEFAULT NULL AFTER status");
+    }
+
+    if (!hasColumn($conn, 'users', 'deleted_by')) {
+        $conn->query("ALTER TABLE users ADD COLUMN deleted_by INT(11) DEFAULT NULL AFTER deleted_at");
+    }
+
+    if (!hasColumn($conn, 'users', 'restored_at')) {
+        $conn->query("ALTER TABLE users ADD COLUMN restored_at DATETIME DEFAULT NULL AFTER deleted_by");
+    }
+
+    if (!hasColumn($conn, 'users', 'restored_by')) {
+        $conn->query("ALTER TABLE users ADD COLUMN restored_by INT(11) DEFAULT NULL AFTER restored_at");
+    }
+
+    $indexResult = $conn->query("SHOW INDEX FROM users WHERE Key_name = 'idx_users_deleted_at'");
+    if ($indexResult && $indexResult->num_rows === 0) {
+        $conn->query("ALTER TABLE users ADD INDEX idx_users_deleted_at (deleted_at, role, status)");
+    }
+
+    $ensured = true;
+}
+
 function compareUsersForTable(array $left, array $right): int {
+    $statusOrder = [
+        'active' => 0,
+        'inactive' => 1,
+    ];
+    $roleOrder = [
+        'engineer' => 0,
+        'foreman' => 1,
+        'client' => 2,
+    ];
+
+    $leftStatus = strtolower(trim((string)($left['status'] ?? 'inactive')));
+    $rightStatus = strtolower(trim((string)($right['status'] ?? 'inactive')));
+    $leftRole = normalizeRole((string)($left['role'] ?? ''));
+    $rightRole = normalizeRole((string)($right['role'] ?? ''));
     $leftName = strtolower(trim((string)($left['full_name'] ?? '')));
     $rightName = strtolower(trim((string)($right['full_name'] ?? '')));
+
+    $statusComparison = ($statusOrder[$leftStatus] ?? 99) <=> ($statusOrder[$rightStatus] ?? 99);
+    if ($statusComparison !== 0) {
+        return $statusComparison;
+    }
+
+    $roleComparison = ($roleOrder[$leftRole] ?? 99) <=> ($roleOrder[$rightRole] ?? 99);
+    if ($roleComparison !== 0) {
+        return $roleComparison;
+    }
 
     if ($leftName === $rightName) {
         return ((int)($right['id'] ?? 0)) <=> ((int)($left['id'] ?? 0));
@@ -493,6 +548,7 @@ function compareUsersForTable(array $left, array $right): int {
 }
 
 $supportsProfilePhoto = hasColumn($conn, 'users', 'profile_photo_path');
+ensureUserTrashColumns($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
@@ -702,45 +758,22 @@ $old['role'] = $role;
             if (!empty($blockers)) {
                 $error = 'Cannot delete ' . $user['full_name'] . ' yet. Reassign ' . implode(' and ', $blockers) . ' first.';
             } else {
-                try {
-                    ensureDeletedUsersArchiveTable($conn);
-                    $conn->begin_transaction();
-
-                    $payloadJson = json_encode($user, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                    $archiveStmt = $conn->prepare(
-                        'INSERT INTO deleted_users_archive (original_user_id, full_name, email, phone, role, status, deleted_by, payload_json)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-                    );
-                    $deletedBy = (int)($_SESSION['user_id'] ?? 0);
-                    $archiveStmt->bind_param(
-                        'isssssis',
-                        $userId,
-                        $user['full_name'],
-                        $user['email'],
-                        $user['phone'],
-                        $user['role'],
-                        $user['status'],
-                        $deletedBy,
-                        $payloadJson
-                    );
-                    $archiveStmt->execute();
-
-                    $cleanupLoginAttempts = $conn->prepare('DELETE FROM login_attempts WHERE email = ?');
-                    $cleanupLoginAttempts->bind_param('s', $user['email']);
-                    $cleanupLoginAttempts->execute();
-
-                    $stmt = $conn->prepare('DELETE FROM users WHERE id = ? LIMIT 1');
-                    $stmt->bind_param('i', $userId);
-                    $stmt->execute();
-
-                    if ($stmt->affected_rows !== 1) {
-                        throw new RuntimeException('User delete failed.');
-                    }
-
+                $deletedBy = (int)($_SESSION['user_id'] ?? 0);
+                $stmt = $conn->prepare(
+                    'UPDATE users
+                     SET deleted_at = NOW(),
+                         deleted_by = ?,
+                         restored_at = NULL,
+                         restored_by = NULL
+                     WHERE id = ?
+                     AND deleted_at IS NULL'
+                );
+                $stmt->bind_param('ii', $deletedBy, $userId);
+                if ($stmt->execute() && $stmt->affected_rows > 0) {
                     audit_log_event(
                         $conn,
                         $deletedBy,
-                        'delete_user',
+                        'trash_user',
                         'user',
                         $userId,
                         [
@@ -750,14 +783,13 @@ $old['role'] = $role;
                             'role' => $user['role'] ?? null,
                             'status' => $user['status'] ?? null,
                         ],
-                        null
+                        [
+                            'deleted_at' => date('Y-m-d H:i:s'),
+                        ]
                     );
-
-                    $conn->commit();
-                    $message = 'User account deleted successfully.';
-                } catch (Throwable $exception) {
-                    $conn->rollback();
-                    $error = 'User could not be deleted yet. Run the user delete schema migration first.';
+                    $message = 'User moved to trash successfully.';
+                } else {
+                    $error = 'Failed to move user to trash.';
                 }
             }
         }
@@ -905,10 +937,12 @@ $old['role'] = $role;
 }
 
 
-function fetchUsersByRoles(mysqli $conn, array $roles, string $statusFilter = ''): array {
+function fetchUsersByRoles(mysqli $conn, array $roles, string $statusFilter = '', bool $trashView = false): array {
     $placeholders = implode(',', array_fill(0, count($roles), '?'));
     $types = str_repeat('s', count($roles));
-    $sql = "SELECT id, full_name, email, phone, status, role FROM users WHERE role IN ($placeholders)";
+    $sql = "SELECT id, full_name, email, phone, status, role, deleted_at FROM users WHERE role IN ($placeholders)";
+
+    $sql .= $trashView ? ' AND deleted_at IS NOT NULL' : ' AND deleted_at IS NULL';
 
     if ($statusFilter !== '') {
         $sql .= ' AND status = ?';
@@ -928,14 +962,15 @@ $userStatusFilter = trim((string)($_GET['status'] ?? ''));
 if (!in_array($userStatusFilter, $allowedStatuses, true)) {
     $userStatusFilter = '';
 }
-
 $isUserWorkspaceTab = in_array($activeTab, ['create', 'users'], true);
-$engineers = fetchUsersByRoles($conn, ['engineer'], $isUserWorkspaceTab ? $userStatusFilter : '');
-$foremen = fetchUsersByRoles($conn, ['foreman', 'foremen'], $isUserWorkspaceTab ? $userStatusFilter : '');
-$clients = fetchUsersByRoles($conn, ['client'], $isUserWorkspaceTab ? $userStatusFilter : '');
+$engineers = fetchUsersByRoles($conn, ['engineer'], $isUserWorkspaceTab ? $userStatusFilter : '', false);
+$foremen = fetchUsersByRoles($conn, ['foreman', 'foremen'], $isUserWorkspaceTab ? $userStatusFilter : '', false);
+$clients = fetchUsersByRoles($conn, ['client'], $isUserWorkspaceTab ? $userStatusFilter : '', false);
 $totalUsers = count($engineers) + count($foremen) + count($clients);
 $managedUsers = array_merge($engineers, $foremen, $clients);
 usort($managedUsers, 'compareUsersForTable');
+$activeUsersAll = count(fetchUsersByRoles($conn, ['engineer', 'foreman', 'foremen', 'client'], 'active', false));
+$trashedUsersCount = count(fetchUsersByRoles($conn, ['engineer', 'foreman', 'foremen', 'client'], '', true));
 $csrfToken = getCsrfToken();
 $currentAdmin = getUserById($conn, (int)($_SESSION['user_id'] ?? 0));
 if ($supportsProfilePhoto && $currentAdmin) {
@@ -1147,13 +1182,13 @@ $userWorkspaceShouldOpenModal = $activeTab === 'create';
                 <div class="user-management-stats">
                     <article class="user-stat-card">
                         <span>Total users</span>
-                        <strong><?php echo $totalUsers; ?></strong>
-                        <small>Across engineers, foremen, and clients</small>
+                        <strong><?php echo $activeUsersAll; ?></strong>
+                        <small>Active and visible user accounts</small>
                     </article>
                     <article class="user-stat-card">
-                        <span>Inactive users</span>
-                        <strong><?php echo max($totalUsers - ($activeEngineerCount + $activeForemanCount + $activeClientCount), 0); ?></strong>
-                        <small>Accounts currently disabled</small>
+                        <span>Users in Trash</span>
+                        <strong><?php echo $trashedUsersCount; ?></strong>
+                        <small>Manage these from the main Trash Bin sidebar</small>
                     </article>
                 </div>
 
@@ -1210,11 +1245,11 @@ $userWorkspaceShouldOpenModal = $activeTab === 'create';
                                                     <button type="button" class="action-btn edit" data-edit-btn>Edit</button>
                                                     <button type="button" class="action-btn save" data-save-btn hidden>Save</button>
                                                     <button type="button" class="action-btn cancel" data-cancel-btn hidden>Cancel</button>
-                                                    <form method="POST" class="inline-action-form" onsubmit="return confirm('Delete this user account permanently? This cannot be undone.');">
+                                                    <form method="POST" class="inline-action-form" onsubmit="return confirm('Move this user to trash? Permanent deletion will happen only from the trash bin.');">
                                                         <input type="hidden" name="action" value="delete_user">
                                                         <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                         <input type="hidden" name="user_id" value="<?php echo $rowId; ?>">
-                                                        <button type="submit" class="action-btn delete">Delete</button>
+                                                        <button type="submit" class="action-btn delete">Move to Trash</button>
                                                     </form>
                                                 </div>
                                                 <div class="action-group compact row-secondary-actions">

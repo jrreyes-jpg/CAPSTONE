@@ -63,6 +63,68 @@ function table_exists(mysqli $conn, string $tableName): bool {
     return $result !== false && $result->num_rows > 0;
 }
 
+function fetch_user_for_trash(mysqli $conn, int $userId): ?array {
+    $stmt = $conn->prepare(
+        'SELECT id, full_name, email, phone, role, status, deleted_at
+         FROM users
+         WHERE id = ?
+         LIMIT 1'
+    );
+
+    if (!$stmt) {
+        return null;
+    }
+
+    $stmt->bind_param('i', $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result ? $result->fetch_assoc() : null;
+}
+
+function ensure_deleted_users_archive_table(mysqli $conn): void {
+    $conn->query(
+        "CREATE TABLE IF NOT EXISTS deleted_users_archive (
+            id INT(11) NOT NULL AUTO_INCREMENT,
+            original_user_id INT(11) NOT NULL,
+            full_name VARCHAR(150) NOT NULL,
+            email VARCHAR(100) NOT NULL,
+            phone VARCHAR(20) DEFAULT NULL,
+            role VARCHAR(30) NOT NULL,
+            status VARCHAR(20) NOT NULL,
+            deleted_by INT(11) DEFAULT NULL,
+            deleted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            payload_json LONGTEXT DEFAULT NULL,
+            PRIMARY KEY (id),
+            KEY idx_deleted_users_archive_original (original_user_id),
+            KEY idx_deleted_users_archive_deleted_by (deleted_by)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
+    );
+}
+
+function ensure_user_soft_delete_columns(mysqli $conn): void {
+    if (!table_has_column($conn, 'users', 'deleted_at')) {
+        $conn->query("ALTER TABLE users ADD COLUMN deleted_at DATETIME DEFAULT NULL AFTER status");
+    }
+
+    if (!table_has_column($conn, 'users', 'deleted_by')) {
+        $conn->query("ALTER TABLE users ADD COLUMN deleted_by INT(11) DEFAULT NULL AFTER deleted_at");
+    }
+
+    if (!table_has_column($conn, 'users', 'restored_at')) {
+        $conn->query("ALTER TABLE users ADD COLUMN restored_at DATETIME DEFAULT NULL AFTER deleted_by");
+    }
+
+    if (!table_has_column($conn, 'users', 'restored_by')) {
+        $conn->query("ALTER TABLE users ADD COLUMN restored_by INT(11) DEFAULT NULL AFTER restored_at");
+    }
+
+    $indexResult = $conn->query("SHOW INDEX FROM users WHERE Key_name = 'idx_users_deleted_at'");
+    if (!$indexResult || (int)$indexResult->num_rows === 0) {
+        $conn->query("ALTER TABLE users ADD INDEX idx_users_deleted_at (deleted_at, role, status)");
+    }
+}
+
 function enum_supports_value(mysqli $conn, string $tableName, string $columnName, string $value): bool {
     $columnType = get_column_type($conn, $tableName, $columnName);
 
@@ -359,6 +421,7 @@ ensure_project_contact_number_column($conn);
 ensure_project_start_date_column($conn);
 ensure_estimated_completion_date_column($conn);
 ensure_project_soft_delete_columns($conn);
+ensure_user_soft_delete_columns($conn);
 $hasProjectSiteColumn = table_has_column($conn, 'projects', 'project_site');
 $hasProjectAddressColumn = table_has_column($conn, 'projects', 'project_address');
 $hasProjectEmailColumn = table_has_column($conn, 'projects', 'project_email');
@@ -816,6 +879,117 @@ function getActiveProjectInventoryDeployment(mysqli $conn, int $deploymentId): ?
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
+
+    if ($action === 'restore_user') {
+        $userId = (int)($_POST['user_id'] ?? 0);
+        $restoredBy = (int)($_SESSION['user_id'] ?? 0);
+        $user = $userId > 0 ? fetch_user_for_trash($conn, $userId) : null;
+
+        if ($userId <= 0 || !$user || empty($user['deleted_at'])) {
+            set_projects_flash('error', 'Trashed user not found.');
+        } elseif ((string)($user['role'] ?? '') === 'super_admin') {
+            set_projects_flash('error', 'Super admin accounts cannot be restored here.');
+        } else {
+            $restoreUser = $conn->prepare(
+                'UPDATE users
+                 SET deleted_at = NULL,
+                     deleted_by = NULL,
+                     restored_at = NOW(),
+                     restored_by = ?
+                 WHERE id = ?
+                 AND deleted_at IS NOT NULL'
+            );
+            if ($restoreUser && $restoreUser->bind_param('ii', $restoredBy, $userId) && $restoreUser->execute() && $restoreUser->affected_rows > 0) {
+                audit_log_event(
+                    $conn,
+                    $restoredBy,
+                    'restore_user',
+                    'user',
+                    $userId,
+                    ['deleted_at' => $user['deleted_at'] ?? null],
+                    ['restored_at' => date('Y-m-d H:i:s')]
+                );
+                set_projects_flash('success', 'User restored from trash.');
+            } else {
+                set_projects_flash('error', 'Failed to restore user.');
+            }
+        }
+
+        header('Location: /codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash');
+        exit;
+    }
+
+    if ($action === 'permanently_delete_user') {
+        $userId = (int)($_POST['user_id'] ?? 0);
+        $user = $userId > 0 ? fetch_user_for_trash($conn, $userId) : null;
+
+        if ($userId <= 0 || !$user || empty($user['deleted_at'])) {
+            set_projects_flash('error', 'Trashed user not found.');
+        } elseif ((string)($user['role'] ?? '') === 'super_admin') {
+            set_projects_flash('error', 'Super admin accounts cannot be permanently deleted here.');
+        } else {
+            try {
+                ensure_deleted_users_archive_table($conn);
+                $conn->begin_transaction();
+
+                $payloadJson = json_encode($user, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $archiveStmt = $conn->prepare(
+                    'INSERT INTO deleted_users_archive (original_user_id, full_name, email, phone, role, status, deleted_by, payload_json)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+                );
+                $deletedBy = (int)($_SESSION['user_id'] ?? 0);
+                $archiveStmt->bind_param(
+                    'isssssis',
+                    $userId,
+                    $user['full_name'],
+                    $user['email'],
+                    $user['phone'],
+                    $user['role'],
+                    $user['status'],
+                    $deletedBy,
+                    $payloadJson
+                );
+                $archiveStmt->execute();
+
+                $cleanupLoginAttempts = $conn->prepare('DELETE FROM login_attempts WHERE email = ?');
+                $cleanupLoginAttempts->bind_param('s', $user['email']);
+                $cleanupLoginAttempts->execute();
+
+                $deleteUser = $conn->prepare('DELETE FROM users WHERE id = ? AND deleted_at IS NOT NULL LIMIT 1');
+                $deleteUser->bind_param('i', $userId);
+                $deleteUser->execute();
+
+                if ($deleteUser->affected_rows !== 1) {
+                    throw new RuntimeException('User permanent delete failed.');
+                }
+
+                audit_log_event(
+                    $conn,
+                    $deletedBy,
+                    'delete_user',
+                    'user',
+                    $userId,
+                    [
+                        'full_name' => $user['full_name'] ?? null,
+                        'email' => $user['email'] ?? null,
+                        'phone' => $user['phone'] ?? null,
+                        'role' => $user['role'] ?? null,
+                        'status' => $user['status'] ?? null,
+                    ],
+                    null
+                );
+
+                $conn->commit();
+                set_projects_flash('success', 'User permanently deleted from trash bin.');
+            } catch (Throwable $exception) {
+                $conn->rollback();
+                set_projects_flash('error', 'Failed to permanently delete user.');
+            }
+        }
+
+        header('Location: /codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash');
+        exit;
+    }
 
     if ($action === 'create_project') {
         $projectName = normalize_text($_POST['project_name'] ?? '');
@@ -2597,12 +2771,44 @@ $trashMetricsResult = $conn->query("
 ");
 $trashMetrics = $trashMetricsResult ? $trashMetricsResult->fetch_assoc() : [];
 $trashedProjects = (int)($trashMetrics['total_trashed'] ?? 0);
+$trashedUsers = 0;
 $trashedSuppliers = 0;
 $trashedPurchaseRequests = 0;
 $trashedAssets = 0;
+$trashedUserRows = [];
 $trashedAssetRows = [];
 $trashedSupplierRows = [];
 $trashedPurchaseRequestRows = [];
+
+$trashedUserMetrics = $conn->query("
+    SELECT COUNT(*) AS total_trashed
+    FROM users
+    WHERE deleted_at IS NOT NULL
+    AND role IN ('engineer', 'foreman', 'foremen', 'client')
+");
+$trashedUsers = (int)(($trashedUserMetrics ? $trashedUserMetrics->fetch_assoc() : [])['total_trashed'] ?? 0);
+
+if ($isTrashView) {
+    $trashedUserResult = $conn->query(
+        "SELECT
+            id,
+            full_name,
+            email,
+            phone,
+            role,
+            status,
+            deleted_at
+         FROM users
+         WHERE deleted_at IS NOT NULL
+         AND role IN ('engineer', 'foreman', 'foremen', 'client')
+         ORDER BY deleted_at DESC, id DESC
+         LIMIT 24"
+    );
+
+    if ($trashedUserResult) {
+        $trashedUserRows = $trashedUserResult->fetch_all(MYSQLI_ASSOC);
+    }
+}
 
 if (table_exists($conn, 'suppliers')) {
     $trashedSupplierMetrics = $conn->query("SELECT COUNT(*) AS total_trashed FROM suppliers WHERE status = 'inactive'");
@@ -2711,7 +2917,7 @@ if (table_exists($conn, 'assets')) {
     }
 }
 
-$trashBinTotal = $trashedProjects + $trashedSuppliers + $trashedPurchaseRequests + $trashedAssets;
+$trashBinTotal = $trashedProjects + $trashedUsers + $trashedSuppliers + $trashedPurchaseRequests + $trashedAssets;
 
 $filteredProjects = project_search_fetch_count($conn, $hasProjectAddressColumn, $hasProjectEmailColumn, $hasProjectCodeColumn, $hasPoNumberColumn, $hasProjectSiteColumn, $hasContactPersonColumn, $hasContactNumberColumn, $searchQuery, $statusFilter, $trashFilterSql);
 
@@ -3350,6 +3556,50 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                 <?php endif; ?>
 
                 <?php if ($isTrashView): ?>
+                    <section class="page-stack" style="margin-top: 24px;">
+                        <h3 class="section-title-inline">Trashed Users</h3>
+                        <?php if (empty($trashedUserRows)): ?>
+                            <div class="empty-state">No trashed users.</div>
+                        <?php else: ?>
+                            <div class="projects-grid">
+                                <?php foreach ($trashedUserRows as $trashedUser): ?>
+                                    <article class="project-card">
+                                        <div class="card-split">
+                                            <div>
+                                                <div class="project-card__eyebrow-row">
+                                                    <span class="project-card__eyebrow">User</span>
+                                                    <span class="project-card__reference"><?php echo htmlspecialchars((string)($trashedUser['email'] ?? '')); ?></span>
+                                                </div>
+                                                <h3><?php echo htmlspecialchars((string)($trashedUser['full_name'] ?? 'User')); ?></h3>
+                                                <div class="status-pill-wrap">
+                                                    <span class="status-pill status-inactive"><?php echo htmlspecialchars(ucfirst((string)($trashedUser['status'] ?? 'inactive'))); ?></span>
+                                                </div>
+                                            </div>
+                                            <div class="project-meta">
+                                                <div><strong>Role:</strong> <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)($trashedUser['role'] ?? 'user')))); ?></div>
+                                                <div><strong>Email:</strong> <?php echo htmlspecialchars((string)($trashedUser['email'] ?? 'Not set')); ?></div>
+                                                <div><strong>Phone:</strong> <?php echo htmlspecialchars((string)($trashedUser['phone'] ?? 'Not set')); ?></div>
+                                                <div><strong>Moved To Trash:</strong> <?php echo htmlspecialchars((string)($trashedUser['deleted_at'] ?? '')); ?></div>
+                                            </div>
+                                        </div>
+                                        <div class="form-actions project-card__actions">
+                                            <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Restore this user from trash?');">
+                                                <input type="hidden" name="action" value="restore_user">
+                                                <input type="hidden" name="user_id" value="<?php echo (int)$trashedUser['id']; ?>">
+                                                <button type="submit" class="btn-secondary">Restore</button>
+                                            </form>
+                                            <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Permanently delete this user? This cannot be undone.');">
+                                                <input type="hidden" name="action" value="permanently_delete_user">
+                                                <input type="hidden" name="user_id" value="<?php echo (int)$trashedUser['id']; ?>">
+                                                <button type="submit" class="btn-danger">Delete Permanently</button>
+                                            </form>
+                                        </div>
+                                    </article>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </section>
+
                     <section class="page-stack" style="margin-top: 24px;">
                         <h3 class="section-title-inline">Trashed Purchase Requests</h3>
                         <?php if (empty($trashedPurchaseRequestRows)): ?>

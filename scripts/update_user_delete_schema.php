@@ -22,6 +22,23 @@ function foreignKeyExists(mysqli $conn, string $tableName, string $constraintNam
     return (bool)($result && $result->fetch_assoc());
 }
 
+function columnExists(mysqli $conn, string $tableName, string $columnName): bool
+{
+    $stmt = $conn->prepare(
+        'SELECT 1
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = ?
+         AND COLUMN_NAME = ?
+         LIMIT 1'
+    );
+    $stmt->bind_param('ss', $tableName, $columnName);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return (bool)($result && $result->fetch_assoc());
+}
+
 function runQuery(mysqli $conn, string $sql): void
 {
     $conn->query($sql);
@@ -49,6 +66,19 @@ try {
             KEY idx_deleted_users_archive_deleted_by (deleted_by)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci"
     );
+
+    if (!columnExists($conn, 'users', 'deleted_at')) {
+        runQuery($conn, 'ALTER TABLE users ADD COLUMN deleted_at DATETIME DEFAULT NULL AFTER status');
+    }
+    if (!columnExists($conn, 'users', 'deleted_by')) {
+        runQuery($conn, 'ALTER TABLE users ADD COLUMN deleted_by INT(11) DEFAULT NULL AFTER deleted_at');
+    }
+    if (!columnExists($conn, 'users', 'restored_at')) {
+        runQuery($conn, 'ALTER TABLE users ADD COLUMN restored_at DATETIME DEFAULT NULL AFTER deleted_by');
+    }
+    if (!columnExists($conn, 'users', 'restored_by')) {
+        runQuery($conn, 'ALTER TABLE users ADD COLUMN restored_by INT(11) DEFAULT NULL AFTER restored_at');
+    }
 
     runQuery($conn, 'ALTER TABLE projects MODIFY client_id INT(11) NULL');
     if (foreignKeyExists($conn, 'projects', 'fk_project_client')) {

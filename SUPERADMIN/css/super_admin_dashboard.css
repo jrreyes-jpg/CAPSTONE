@@ -3016,6 +3016,10 @@ tbody tr:hover {
     margin-top: 8px;
 }
 
+.is-hidden {
+    display: none !important;
+}
+
 .inline-action-form {
     margin: 0;
 }
