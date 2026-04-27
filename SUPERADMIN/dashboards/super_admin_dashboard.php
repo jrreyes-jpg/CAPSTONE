@@ -1179,19 +1179,7 @@ $userWorkspaceShouldOpenModal = $activeTab === 'create';
             <section class="user-management-shell" data-user-management-shell data-create-modal-default-open="<?php echo $userWorkspaceShouldOpenModal ? 'true' : 'false'; ?>">
              
 
-                <div class="user-management-stats">
-                    <article class="user-stat-card">
-                        <span>Total users</span>
-                        <strong><?php echo $activeUsersAll; ?></strong>
-                        <small>Active and visible user accounts</small>
-                    </article>
-                    <article class="user-stat-card">
-                        <span>Users in Trash</span>
-                        <strong><?php echo $trashedUsersCount; ?></strong>
-                        <small>Manage these from the main Trash Bin sidebar</small>
-                    </article>
-                </div>
-
+             
                 <section class="dashboard-panel user-management-panel">
                     <div class="user-table-toolbar">
                         <div class="user-table-toolbar__copy">
@@ -1285,7 +1273,6 @@ $userWorkspaceShouldOpenModal = $activeTab === 'create';
                             <div>
                                 <p class="section-kicker">Create Account</p>
                                 <h2 id="createAccountModalTitle" class="dashboard-section-title">Add a new user without leaving the table</h2>
-                                <p class="panel-copy">The form lives in a modal to keep the management view clean and focused.</p>
                             </div>
                             <button type="button" class="modal-close-button" aria-label="Close create account modal" data-close-create-modal>&times;</button>
                         </div>
