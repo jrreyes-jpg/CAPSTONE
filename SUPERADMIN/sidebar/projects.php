@@ -2708,7 +2708,7 @@ if ($createProjectValues['status'] === '' || !in_array($createProjectValues['sta
 $clients = [];
 $engineers = [];
 
-$clientResult = $conn->query("SELECT id, full_name FROM users WHERE role = 'client' AND status = 'active' ORDER BY full_name ASC");
+$clientResult = $conn->query("SELECT id, full_name, email, phone FROM users WHERE role = 'client' AND status = 'active' ORDER BY full_name ASC");
 if ($clientResult) {
     $clients = $clientResult->fetch_all(MYSQLI_ASSOC);
 }
@@ -3003,7 +3003,13 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             <select id="client_id" name="client_id" required>
                                 <option value="">Select client</option>
                                 <?php foreach ($clients as $client): ?>
-                                    <option value="<?php echo (int)$client['id']; ?>" <?php echo $createProjectValues['client_id'] === (string)$client['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($client['full_name']); ?></option>
+                                    <option
+                                        value="<?php echo (int)$client['id']; ?>"
+                                        data-client-name="<?php echo htmlspecialchars((string)$client['full_name'], ENT_QUOTES); ?>"
+                                        data-client-email="<?php echo htmlspecialchars((string)($client['email'] ?? ''), ENT_QUOTES); ?>"
+                                        data-client-phone="<?php echo htmlspecialchars((string)($client['phone'] ?? ''), ENT_QUOTES); ?>"
+                                        <?php echo $createProjectValues['client_id'] === (string)$client['id'] ? 'selected' : ''; ?>
+                                    ><?php echo htmlspecialchars($client['full_name']); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -3252,18 +3258,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                 ?>"
                 data-search-endpoint="/codesamplecaps/SUPERADMIN/sidebar/project_search_api.php"
             >
-                <div class="projects-section-heading">
-                    <div>
-                        <h2 class="section-title-inline"><?php echo $isTrashView ? 'Trash Bin' : 'Projects'; ?></h2>
-                        <p class="projects-section-subtitle">
-                            <?php echo $isTrashView ? 'Deleted records stay here before permanent removal. Projects auto-purge after 30 days.' : 'Manage active and completed projects, then send old ones to trash when needed.'; ?>
-                        </p>
-                    </div>
-                    <div class="projects-view-switch">
-                        <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="project-view-chip<?php echo !$isTrashView ? ' is-active' : ''; ?>">All Projects</a>
-                        <a href="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash" class="project-view-chip<?php echo $isTrashView ? ' is-active' : ''; ?>">Trash (<?php echo $trashBinTotal; ?>)</a>
-                    </div>
-                </div>
+                
                 <div class="project-controls">
                     <?php if (!$isTrashView): ?>
                         <div class="project-filter-chips">
@@ -4155,6 +4150,77 @@ function initCreateProjectForm() {
     }
 }
 
+function initCreateProjectClientAutofill() {
+    const createProjectForm = document.getElementById('create-project-form');
+
+    if (!createProjectForm) {
+        return;
+    }
+
+    const clientField = createProjectForm.elements.namedItem('client_id');
+    const contactPersonField = createProjectForm.elements.namedItem('contact_person');
+    const contactNumberField = createProjectForm.elements.namedItem('contact_number');
+    const projectEmailField = createProjectForm.elements.namedItem('project_email');
+
+    if (!clientField) {
+        return;
+    }
+
+    const getSelectedClient = function () {
+        const selectedOption = clientField.options[clientField.selectedIndex];
+        if (!selectedOption || selectedOption.value === '') {
+            return null;
+        }
+
+        return {
+            name: String(selectedOption.getAttribute('data-client-name') || '').trim(),
+            email: String(selectedOption.getAttribute('data-client-email') || '').trim(),
+            phone: String(selectedOption.getAttribute('data-client-phone') || '').trim(),
+        };
+    };
+
+    const syncClientDetails = function (forceOverwrite) {
+        const selectedClient = getSelectedClient();
+
+        if (!selectedClient) {
+            if (forceOverwrite) {
+                if (contactPersonField) {
+                    contactPersonField.value = '';
+                }
+                if (contactNumberField) {
+                    contactNumberField.value = '';
+                }
+                if (projectEmailField) {
+                    projectEmailField.value = '';
+                }
+            }
+            return;
+        }
+
+        if (contactPersonField && (forceOverwrite || String(contactPersonField.value || '').trim() === '')) {
+            contactPersonField.value = selectedClient.name;
+        }
+
+        if (contactNumberField && (forceOverwrite || String(contactNumberField.value || '').trim() === '')) {
+            contactNumberField.value = selectedClient.phone;
+        }
+
+        if (projectEmailField && (forceOverwrite || String(projectEmailField.value || '').trim() === '')) {
+            projectEmailField.value = selectedClient.email;
+        }
+    };
+
+    clientField.addEventListener('change', function () {
+        syncClientDetails(true);
+        createProjectForm.dispatchEvent(new Event('input', { bubbles: true }));
+        createProjectForm.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    if (String(clientField.value || '').trim() !== '') {
+        syncClientDetails(false);
+    }
+}
+
 function initCreateProjectDraft() {
     const createProjectForm = document.getElementById('create-project-form');
     const clearButton = document.getElementById('create-project-clear-details');
@@ -4586,6 +4652,7 @@ function initEngineerAssignmentPicker() {
 
 document.addEventListener('DOMContentLoaded', initProjectSearchUI);
 document.addEventListener('DOMContentLoaded', initCreateProjectForm);
+document.addEventListener('DOMContentLoaded', initCreateProjectClientAutofill);
 document.addEventListener('DOMContentLoaded', initCreateProjectDraft);
 document.addEventListener('DOMContentLoaded', initCurrencyInputs);
 document.addEventListener('DOMContentLoaded', initEngineerAssignmentPicker);

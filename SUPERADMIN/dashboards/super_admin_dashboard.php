@@ -1187,7 +1187,7 @@ $userWorkspaceShouldOpenModal = $activeTab === 'create';
                         </div>
                         <div class="user-table-toolbar__controls">
                             <label class="user-search-field" for="userSearch">
-                                <input type="search" id="userSearch" placeholder="Search name, email, or role" data-user-search>
+                                <input type="search" id="userSearch" placeholder="Search name, email, phone, or role" data-user-search>
                                
                             </label>
                         </div>
@@ -1203,26 +1203,30 @@ $userWorkspaceShouldOpenModal = $activeTab === 'create';
                     <div class="users-table user-management-table">
                         <table class="responsive-table">
                             <colgroup>
-                                <col style="width: 26%;">
-                                <col style="width: 28%;">
-                                <col style="width: 14%;">
+                                <col style="width: 22%;">
+                                <col style="width: 24%;">
+                                <col style="width: 16%;">
                                 <col style="width: 12%;">
-                                <col style="width: 20%;">
+                                <col style="width: 10%;">
+                                <col style="width: 16%;">
                             </colgroup>
                             <thead>
-                                <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr>
+                                <tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Actions</th></tr>
                             </thead>
                             <tbody data-user-table-body>
                                 <?php if (empty($managedUsers)): ?>
-                                    <tr><td colspan="5" class="user-table-empty">No users match the current filter.</td></tr>
+                                    <tr><td colspan="6" class="user-table-empty">No users match the current filter.</td></tr>
                                 <?php else: ?>
                                     <?php foreach ($managedUsers as $user): $status = $user['status'] ?? 'active'; $rowId = (int)$user['id']; $normalizedRole = normalizeRole((string)($user['role'] ?? '')); ?>
-                                        <tr class="user-row" data-row-id="<?php echo $rowId; ?>" data-user-search="<?php echo htmlspecialchars(strtolower(trim(($user['full_name'] ?? '') . ' ' . ($user['email'] ?? '') . ' ' . $normalizedRole . ' ' . $status))); ?>">
+                                        <tr class="user-row" data-row-id="<?php echo $rowId; ?>" data-user-search="<?php echo htmlspecialchars(strtolower(trim(($user['full_name'] ?? '') . ' ' . ($user['email'] ?? '') . ' ' . ($user['phone'] ?? '') . ' ' . $normalizedRole . ' ' . $status))); ?>">
                                             <td data-label="Name">
                                                 <input class="table-input" type="text" data-field="full_name" value="<?php echo htmlspecialchars($user['full_name']); ?>" readonly required>
                                             </td>
                                             <td data-label="Email">
                                                 <input class="table-input" type="email" data-field="email" value="<?php echo htmlspecialchars($user['email']); ?>" readonly required>
+                                            </td>
+                                            <td data-label="Phone">
+                                                <input class="table-input" type="tel" data-field="phone" value="<?php echo htmlspecialchars((string)($user['phone'] ?? '')); ?>" readonly pattern="^09[0-9]{9}$" maxlength="11" inputmode="numeric">
                                             </td>
                                             <td data-label="Role">
                                                 <span class="role-badge role-badge-<?php echo htmlspecialchars($normalizedRole); ?>"><?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $normalizedRole))); ?></span>
@@ -1260,7 +1264,7 @@ $userWorkspaceShouldOpenModal = $activeTab === 'create';
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
-                                    <tr class="user-search-empty-row" hidden><td colspan="5" class="user-table-empty">No users match your search.</td></tr>
+                                    <tr class="user-search-empty-row" hidden><td colspan="6" class="user-table-empty">No users match your search.</td></tr>
                                 <?php endif; ?>
                             </tbody>
                         </table>
