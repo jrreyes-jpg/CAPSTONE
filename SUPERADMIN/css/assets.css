@@ -186,6 +186,22 @@
 .asset-section-subtitle-row {
     align-items: flex-start;
     gap: 10px;
+    justify-content: flex-start;
+}
+
+.asset-section-subtitle-row .asset-section-subtitle {
+    margin: 0;
+}
+
+.asset-section-subtitle--label {
+    color: #0f172a;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+
+.asset-section-subtitle-row .field-tip {
+    margin-top: 2px;
+    flex-shrink: 0;
 }
 
 .asset-section-actions {

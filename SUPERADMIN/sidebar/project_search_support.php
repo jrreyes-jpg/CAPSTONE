@@ -234,6 +234,7 @@ if (!function_exists('project_search_fetch_page')) {
         $projectSiteSelect = $hasProjectSiteColumn ? 'p.project_site,' : 'NULL AS project_site,';
         $projectAddressSelect = $hasProjectAddressColumn ? 'p.project_address,' : 'NULL AS project_address,';
         $projectEmailSelect = $hasProjectEmailColumn ? 'p.project_email,' : 'NULL AS project_email,';
+        $projectAdditionalInfoSelect = project_search_table_has_column($conn, 'projects', 'additional_info_json') ? 'p.additional_info_json,' : 'NULL AS additional_info_json,';
         $contactPersonSelect = $hasContactPersonColumn ? 'p.contact_person,' : 'NULL AS contact_person,';
         $contactNumberSelect = $hasContactNumberColumn ? 'p.contact_number,' : 'NULL AS contact_number,';
         $projectCodeSelect = $hasProjectCodeColumn ? 'p.project_code,' : 'NULL AS project_code,';
@@ -247,6 +248,7 @@ if (!function_exists('project_search_fetch_page')) {
                 {$projectSiteSelect}
                 {$projectAddressSelect}
                 {$projectEmailSelect}
+                {$projectAdditionalInfoSelect}
                 {$contactPersonSelect}
                 {$contactNumberSelect}
                 {$projectCodeSelect}

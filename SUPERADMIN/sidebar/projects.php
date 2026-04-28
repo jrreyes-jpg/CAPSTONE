@@ -251,6 +251,12 @@ function ensure_project_email_column(mysqli $conn): void {
     }
 }
 
+function ensure_project_additional_info_column(mysqli $conn): void {
+    if (!table_has_column($conn, 'projects', 'additional_info_json')) {
+        $conn->query("ALTER TABLE projects ADD COLUMN additional_info_json LONGTEXT DEFAULT NULL AFTER project_email");
+    }
+}
+
 function ensure_project_code_column(mysqli $conn): void {
     if (!table_has_column($conn, 'projects', 'project_code')) {
         $conn->query("ALTER TABLE projects ADD COLUMN project_code VARCHAR(80) DEFAULT NULL AFTER project_email");
@@ -414,6 +420,7 @@ $supportsArchivedStatus = enum_supports_value($conn, 'projects', 'status', 'arch
 ensure_project_address_column($conn);
 ensure_project_site_column($conn);
 ensure_project_email_column($conn);
+ensure_project_additional_info_column($conn);
 ensure_project_code_column($conn);
 ensure_project_po_number_column($conn);
 ensure_project_contact_person_column($conn);
@@ -425,6 +432,7 @@ ensure_user_soft_delete_columns($conn);
 $hasProjectSiteColumn = table_has_column($conn, 'projects', 'project_site');
 $hasProjectAddressColumn = table_has_column($conn, 'projects', 'project_address');
 $hasProjectEmailColumn = table_has_column($conn, 'projects', 'project_email');
+$hasProjectAdditionalInfoColumn = table_has_column($conn, 'projects', 'additional_info_json');
 $hasProjectCodeColumn = table_has_column($conn, 'projects', 'project_code');
 $hasPoNumberColumn = table_has_column($conn, 'projects', 'po_number');
 $hasContactPersonColumn = table_has_column($conn, 'projects', 'contact_person');
@@ -488,6 +496,7 @@ function set_projects_old_input(array $input, ?string $focusField = null): void 
         'project_site' => trim((string)($input['project_site'] ?? '')),
         'project_address' => trim((string)($input['project_address'] ?? '')),
         'project_email' => trim((string)($input['project_email'] ?? '')),
+        'additional_info' => normalize_project_additional_info_input($input['additional_info'] ?? []),
         'project_code' => trim((string)($input['project_code'] ?? '')),
         'po_number' => trim((string)($input['po_number'] ?? '')),
         'client_id' => (string)($input['client_id'] ?? ''),
@@ -513,6 +522,111 @@ function normalize_text(?string $value): string {
 function normalize_date_or_null(?string $value): ?string {
     $value = trim((string)$value);
     return $value === '' ? null : $value;
+}
+
+function blank_project_additional_info_row(): array {
+    return [
+        'contact_name' => '',
+        'contact_number' => '',
+        'email_address' => '',
+    ];
+}
+
+function normalize_project_additional_info_input($rows): array {
+    if (!is_array($rows)) {
+        return [];
+    }
+
+    $normalizedRows = [];
+
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+
+        $normalizedRow = [
+            'contact_name' => trim((string)($row['contact_name'] ?? '')),
+            'contact_number' => trim((string)($row['contact_number'] ?? '')),
+            'email_address' => trim((string)($row['email_address'] ?? '')),
+        ];
+
+        if (
+            $normalizedRow['contact_name'] === ''
+            && $normalizedRow['contact_number'] === ''
+            && $normalizedRow['email_address'] === ''
+        ) {
+            continue;
+        }
+
+        $normalizedRows[] = $normalizedRow;
+    }
+
+    return $normalizedRows;
+}
+
+function decode_project_additional_info($rawValue): array {
+    if (is_array($rawValue)) {
+        return normalize_project_additional_info_input($rawValue);
+    }
+
+    $rawValue = trim((string)$rawValue);
+    if ($rawValue === '') {
+        return [];
+    }
+
+    $decoded = json_decode($rawValue, true);
+    if (!is_array($decoded)) {
+        return [];
+    }
+
+    return normalize_project_additional_info_input($decoded);
+}
+
+function encode_project_additional_info(array $rows): ?string {
+    $normalizedRows = normalize_project_additional_info_input($rows);
+    if ($normalizedRows === []) {
+        return null;
+    }
+
+    $encoded = json_encode($normalizedRows, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    return $encoded === false ? null : $encoded;
+}
+
+function project_additional_info_rows_for_form($rows): array {
+    $normalizedRows = is_array($rows) ? normalize_project_additional_info_input($rows) : [];
+    return $normalizedRows === [] ? [blank_project_additional_info_row()] : array_values($normalizedRows);
+}
+
+function project_additional_info_search_text(array $rows): string {
+    $chunks = [];
+
+    foreach ($rows as $row) {
+        if (!is_array($row)) {
+            continue;
+        }
+
+        $chunks[] = trim(implode(' ', array_filter([
+            trim((string)($row['contact_name'] ?? '')),
+            trim((string)($row['contact_number'] ?? '')),
+            trim((string)($row['email_address'] ?? '')),
+        ])));
+    }
+
+    return trim(implode(' ', array_filter($chunks)));
+}
+
+function save_project_additional_info_json(mysqli $conn, int $projectId, ?string $additionalInfoJson): bool {
+    if ($projectId <= 0) {
+        return false;
+    }
+
+    if ($additionalInfoJson === null) {
+        $stmt = $conn->prepare('UPDATE projects SET additional_info_json = NULL WHERE id = ?');
+        return $stmt && $stmt->bind_param('i', $projectId) && $stmt->execute();
+    }
+
+    $stmt = $conn->prepare('UPDATE projects SET additional_info_json = ? WHERE id = ?');
+    return $stmt && $stmt->bind_param('si', $additionalInfoJson, $projectId) && $stmt->execute();
 }
 
 function getProjectFinancialSnapshot(mysqli $conn, int $projectId): ?array {
@@ -637,6 +751,7 @@ function getProjectSnapshot(mysqli $conn, int $projectId): ?array {
             p.project_site,
             p.project_address,
             p.project_email,
+            p.additional_info_json,
             p.project_code,
             p.po_number,
             p.start_date,
@@ -999,6 +1114,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $projectSite = $hasProjectSiteColumn ? normalize_text_or_null($_POST['project_site'] ?? null) : null;
         $projectAddress = $hasProjectAddressColumn ? normalize_text_or_null($_POST['project_address'] ?? null) : null;
         $projectEmail = $hasProjectEmailColumn ? normalize_text_or_null($_POST['project_email'] ?? null) : null;
+        $additionalInfoRows = normalize_project_additional_info_input($_POST['additional_info'] ?? []);
+        $additionalInfoJson = encode_project_additional_info($additionalInfoRows);
         $projectCode = $hasProjectCodeColumn ? normalize_text_or_null($_POST['project_code'] ?? null) : null;
         $poNumber = $hasPoNumberColumn ? normalize_text_or_null($_POST['po_number'] ?? null) : null;
         $clientId = (int)($_POST['client_id'] ?? 0);
@@ -1019,6 +1136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'project_site' => $_POST['project_site'] ?? '',
             'project_address' => $_POST['project_address'] ?? '',
             'project_email' => $_POST['project_email'] ?? '',
+            'additional_info' => $_POST['additional_info'] ?? [],
             'project_code' => $_POST['project_code'] ?? '',
             'po_number' => $_POST['po_number'] ?? '',
             'client_id' => $_POST['client_id'] ?? '',
@@ -1094,6 +1212,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_projects_old_input($createProjectInput, 'project_email');
             set_projects_flash('error', 'Project email must be a valid email address.');
             redirect_projects_page();
+        }
+
+        foreach ($additionalInfoRows as $additionalInfoRow) {
+            $additionalInfoEmail = trim((string)($additionalInfoRow['email_address'] ?? ''));
+            if ($additionalInfoEmail !== '' && !filter_var($additionalInfoEmail, FILTER_VALIDATE_EMAIL)) {
+                set_projects_old_input($createProjectInput, 'additional_info');
+                set_projects_flash('error', 'Each additional info email address must be valid.');
+                redirect_projects_page();
+            }
         }
 
         if ($projectCode === null) {
@@ -1283,6 +1410,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $projectId = (int)$createProject->insert_id;
 
+            if ($hasProjectAdditionalInfoColumn && !save_project_additional_info_json($conn, $projectId, $additionalInfoJson)) {
+                throw new RuntimeException('Failed to save project additional info.');
+            }
+
             $assignEngineer = $conn->prepare(
                 'INSERT INTO project_assignments (project_id, engineer_id, assigned_by)
                  VALUES (?, ?, ?)'
@@ -1335,6 +1466,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'contact_person' => $contactPerson,
                     'contact_number' => $contactNumber,
                     'project_email' => $projectEmail,
+                    'additional_info' => $additionalInfoRows,
                     'project_code' => $projectCode,
                     'po_number' => $poNumber,
                     'budget_amount' => $budgetAmount,
@@ -1675,6 +1807,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $estimatedCompletionDate = $hasEstimatedCompletionDateColumn ? normalize_date_or_null($_POST['estimated_completion_date'] ?? null) : null;
         $endDate = null;
         $project = $projectId > 0 ? getProjectSnapshot($conn, $projectId) : null;
+        $hasPostedAdditionalInfo = array_key_exists('additional_info', $_POST);
+        $additionalInfoRows = $hasPostedAdditionalInfo
+            ? normalize_project_additional_info_input($_POST['additional_info'] ?? [])
+            : decode_project_additional_info($project['additional_info_json'] ?? null);
+        $additionalInfoJson = encode_project_additional_info($additionalInfoRows);
         $updatedBy = (int)($_SESSION['user_id'] ?? 0);
 
         if ($projectId <= 0 || !$project) {
@@ -1747,6 +1884,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($projectEmail !== null && !filter_var($projectEmail, FILTER_VALIDATE_EMAIL)) {
             set_projects_flash('error', 'Project email must be a valid email address.');
             redirect_projects_page();
+        }
+
+        foreach ($additionalInfoRows as $additionalInfoRow) {
+            $additionalInfoEmail = trim((string)($additionalInfoRow['email_address'] ?? ''));
+            if ($additionalInfoEmail !== '' && !filter_var($additionalInfoEmail, FILTER_VALIDATE_EMAIL)) {
+                set_projects_flash('error', 'Each additional info email address must be valid.');
+                redirect_projects_page();
+            }
         }
 
         if ($projectCode === null) {
@@ -1902,6 +2047,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
+            if ($hasProjectAdditionalInfoColumn && !save_project_additional_info_json($conn, $projectId, $additionalInfoJson)) {
+                throw new RuntimeException('Failed to update project additional info.');
+            }
+
             $conn->commit();
             audit_log_event(
                 $conn,
@@ -1920,6 +2069,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'contact_person' => $contactPerson,
                     'contact_number' => $contactNumber,
                     'project_email' => $projectEmail,
+                    'additional_info' => $additionalInfoRows,
                     'project_code' => $projectCode,
                     'po_number' => $poNumber,
                     'start_date' => $startDate,
@@ -2689,6 +2839,7 @@ $createProjectValues = [
     'project_site' => (string)($createProjectOldInput['project_site'] ?? ''),
     'project_address' => (string)($createProjectOldInput['project_address'] ?? ''),
     'project_email' => (string)($createProjectOldInput['project_email'] ?? ''),
+    'additional_info' => project_additional_info_rows_for_form($createProjectOldInput['additional_info'] ?? []),
     'project_code' => (string)($createProjectOldInput['project_code'] ?? ''),
     'po_number' => (string)($createProjectOldInput['po_number'] ?? ''),
     'client_id' => (string)($createProjectOldInput['client_id'] ?? ''),
@@ -3111,13 +3262,6 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             </div>
                         </div>
                         
-                        <?php if ($hasProjectEmailColumn): ?>
-                            <div class="input-group">
-                                <label for="project_email">Email Address <span class="optional-indicator">(Optional)</span></label>
-                                <input type="email" id="project_email" name="project_email" value="<?php echo htmlspecialchars($createProjectValues['project_email']); ?>" placeholder="project@example.com">
-                            </div>
-                        <?php endif; ?> 
-
                             <div class="input-group">
                             <div class="field-label-row">
                                 <label for="project_start_date">Project Start Date <span class="required-indicator" aria-hidden="true">*</span></label>
@@ -3234,6 +3378,63 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                         <div class="input-group input-group-spaced">
                             <label for="description">Comment <span class="optional-indicator">(Optional)</span></label>
                             <textarea id="description" name="description" placeholder="Project comment"><?php echo htmlspecialchars($createProjectValues['description']); ?></textarea>
+                        </div>
+
+                        <div class="input-group input-group-spaced input-group-wide additional-info-section" data-additional-info-section>
+                            <div class="field-label-row">
+                                <label for="additional_info_rows">Additional Info <span class="optional-indicator">(Optional)</span></label>
+                                <button type="button" class="field-tip" aria-label="Additional info help">
+                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                    <span class="field-tip__bubble">Add extra project contacts here, such as coordinators, alternate site contacts, or billing points of contact.</span>
+                                </button>
+                            </div>
+                            <div class="additional-info-list" id="additional_info_rows" data-additional-info-list data-next-index="<?php echo count($createProjectValues['additional_info']); ?>">
+                                <?php foreach ($createProjectValues['additional_info'] as $additionalInfoIndex => $additionalInfoRow): ?>
+                                    <div class="additional-info-item" data-additional-info-item>
+                                        <div class="additional-info-item__grid">
+                                            <div class="input-group">
+                                                <label>Contact Name</label>
+                                                <input type="text" name="additional_info[<?php echo (int)$additionalInfoIndex; ?>][contact_name]" value="<?php echo htmlspecialchars((string)($additionalInfoRow['contact_name'] ?? '')); ?>" placeholder="Contact name" data-additional-info-name>
+                                            </div>
+                                            <div class="input-group">
+                                                <label>Contact Number</label>
+                                                <input type="text" name="additional_info[<?php echo (int)$additionalInfoIndex; ?>][contact_number]" value="<?php echo htmlspecialchars((string)($additionalInfoRow['contact_number'] ?? '')); ?>" placeholder="09xxxxxxxxx or landline" data-additional-info-number>
+                                            </div>
+                                            <div class="input-group">
+                                                <label>Email Address <span class="optional-indicator">(Optional)</span></label>
+                                                <input type="email" name="additional_info[<?php echo (int)$additionalInfoIndex; ?>][email_address]" value="<?php echo htmlspecialchars((string)($additionalInfoRow['email_address'] ?? '')); ?>" placeholder="contact@example.com" data-additional-info-email>
+                                            </div>
+                                        </div>
+                                        <div class="additional-info-item__actions">
+                                            <button type="button" class="btn-secondary additional-info-remove" data-additional-info-remove aria-label="Remove this additional info row">&times; Remove</button>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <div class="additional-info-actions">
+                                <button type="button" class="btn-secondary" data-additional-info-add>+ Add More</button>
+                            </div>
+                            <template data-additional-info-template>
+                                <div class="additional-info-item" data-additional-info-item>
+                                    <div class="additional-info-item__grid">
+                                        <div class="input-group">
+                                            <label>Contact Name</label>
+                                            <input type="text" name="additional_info[__INDEX__][contact_name]" value="" placeholder="Contact name" data-additional-info-name>
+                                        </div>
+                                        <div class="input-group">
+                                            <label>Contact Number</label>
+                                            <input type="text" name="additional_info[__INDEX__][contact_number]" value="" placeholder="09xxxxxxxxx or landline" data-additional-info-number>
+                                        </div>
+                                        <div class="input-group">
+                                            <label>Email Address <span class="optional-indicator">(Optional)</span></label>
+                                            <input type="email" name="additional_info[__INDEX__][email_address]" value="" placeholder="contact@example.com" data-additional-info-email>
+                                        </div>
+                                    </div>
+                                    <div class="additional-info-item__actions">
+                                        <button type="button" class="btn-secondary additional-info-remove" data-additional-info-remove aria-label="Remove this additional info row">&times; Remove</button>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
 
                         <div class="form-actions">
@@ -3364,7 +3565,8 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             $projectContactPerson = trim((string)($project['contact_person'] ?? ''));
                             $projectContactNumber = trim((string)($project['contact_number'] ?? ''));
                             $projectSite = trim((string)($project['project_site'] ?? ''));
-                            $projectEmail = trim((string)($project['project_email'] ?? ''));
+                            $projectAdditionalInfoRows = decode_project_additional_info($project['additional_info_json'] ?? null);
+                            $projectAdditionalInfoSearchText = project_additional_info_search_text($projectAdditionalInfoRows);
                             $assignedEngineerNames = trim((string)($project['engineer_names'] ?? ''));
                             $deletedAt = trim((string)($project['deleted_at'] ?? ''));
                             $deleteScheduledAt = trim((string)($project['delete_scheduled_at'] ?? ''));
@@ -3388,7 +3590,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                 $project['client_name'] ?? '',
                                 $assignedEngineerNames,
                                 $project['project_address'] ?? '',
-                                $projectEmail,
+                                $projectAdditionalInfoSearchText,
                                 $project['status'] ?? '',
                             ])));
                             $detailsPath = '/codesamplecaps/SUPERADMIN/sidebar/project_details.php?id=' . (int)$project['id'];
@@ -3424,9 +3626,6 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                             <?php if ($hasProjectAddressColumn): ?>
                                             <div><strong>Address:</strong> <?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></div>
                                         <?php endif; ?>
-                                        <?php if ($projectEmail !== ''): ?>
-                                            <div><strong>Email Address:</strong> <?php echo htmlspecialchars($projectEmail); ?></div>
-                                        <?php endif; ?>
                                         <div><strong>Completed:</strong> <?php echo htmlspecialchars($project['end_date'] ?? 'N/A'); ?></div>
                                         <div><strong>Tasks:</strong> <?php echo (int)$project['completed_tasks']; ?> / <?php echo (int)$project['total_tasks']; ?> completed</div>
                                     </div>
@@ -3434,6 +3633,30 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
 
                                 <?php if (!empty($project['description'])): ?>
                                     <div class="empty-state empty-state-solid project-card__description"><?php echo nl2br(htmlspecialchars($project['description'])); ?></div>
+                                <?php endif; ?>
+
+                                <?php if ($projectAdditionalInfoRows !== []): ?>
+                                    <section class="project-additional-info-panel">
+                                        <div class="project-additional-info-panel__header">
+                                            <h4>Additional Info</h4>
+                                            <span><?php echo count($projectAdditionalInfoRows); ?> contact<?php echo count($projectAdditionalInfoRows) === 1 ? '' : 's'; ?></span>
+                                        </div>
+                                        <div class="project-additional-info-panel__grid">
+                                            <?php foreach ($projectAdditionalInfoRows as $projectAdditionalInfoRow): ?>
+                                                <article class="project-additional-info-card">
+                                                    <?php if (trim((string)($projectAdditionalInfoRow['contact_name'] ?? '')) !== ''): ?>
+                                                        <div><strong>Name:</strong> <?php echo htmlspecialchars((string)$projectAdditionalInfoRow['contact_name']); ?></div>
+                                                    <?php endif; ?>
+                                                    <?php if (trim((string)($projectAdditionalInfoRow['contact_number'] ?? '')) !== ''): ?>
+                                                        <div><strong>Number:</strong> <?php echo htmlspecialchars((string)$projectAdditionalInfoRow['contact_number']); ?></div>
+                                                    <?php endif; ?>
+                                                    <?php if (trim((string)($projectAdditionalInfoRow['email_address'] ?? '')) !== ''): ?>
+                                                        <div><strong>Email:</strong> <?php echo htmlspecialchars((string)$projectAdditionalInfoRow['email_address']); ?></div>
+                                                    <?php endif; ?>
+                                                </article>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </section>
                                 <?php endif; ?>
 
                                 <?php if ($isTrashView): ?>
@@ -4160,7 +4383,6 @@ function initCreateProjectClientAutofill() {
     const clientField = createProjectForm.elements.namedItem('client_id');
     const contactPersonField = createProjectForm.elements.namedItem('contact_person');
     const contactNumberField = createProjectForm.elements.namedItem('contact_number');
-    const projectEmailField = createProjectForm.elements.namedItem('project_email');
 
     if (!clientField) {
         return;
@@ -4174,7 +4396,6 @@ function initCreateProjectClientAutofill() {
 
         return {
             name: String(selectedOption.getAttribute('data-client-name') || '').trim(),
-            email: String(selectedOption.getAttribute('data-client-email') || '').trim(),
             phone: String(selectedOption.getAttribute('data-client-phone') || '').trim(),
         };
     };
@@ -4190,9 +4411,6 @@ function initCreateProjectClientAutofill() {
                 if (contactNumberField) {
                     contactNumberField.value = '';
                 }
-                if (projectEmailField) {
-                    projectEmailField.value = '';
-                }
             }
             return;
         }
@@ -4203,10 +4421,6 @@ function initCreateProjectClientAutofill() {
 
         if (contactNumberField && (forceOverwrite || String(contactNumberField.value || '').trim() === '')) {
             contactNumberField.value = selectedClient.phone;
-        }
-
-        if (projectEmailField && (forceOverwrite || String(projectEmailField.value || '').trim() === '')) {
-            projectEmailField.value = selectedClient.email;
         }
     };
 
@@ -4219,6 +4433,133 @@ function initCreateProjectClientAutofill() {
     if (String(clientField.value || '').trim() !== '') {
         syncClientDetails(false);
     }
+}
+
+function initProjectAdditionalInfoRows() {
+    const createProjectForm = document.getElementById('create-project-form');
+    const section = createProjectForm?.querySelector('[data-additional-info-section]');
+    const list = section?.querySelector('[data-additional-info-list]');
+    const addButton = section?.querySelector('[data-additional-info-add]');
+    const template = section?.querySelector('[data-additional-info-template]');
+
+    if (!createProjectForm || !section || !list || !addButton || !template) {
+        return;
+    }
+
+    let nextIndex = Number(list.getAttribute('data-next-index') || '0');
+    if (!Number.isFinite(nextIndex) || nextIndex < 0) {
+        nextIndex = list.querySelectorAll('[data-additional-info-item]').length;
+    }
+
+    function buildRow(values) {
+        const rowMarkup = template.innerHTML.replace(/__INDEX__/g, String(nextIndex++));
+        const fragment = document.createRange().createContextualFragment(rowMarkup);
+        const row = fragment.querySelector('[data-additional-info-item]');
+
+        if (!row) {
+            return null;
+        }
+
+        row.querySelector('[data-additional-info-name]').value = String(values?.contact_name || '');
+        row.querySelector('[data-additional-info-number]').value = String(values?.contact_number || '');
+        row.querySelector('[data-additional-info-email]').value = String(values?.email_address || '');
+
+        return row;
+    }
+
+    function addRow(values = {}, shouldFocus = false) {
+        const row = buildRow(values);
+        if (!row) {
+            return;
+        }
+
+        list.appendChild(row);
+
+        if (shouldFocus) {
+            const firstField = row.querySelector('[data-additional-info-name]');
+            if (firstField && typeof firstField.focus === 'function') {
+                firstField.focus();
+            }
+        }
+
+        syncRemoveButtons();
+    }
+
+    function ensureAtLeastOneRow() {
+        if (list.querySelector('[data-additional-info-item]')) {
+            return;
+        }
+
+        addRow();
+    }
+
+    function syncRemoveButtons() {
+        const rows = Array.from(list.querySelectorAll('[data-additional-info-item]'));
+
+        rows.forEach(function (row, index) {
+            const removeButton = row.querySelector('[data-additional-info-remove]');
+            if (!removeButton) {
+                return;
+            }
+
+            const isBaseRow = index === 0;
+            removeButton.hidden = isBaseRow;
+            removeButton.disabled = isBaseRow;
+        });
+    }
+
+    function collectRows() {
+        return Array.from(list.querySelectorAll('[data-additional-info-item]')).map(function (row) {
+            return {
+                contact_name: String(row.querySelector('[data-additional-info-name]')?.value || ''),
+                contact_number: String(row.querySelector('[data-additional-info-number]')?.value || ''),
+                email_address: String(row.querySelector('[data-additional-info-email]')?.value || ''),
+            };
+        });
+    }
+
+    function setRows(rows) {
+        list.innerHTML = '';
+        nextIndex = 0;
+
+        if (Array.isArray(rows) && rows.length > 0) {
+            rows.forEach(function (row) {
+                addRow(row);
+            });
+        } else {
+            addRow();
+        }
+    }
+
+    addButton.addEventListener('click', function () {
+        addRow({}, true);
+        createProjectForm.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    list.addEventListener('click', function (event) {
+        const removeButton = event.target.closest('[data-additional-info-remove]');
+        if (!removeButton) {
+            return;
+        }
+
+        const row = removeButton.closest('[data-additional-info-item]');
+        if (!row) {
+            return;
+        }
+
+        row.remove();
+        ensureAtLeastOneRow();
+        syncRemoveButtons();
+        createProjectForm.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    ensureAtLeastOneRow();
+    syncRemoveButtons();
+
+    window.__projectAdditionalInfoManager = {
+        getRows: collectRows,
+        setRows: setRows,
+    };
 }
 
 function initCreateProjectDraft() {
@@ -4238,12 +4579,12 @@ function initCreateProjectDraft() {
         start_date: <?php echo json_encode($todayDate, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
         project_start_date: '',
         estimated_completion_date: '',
-        project_email: '',
         project_site: '',
         budget_amount: '',
         budget_notes: '',
         description: '',
         project_address: '',
+        additional_info: [<?php echo json_encode(blank_project_additional_info_row(), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>],
     };
     const draftStorageKey = 'codesamplecaps.superadmin.projects.createProjectDraft.v1';
 
@@ -4333,12 +4674,14 @@ function initCreateProjectDraft() {
             start_date: String(createProjectForm.elements.namedItem('start_date')?.value || ''),
             project_start_date: String(createProjectForm.elements.namedItem('project_start_date')?.value || ''),
             estimated_completion_date: String(createProjectForm.elements.namedItem('estimated_completion_date')?.value || ''),
-            project_email: String(createProjectForm.elements.namedItem('project_email')?.value || ''),
             project_site: String(createProjectForm.elements.namedItem('project_site')?.value || ''),
             budget_amount: String(createProjectForm.elements.namedItem('budget_amount')?.value || ''),
             budget_notes: String(createProjectForm.elements.namedItem('budget_notes')?.value || ''),
             description: String(createProjectForm.elements.namedItem('description')?.value || ''),
             project_address: String(createProjectForm.elements.namedItem('project_address')?.value || ''),
+            additional_info: window.__projectAdditionalInfoManager
+                ? window.__projectAdditionalInfoManager.getRows()
+                : defaultDraft.additional_info,
         };
     }
 
@@ -4376,7 +4719,7 @@ function initCreateProjectDraft() {
         }
 
         Object.keys(defaultDraft).forEach(function (fieldName) {
-            if (fieldName === 'engineer_ids') {
+            if (fieldName === 'engineer_ids' || fieldName === 'additional_info') {
                 return;
             }
 
@@ -4388,6 +4731,11 @@ function initCreateProjectDraft() {
         });
 
         setEngineerIds(Array.isArray(draft.engineer_ids) ? draft.engineer_ids.map(String) : []);
+
+        if (window.__projectAdditionalInfoManager) {
+            const nextRows = Array.isArray(draft.additional_info) ? draft.additional_info : defaultDraft.additional_info;
+            window.__projectAdditionalInfoManager.setRows(nextRows);
+        }
     }
 
     if (shouldClearStoredDraft) {
@@ -4653,6 +5001,7 @@ function initEngineerAssignmentPicker() {
 document.addEventListener('DOMContentLoaded', initProjectSearchUI);
 document.addEventListener('DOMContentLoaded', initCreateProjectForm);
 document.addEventListener('DOMContentLoaded', initCreateProjectClientAutofill);
+document.addEventListener('DOMContentLoaded', initProjectAdditionalInfoRows);
 document.addEventListener('DOMContentLoaded', initCreateProjectDraft);
 document.addEventListener('DOMContentLoaded', initCurrencyInputs);
 document.addEventListener('DOMContentLoaded', initEngineerAssignmentPicker);

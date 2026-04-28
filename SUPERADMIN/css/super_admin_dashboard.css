@@ -5320,10 +5320,15 @@ input[data-inline-editable]:disabled {
             right: auto;
         }
 
-        .projects-content .project-card,
-        .projects-content .form-panel {
-            padding: 18px;
-        }
+    .projects-content .project-card,
+    .projects-content .form-panel {
+        padding: 18px;
+    }
+
+    .additional-info-item__grid,
+    .project-additional-info-panel__grid {
+        grid-template-columns: 1fr;
+    }
 
     .projects-content .project-meta,
     .projects-content .task-list,
@@ -5521,6 +5526,84 @@ input[data-inline-editable]:disabled {
     outline: 2px solid #16a34a;
     outline-offset: 3px;
     border-radius: 999px;
+}
+
+.additional-info-section {
+    display: grid;
+    gap: 14px;
+}
+
+.additional-info-list {
+    display: grid;
+    gap: 12px;
+}
+
+.additional-info-item {
+    padding: 16px;
+    border: 1px solid #dbe4ee;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.05);
+}
+
+.additional-info-item__grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.additional-info-item__actions,
+.additional-info-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
+.additional-info-remove {
+    min-width: 112px;
+}
+
+.project-additional-info-panel {
+    display: grid;
+    gap: 14px;
+    margin-top: 16px;
+    padding: 18px;
+    border: 1px solid #dbe4ee;
+    border-radius: 16px;
+    background: #f8fafc;
+}
+
+.project-additional-info-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.project-additional-info-panel__header h4 {
+    margin: 0;
+    color: #0f172a;
+}
+
+.project-additional-info-panel__header span {
+    color: #64748b;
+    font-size: 0.86rem;
+    font-weight: 600;
+}
+
+.project-additional-info-panel__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+
+.project-additional-info-card {
+    display: grid;
+    gap: 8px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid #dbe4ee;
+    background: #ffffff;
 }
 
 /* Keep collapsed activity rows hidden even though .activity-item uses grid layout. */

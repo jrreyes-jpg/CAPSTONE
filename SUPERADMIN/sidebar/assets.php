@@ -1458,17 +1458,6 @@ if ($createdAssetId > 0) {
             <div class="asset-section-header">
                 <div>
                     <h2 class="dashboard-section-title"><?php echo $isTrashView ? 'Trashed Assets' : 'Existing Assets'; ?></h2>
-                    <?php if ($isTrashView): ?>
-                        <p class="asset-section-subtitle"><?php echo 'Archived asset records stay recoverable here until permanently removed.'; ?></p>
-                    <?php else: ?>
-                        <div class="field-label-row asset-section-subtitle-row">
-                            <p class="asset-section-subtitle"><?php echo 'Review asset details, stock distribution, and status changes at a glance. ' . (int)($assetUnitMetrics['in_use_units'] ?? 0) . ' unit(s) are currently in use.'; ?></p>
-                            <button type="button" class="field-tip" aria-label="Asset list help">
-                                <span class="field-tip__icon" aria-hidden="true">i</span>
-                                <span class="field-tip__bubble">Use this list to review stock health, unit distribution, QR readiness, and asset recovery actions in one place.</span>
-                            </button>
-                        </div>
-                    <?php endif; ?>
                 </div>
                 <div class="asset-section-actions">
                     <?php if ($qrLibraryReady && !$isTrashView): ?>
