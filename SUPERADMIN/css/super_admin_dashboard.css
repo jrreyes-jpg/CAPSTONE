@@ -3764,7 +3764,6 @@ tbody tr:hover {
         .btn-secondary {
             background: rgb(208, 44, 44);
             color: white;
-             padding: 16px 18px 8px 18px;
         }
 
 .btn-status-danger {
@@ -4703,6 +4702,7 @@ tbody tr:hover {
 .status-engineer-review { background: #0ea5e9; color: #ffffff; }
 .status-engineer-approved { background: #22c55e; color: #ffffff; }
 .status-engineer-rejected { background: #ef4444; color: #ffffff; }
+.status-rejected { background: #dc2626; color: #ffffff; }
 .status-approved { background: #16a34a; color: #ffffff; }
 .status-issued { background: #2563eb; color: #ffffff; }
 .status-partially-delivered { background: #f59e0b; color: #ffffff; }

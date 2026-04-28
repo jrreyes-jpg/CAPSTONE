@@ -121,15 +121,6 @@ $assignedProjects = array_slice($data['assigned_projects'], 0, 3);
     </style>
 </head>
 <body>
-
-<button class="sidebar-mobile-toggle" type="button" aria-label="Toggle menu" data-sidebar-mobile-toggle>
-    <span></span>
-    <span></span>
-    <span></span>
-</button>
-
-<div class="sidebar-overlay" data-sidebar-overlay></div>
-
 <?php include '../sidebar/sidebar_engineer.php'; ?>
 
 <div class="main-content">

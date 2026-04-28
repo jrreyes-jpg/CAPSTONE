@@ -524,7 +524,7 @@ foreach ($requestRows as $requestRow) {
                 <div>
                     <span class="section-badge">Request Form</span>
                     <h2><?php echo $editRequest ? 'Edit Purchase Request' : 'Create Purchase Request'; ?></h2>
-                    <p>Foreman submits the request, Engineer validates it, then Super Admin handles supplier selection and purchase order creation.</p>
+                    <p>Foreman submits the request, Engineer validates it and creates the purchase order, then Super Admin gives the final approval.</p>
                 </div>
             </div>
 

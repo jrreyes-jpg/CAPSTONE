@@ -14,6 +14,7 @@ $foremanNotifications = $foremanNotifications ?? [
 
 $isOverview = $currentFile === 'foreman_dashboard.php';
 $isProjects = $currentFile === 'projects.php';
+$isReports = in_array($currentFile, ['reports.php', 'report_list.php', 'report_detail.php'], true);
 $isProcurement = $currentFile === 'procurement.php';
 $isAssets = $currentFile === 'asset_status.php';
 $isLogs = $currentFile === 'usage_logs.php';
@@ -87,6 +88,22 @@ $isWorkers = $currentFile === 'worker_summary.php';
                     <span class="menu-mini-label">Proj</span>
                 </span>
                 <span class="menu-text">My Projects</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/FOREMAN/dashboards/reports.php" class="menu-link<?php echo $isReports ? ' active' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M7 4h10"></path>
+                            <path d="M7 8h10"></path>
+                            <path d="M7 12h6"></path>
+                            <path d="M6 20h12a2 2 0 0 0 2-2V6l-4-4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Rep</span>
+                </span>
+                <span class="menu-text">Reports</span>
             </a>
         </li>
         <li>

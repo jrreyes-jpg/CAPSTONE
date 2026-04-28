@@ -180,6 +180,12 @@
     margin: 8px 0 0;
     color: var(--text-light);
     max-width: 680px;
+    line-height: 1.6;
+}
+
+.asset-section-subtitle-row {
+    align-items: flex-start;
+    gap: 10px;
 }
 
 .asset-section-actions {

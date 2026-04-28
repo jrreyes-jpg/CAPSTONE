@@ -118,6 +118,28 @@ function assets_table_has_column(mysqli $conn, string $columnName): bool {
     return (int)$count > 0;
 }
 
+function database_table_has_column(mysqli $conn, string $tableName, string $columnName): bool {
+    $stmt = $conn->prepare(
+        'SELECT COUNT(*)
+         FROM information_schema.columns
+         WHERE table_schema = DATABASE()
+         AND table_name = ?
+         AND column_name = ?'
+    );
+
+    if (!$stmt) {
+        return false;
+    }
+
+    $stmt->bind_param('ss', $tableName, $columnName);
+    $stmt->execute();
+    $stmt->bind_result($count);
+    $stmt->fetch();
+    $stmt->close();
+
+    return (int)$count > 0;
+}
+
 function assets_get_column_type(mysqli $conn, string $columnName): ?string {
     $stmt = $conn->prepare(
         'SELECT COLUMN_TYPE
@@ -177,17 +199,17 @@ function ensure_assets_status_values(mysqli $conn): void {
 
 function asset_category_seed_defaults(): array {
     return [
-        'tool' => ['label' => 'Tool', 'min_stock' => 1, 'description' => 'Reusable hand tools and power tools.', 'sort_order' => 10],
-        'equipment' => ['label' => 'Equipment', 'min_stock' => 1, 'description' => 'Heavy or specialized operational equipment.', 'sort_order' => 20],
-        'it_device' => ['label' => 'IT Device', 'min_stock' => 1, 'description' => 'Laptops, tablets, routers, cameras, and other IT hardware.', 'sort_order' => 30],
-        'vehicle' => ['label' => 'Vehicle', 'min_stock' => 0, 'description' => 'Service vehicles and transport assets.', 'sort_order' => 40],
-        'ppe' => ['label' => 'PPE', 'min_stock' => 10, 'description' => 'Safety gear issued to workers.', 'sort_order' => 50],
-        'consumable' => ['label' => 'Consumable', 'min_stock' => 20, 'description' => 'Items that are used up and not returned.', 'sort_order' => 60],
-        'electrical_material' => ['label' => 'Electrical Material', 'min_stock' => 10, 'description' => 'Wires, breakers, relays, conduits, and similar materials.', 'sort_order' => 70],
-        'mechanical_material' => ['label' => 'Mechanical Material', 'min_stock' => 10, 'description' => 'Pipes, fittings, valves, and other mechanical materials.', 'sort_order' => 80],
-        'spare_part' => ['label' => 'Spare Part', 'min_stock' => 2, 'description' => 'Replacement parts for repair and maintenance.', 'sort_order' => 90],
-        'office_supply' => ['label' => 'Office Supply', 'min_stock' => 5, 'description' => 'Administrative and office-use supplies.', 'sort_order' => 100],
-        'measuring_device' => ['label' => 'Measuring Device', 'min_stock' => 1, 'description' => 'Meters, testers, and calibration-sensitive devices.', 'sort_order' => 110],
+        'tool' => ['label' => 'Tool', 'min_stock' => 1, 'max_stock' => 6, 'description' => 'Reusable hand tools and power tools.', 'sort_order' => 10],
+        'equipment' => ['label' => 'Equipment', 'min_stock' => 1, 'max_stock' => 3, 'description' => 'Heavy or specialized operational equipment.', 'sort_order' => 20],
+        'it_device' => ['label' => 'IT Device', 'min_stock' => 1, 'max_stock' => 4, 'description' => 'Laptops, tablets, routers, cameras, and other IT hardware.', 'sort_order' => 30],
+        'vehicle' => ['label' => 'Vehicle', 'min_stock' => 0, 'max_stock' => 2, 'description' => 'Service vehicles and transport assets.', 'sort_order' => 40],
+        'ppe' => ['label' => 'PPE', 'min_stock' => 10, 'max_stock' => 120, 'description' => 'Safety gear issued to workers.', 'sort_order' => 50],
+        'consumable' => ['label' => 'Consumable', 'min_stock' => 20, 'max_stock' => 250, 'description' => 'Items that are used up and not returned.', 'sort_order' => 60],
+        'electrical_material' => ['label' => 'Electrical Material', 'min_stock' => 10, 'max_stock' => 150, 'description' => 'Wires, breakers, relays, conduits, and similar materials.', 'sort_order' => 70],
+        'mechanical_material' => ['label' => 'Mechanical Material', 'min_stock' => 10, 'max_stock' => 150, 'description' => 'Pipes, fittings, valves, and other mechanical materials.', 'sort_order' => 80],
+        'spare_part' => ['label' => 'Spare Part', 'min_stock' => 2, 'max_stock' => 18, 'description' => 'Replacement parts for repair and maintenance.', 'sort_order' => 90],
+        'office_supply' => ['label' => 'Office Supply', 'min_stock' => 5, 'max_stock' => 40, 'description' => 'Administrative and office-use supplies.', 'sort_order' => 100],
+        'measuring_device' => ['label' => 'Measuring Device', 'min_stock' => 1, 'max_stock' => 4, 'description' => 'Meters, testers, and calibration-sensitive devices.', 'sort_order' => 110],
     ];
 }
 
@@ -198,6 +220,7 @@ function ensure_asset_category_defaults_table(mysqli $conn): void {
             category_key VARCHAR(80) NOT NULL UNIQUE,
             category_label VARCHAR(120) NOT NULL,
             recommended_min_stock INT(11) NOT NULL DEFAULT 0,
+            recommended_max_stock INT(11) DEFAULT NULL,
             description TEXT DEFAULT NULL,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
             sort_order INT(11) NOT NULL DEFAULT 0,
@@ -208,6 +231,16 @@ function ensure_asset_category_defaults_table(mysqli $conn): void {
     );
 }
 
+function ensure_asset_inventory_threshold_columns(mysqli $conn): void {
+    if (!database_table_has_column($conn, 'inventory', 'max_stock')) {
+        $conn->query('ALTER TABLE inventory ADD COLUMN max_stock INT(11) DEFAULT NULL AFTER min_stock');
+    }
+
+    if (!database_table_has_column($conn, 'asset_category_defaults', 'recommended_max_stock')) {
+        $conn->query('ALTER TABLE asset_category_defaults ADD COLUMN recommended_max_stock INT(11) DEFAULT NULL AFTER recommended_min_stock');
+    }
+}
+
 function seed_asset_category_defaults(mysqli $conn): void {
     $seedDefaults = asset_category_seed_defaults();
     $statement = $conn->prepare(
@@ -215,13 +248,15 @@ function seed_asset_category_defaults(mysqli $conn): void {
             category_key,
             category_label,
             recommended_min_stock,
+            recommended_max_stock,
             description,
             is_active,
             sort_order
-        ) VALUES (?, ?, ?, ?, 1, ?)
+        ) VALUES (?, ?, ?, ?, ?, 1, ?)
         ON DUPLICATE KEY UPDATE
             category_label = VALUES(category_label),
             recommended_min_stock = VALUES(recommended_min_stock),
+            recommended_max_stock = COALESCE(asset_category_defaults.recommended_max_stock, VALUES(recommended_max_stock)),
             description = COALESCE(asset_category_defaults.description, VALUES(description)),
             sort_order = VALUES(sort_order)"
     );
@@ -233,9 +268,10 @@ function seed_asset_category_defaults(mysqli $conn): void {
     foreach ($seedDefaults as $categoryKey => $meta) {
         $categoryLabel = (string)($meta['label'] ?? $categoryKey);
         $recommendedMinStock = (int)($meta['min_stock'] ?? 0);
+        $recommendedMaxStock = isset($meta['max_stock']) ? (int)$meta['max_stock'] : null;
         $description = (string)($meta['description'] ?? '');
         $sortOrder = (int)($meta['sort_order'] ?? 0);
-        $statement->bind_param('ssisi', $categoryKey, $categoryLabel, $recommendedMinStock, $description, $sortOrder);
+        $statement->bind_param('ssiisi', $categoryKey, $categoryLabel, $recommendedMinStock, $recommendedMaxStock, $description, $sortOrder);
         $statement->execute();
     }
 }
@@ -248,6 +284,7 @@ function fetch_asset_category_defaults(mysqli $conn): array {
             category_key,
             category_label,
             recommended_min_stock,
+            recommended_max_stock,
             description,
             is_active,
             sort_order
@@ -275,6 +312,7 @@ function asset_category_defaults_index(array $rows): array {
             'id' => (int)($row['id'] ?? 0),
             'label' => (string)($row['category_label'] ?? $categoryKey),
             'min_stock' => (int)($row['recommended_min_stock'] ?? 0),
+            'max_stock' => isset($row['recommended_max_stock']) ? (int)$row['recommended_max_stock'] : null,
             'description' => (string)($row['description'] ?? ''),
             'is_active' => (int)($row['is_active'] ?? 1) === 1,
             'sort_order' => (int)($row['sort_order'] ?? 0),
@@ -331,6 +369,55 @@ function determine_asset_inventory_status(int $quantity, ?int $minStock): string
     return 'available';
 }
 
+function suggest_asset_max_stock(?string $categoryKey, int $quantity, ?int $minStock, array $categoryDefaults = []): int
+{
+    $quantity = max(0, $quantity);
+    $minStock = $minStock !== null ? max(0, $minStock) : null;
+
+    if ($categoryKey !== null && $categoryKey !== '' && isset($categoryDefaults[$categoryKey]['max_stock'])) {
+        $recommended = (int)$categoryDefaults[$categoryKey]['max_stock'];
+        if ($recommended > 0) {
+            return max($recommended, $quantity, (int)($minStock ?? 0));
+        }
+    }
+
+    $baseline = max($quantity, (int)($minStock ?? 0));
+    $buffer = max(2, (int)ceil($baseline * 0.5));
+    $derived = $baseline + $buffer;
+
+    if ($minStock !== null) {
+        $derived = max($derived, $minStock * 2);
+    }
+
+    return max(1, $derived);
+}
+
+function build_asset_stock_capacity_label(?int $quantity, ?int $minStock, ?int $maxStock): string
+{
+    $quantityLabel = $quantity !== null ? (string)$quantity : 'N/A';
+    $minLabel = $minStock !== null ? (string)$minStock : 'N/A';
+    $maxLabel = $maxStock !== null ? (string)$maxStock : 'Auto';
+
+    return $quantityLabel . ' / ' . $minLabel . ' / ' . $maxLabel;
+}
+
+function build_asset_stock_capacity_note(?int $quantity, ?int $maxStock): ?string
+{
+    if ($quantity === null || $maxStock === null || $maxStock <= 0) {
+        return null;
+    }
+
+    if ($quantity > $maxStock) {
+        return 'Above ceiling by ' . ($quantity - $maxStock);
+    }
+
+    if ($quantity === $maxStock) {
+        return 'At stock ceiling';
+    }
+
+    return null;
+}
+
 function build_asset_stock_badge_label(?string $status): string {
     $normalized = trim((string)$status);
     if ($normalized === '') {
@@ -354,7 +441,7 @@ function build_asset_stock_badge_label(?string $status): string {
 
 function getAssetInventorySnapshot(mysqli $conn, int $assetId): ?array {
     $stmt = $conn->prepare(
-        'SELECT id, asset_id, quantity, min_stock, status
+        'SELECT id, asset_id, quantity, min_stock, max_stock, status
          FROM inventory
          WHERE asset_id = ?
          LIMIT 1'
@@ -436,6 +523,7 @@ ensure_asset_unit_tracking_schema($conn);
 ensure_assets_classification_columns($conn);
 ensure_assets_status_values($conn);
 ensure_asset_category_defaults_table($conn);
+ensure_asset_inventory_threshold_columns($conn);
 seed_asset_category_defaults($conn);
 $assetCategoryDefaultRows = fetch_asset_category_defaults($conn);
 $assetCategoryDefaults = asset_category_defaults_index($assetCategoryDefaultRows);
@@ -504,6 +592,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $categoryDefaultId = (int)($_POST['category_default_id'] ?? 0);
         $categoryLabel = trim((string)($_POST['category_label'] ?? ''));
         $recommendedMinStock = max(0, (int)($_POST['recommended_min_stock'] ?? 0));
+        $recommendedMaxStockRaw = trim((string)($_POST['recommended_max_stock'] ?? ''));
+        $recommendedMaxStock = $recommendedMaxStockRaw === '' ? null : max(0, (int)$recommendedMaxStockRaw);
         $description = trim((string)($_POST['description'] ?? ''));
         $sortOrder = max(0, (int)($_POST['sort_order'] ?? 0));
         $isActive = isset($_POST['is_active']) ? 1 : 0;
@@ -513,15 +603,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect_assets_page();
         }
 
+        if ($recommendedMaxStock !== null && $recommendedMaxStock < $recommendedMinStock) {
+            $_SESSION['assets_error'] = 'Recommended max stock must be greater than or equal to the recommended min stock.';
+            redirect_assets_page();
+        }
+
         $updateDefault = $conn->prepare(
             'UPDATE asset_category_defaults
-             SET category_label = ?, recommended_min_stock = ?, description = ?, is_active = ?, sort_order = ?
+             SET category_label = ?, recommended_min_stock = ?, recommended_max_stock = ?, description = ?, is_active = ?, sort_order = ?
              WHERE id = ?'
         );
 
         if (
             $updateDefault &&
-            $updateDefault->bind_param('sisiii', $categoryLabel, $recommendedMinStock, $description, $isActive, $sortOrder, $categoryDefaultId) &&
+            $updateDefault->bind_param('siisiii', $categoryLabel, $recommendedMinStock, $recommendedMaxStock, $description, $isActive, $sortOrder, $categoryDefaultId) &&
             $updateDefault->execute()
         ) {
             $_SESSION['assets_message'] = 'Asset category defaults updated.';
@@ -540,6 +635,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $quantity = max(0, (int)($_POST['quantity'] ?? 0));
         $minStockRaw = trim((string)($_POST['min_stock'] ?? ''));
         $minStock = $minStockRaw === '' ? null : max(0, (int)$minStockRaw);
+        $maxStockRaw = trim((string)($_POST['max_stock'] ?? ''));
+        $maxStock = $maxStockRaw === '' ? null : max(0, (int)$maxStockRaw);
 
         if (!isset($assetCategoryDefaults[$assetCategory]) || empty($assetCategoryDefaults[$assetCategory]['is_active'])) {
             $assetCategory = 'tool';
@@ -553,10 +650,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $minStock = (int)$assetCategoryDefaults[$assetCategory]['min_stock'];
         }
 
+        if ($maxStock === null) {
+            $maxStock = suggest_asset_max_stock($assetCategory, $quantity, $minStock, $assetCategoryDefaults);
+        }
+
         if ($assetName === '') {
             $_SESSION['assets_error'] = 'Asset name is required.';
         } elseif ($quantity <= 0) {
             $_SESSION['assets_error'] = 'Quantity must be at least 1 when creating an asset.';
+        } elseif ($maxStock !== null && $minStock !== null && $maxStock < $minStock) {
+            $_SESSION['assets_error'] = 'Max stock must be greater than or equal to min stock.';
+        } elseif ($maxStock !== null && $maxStock < $quantity) {
+            $_SESSION['assets_error'] = 'Max stock cannot be lower than the starting quantity.';
         } else {
             $emptySerial = '';
             $inventoryStatus = determine_asset_inventory_status($quantity, $minStock);
@@ -596,12 +701,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 $inventoryStmt = $conn->prepare(
-                    'INSERT INTO inventory (asset_id, quantity, min_stock, status)
-                     VALUES (?, ?, ?, ?)'
+                    'INSERT INTO inventory (asset_id, quantity, min_stock, max_stock, status)
+                     VALUES (?, ?, ?, ?, ?)'
                 );
                 if (
                     !$inventoryStmt ||
-                    !$inventoryStmt->bind_param('iiis', $assetId, $quantity, $minStock, $inventoryStatus) ||
+                    !$inventoryStmt->bind_param('iiiis', $assetId, $quantity, $minStock, $maxStock, $inventoryStatus) ||
                     !$inventoryStmt->execute()
                 ) {
                     throw new RuntimeException('Failed to create the inventory record.');
@@ -625,6 +730,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'criticality' => $criticality,
                         'quantity' => $quantity,
                         'min_stock' => $minStock,
+                        'max_stock' => $maxStock,
                         'inventory_status' => $inventoryStatus,
                     ]
                 );
@@ -641,6 +747,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'asset_name' => $assetName,
                         'quantity' => $quantity,
                         'min_stock' => $minStock,
+                        'max_stock' => $maxStock,
                         'status' => $inventoryStatus,
                     ]
                 );
@@ -1061,6 +1168,7 @@ $assetQuery = 'SELECT
     i.id AS inventory_id,
     i.quantity AS inventory_quantity,
     i.min_stock AS inventory_min_stock,
+    i.max_stock AS inventory_max_stock,
     i.status AS inventory_status,
     COALESCE(unit_counts.available_units, 0) AS available_units,
     COALESCE(unit_counts.deployed_units, 0) AS deployed_units,
@@ -1288,6 +1396,7 @@ if ($createdAssetId > 0) {
                                 <option
                                     value="<?php echo htmlspecialchars((string)($categoryRow['category_key'] ?? '')); ?>"
                                     data-default-min-stock="<?php echo (int)($categoryRow['recommended_min_stock'] ?? 0); ?>"
+                                    data-default-max-stock="<?php echo htmlspecialchars((string)($categoryRow['recommended_max_stock'] ?? '')); ?>"
                                     <?php echo (string)($categoryRow['category_key'] ?? '') === 'tool' ? 'selected' : ''; ?>
                                 >
                                     <?php echo htmlspecialchars((string)($categoryRow['category_label'] ?? ($categoryRow['category_key'] ?? 'Category'))); ?>
@@ -1308,14 +1417,21 @@ if ($createdAssetId > 0) {
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="quantity">Quantity</label>
-                        <input type="number" id="quantity" name="quantity" min="1" step="1" value="1" required>
-                    </div>
-                    <div class="form-group">
                         <label for="min_stock">Min Stock</label>
                         <input type="number" id="min_stock" name="min_stock" min="0" step="1" value="<?php echo (int)($assetCategoryDefaults['tool']['min_stock'] ?? 0); ?>" placeholder="Auto-filled by category">
                     </div>
+                    <div class="form-group">
+                        <div class="field-label-row">
+                            <label for="max_stock">Max Stock</label>
+                            <button type="button" class="field-tip" aria-label="Max stock help">
+                                <span class="field-tip__icon" aria-hidden="true">i</span>
+                                <span class="field-tip__bubble">Auto-guided ceiling based on category and starting stock. Increase it if this asset usually needs extra on-hand buffer.</span>
+                            </button>
+                        </div>
+                        <input type="number" id="max_stock" name="max_stock" min="1" step="1" value="<?php echo (int)suggest_asset_max_stock('tool', 1, (int)($assetCategoryDefaults['tool']['min_stock'] ?? 0), $assetCategoryDefaults); ?>" placeholder="Smart auto-fill based on category">
+                    </div>
                 </div>
+                <input type="hidden" id="quantity" name="quantity" value="1">
                 <button type="submit" class="btn-primary">Create Asset + Inventory + QR</button>
             </form>
         </section>
@@ -1342,9 +1458,17 @@ if ($createdAssetId > 0) {
             <div class="asset-section-header">
                 <div>
                     <h2 class="dashboard-section-title"><?php echo $isTrashView ? 'Trashed Assets' : 'Existing Assets'; ?></h2>
-                    <p class="asset-section-subtitle">
-                        <?php echo $isTrashView ? 'Archived asset records stay recoverable here until permanently removed.' : 'Review asset details, stock distribution, and status changes at a glance. ' . (int)($assetUnitMetrics['in_use_units'] ?? 0) . ' unit(s) are currently in use.'; ?>
-                    </p>
+                    <?php if ($isTrashView): ?>
+                        <p class="asset-section-subtitle"><?php echo 'Archived asset records stay recoverable here until permanently removed.'; ?></p>
+                    <?php else: ?>
+                        <div class="field-label-row asset-section-subtitle-row">
+                            <p class="asset-section-subtitle"><?php echo 'Review asset details, stock distribution, and status changes at a glance. ' . (int)($assetUnitMetrics['in_use_units'] ?? 0) . ' unit(s) are currently in use.'; ?></p>
+                            <button type="button" class="field-tip" aria-label="Asset list help">
+                                <span class="field-tip__icon" aria-hidden="true">i</span>
+                                <span class="field-tip__bubble">Use this list to review stock health, unit distribution, QR readiness, and asset recovery actions in one place.</span>
+                            </button>
+                        </div>
+                    <?php endif; ?>
                 </div>
                 <div class="asset-section-actions">
                     <?php if ($qrLibraryReady && !$isTrashView): ?>
@@ -1432,7 +1556,14 @@ if ($createdAssetId > 0) {
                                                             <?php echo htmlspecialchars(build_asset_stock_badge_label($asset['inventory_status'] ?? null)); ?>
                                                         </span>
                                                     </span>
-                                                    <span class="asset-meta-inline__item"><strong>Qty / Min:</strong> <?php echo (int)($asset['inventory_quantity'] ?? 0); ?> / <?php echo $asset['inventory_min_stock'] !== null ? (int)$asset['inventory_min_stock'] : 'N/A'; ?></span>
+                                                    <span class="asset-meta-inline__item"><strong>Qty / Min / Max:</strong> <?php echo htmlspecialchars(build_asset_stock_capacity_label(isset($asset['inventory_quantity']) ? (int)$asset['inventory_quantity'] : null, $asset['inventory_min_stock'] !== null ? (int)$asset['inventory_min_stock'] : null, $asset['inventory_max_stock'] !== null ? (int)$asset['inventory_max_stock'] : null)); ?></span>
+                                                    <?php $capacityNote = build_asset_stock_capacity_note(isset($asset['inventory_quantity']) ? (int)$asset['inventory_quantity'] : null, $asset['inventory_max_stock'] !== null ? (int)$asset['inventory_max_stock'] : null); ?>
+                                                    <?php if ($capacityNote !== null): ?>
+                                                        <span class="asset-meta-inline__item asset-meta-inline__item--status">
+                                                            <strong>Capacity:</strong>
+                                                            <span class="status-pill status-low-stock"><?php echo htmlspecialchars($capacityNote); ?></span>
+                                                        </span>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
                                         </div>
@@ -1596,24 +1727,79 @@ if ($createdAssetId > 0) {
 document.addEventListener('DOMContentLoaded', () => {
     const categoryField = document.getElementById('asset_category');
     const minStockField = document.getElementById('min_stock');
+    const maxStockField = document.getElementById('max_stock');
+    const quantityField = document.getElementById('quantity');
 
-    if (!categoryField || !minStockField) {
+    if (!categoryField || !minStockField || !maxStockField || !quantityField) {
         return;
     }
 
-    categoryField.addEventListener('change', () => {
+    const computeSmartMaxStock = (quantityValue, minStockValue, categoryDefaultMax) => {
+        const quantity = Math.max(0, Number(quantityValue || 0));
+        const minStock = Math.max(0, Number(minStockValue || 0));
+        const defaultMax = Number(categoryDefaultMax || 0);
+
+        if (defaultMax > 0) {
+            return Math.max(defaultMax, quantity, minStock);
+        }
+
+        const baseline = Math.max(quantity, minStock);
+        const buffer = Math.max(2, Math.ceil(baseline * 0.5));
+        return Math.max(1, baseline + buffer, minStock * 2);
+    };
+
+    const syncThresholdsFromCategory = () => {
         const selectedOption = categoryField.options[categoryField.selectedIndex];
         if (!selectedOption) {
             return;
         }
 
         const recommendedMinStock = selectedOption.getAttribute('data-default-min-stock');
-        if (recommendedMinStock === null) {
-            return;
+        const recommendedMaxStock = selectedOption.getAttribute('data-default-max-stock');
+
+        if (recommendedMinStock !== null) {
+            minStockField.value = recommendedMinStock;
         }
 
-        minStockField.value = recommendedMinStock;
+        const shouldAutoSyncMax = maxStockField.dataset.userEdited !== 'true';
+        if (shouldAutoSyncMax) {
+            maxStockField.value = String(
+                computeSmartMaxStock(quantityField.value, recommendedMinStock, recommendedMaxStock)
+            );
+        }
+    };
+
+    categoryField.addEventListener('change', syncThresholdsFromCategory);
+    minStockField.addEventListener('input', () => {
+        if (maxStockField.dataset.userEdited === 'true') {
+            return;
+        }
+        const selectedOption = categoryField.options[categoryField.selectedIndex];
+        maxStockField.value = String(
+            computeSmartMaxStock(
+                quantityField.value,
+                minStockField.value,
+                selectedOption?.getAttribute('data-default-max-stock')
+            )
+        );
     });
+    quantityField.addEventListener('input', () => {
+        if (maxStockField.dataset.userEdited === 'true') {
+            return;
+        }
+        const selectedOption = categoryField.options[categoryField.selectedIndex];
+        maxStockField.value = String(
+            computeSmartMaxStock(
+                quantityField.value,
+                minStockField.value,
+                selectedOption?.getAttribute('data-default-max-stock')
+            )
+        );
+    });
+    maxStockField.addEventListener('input', () => {
+        maxStockField.dataset.userEdited = 'true';
+    });
+    syncThresholdsFromCategory();
 
     const filterTabs = Array.from(document.querySelectorAll('.asset-filter-tab'));
     const assetRows = Array.from(document.querySelectorAll('.asset-table-row'));

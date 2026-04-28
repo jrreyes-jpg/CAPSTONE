@@ -444,7 +444,7 @@ if ($supportsArchivedStatus) {
     $statusOptions[] = 'archived';
 }
 $initialStatusOptions = $supportsDraftStatus
-    ? ['draft', 'pending', 'ongoing']
+    ? ['draft', 'pending']
     : ['pending', 'ongoing'];
 $todayDate = today_date();
 
