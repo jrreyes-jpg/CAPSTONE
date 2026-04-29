@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../../config/auth_middleware.php';
 
 function engineer_normalize_text_or_null(?string $value): ?string
 {

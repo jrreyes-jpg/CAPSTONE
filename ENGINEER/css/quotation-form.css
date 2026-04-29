@@ -26,13 +26,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.field-inline-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-}
-
 .flash {
     padding: 14px 16px;
     border-radius: 16px;
@@ -65,6 +58,10 @@ p {
     color: #64748b;
 }
 
+.top-actions {
+    justify-content: space-between;
+}
+
 .helper-copy.is-info {
     padding: 10px 12px;
     border-radius: 14px;
@@ -95,33 +92,6 @@ p {
 
 .required-dot {
     color: #dc2626;
-}
-
-.validation-note {
-    font-size: 0.8rem;
-    color: #64748b;
-}
-
-.field-chip {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 5px 10px;
-    border-radius: 999px;
-    background: #dcfce7;
-    color: #166534;
-    font-size: 0.76rem;
-    font-weight: 800;
-}
-
-.field-chip.is-warning {
-    background: #fef3c7;
-    color: #92400e;
-}
-
-.field-chip.is-danger {
-    background: #fee2e2;
-    color: #b91c1c;
 }
 
 .form-group input,
@@ -273,21 +243,29 @@ p {
     background: #f8fafc;
 }
 
-.items-table .row-tag {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 84px;
-    padding: 6px 8px;
-    border-radius: 999px;
-    font-size: 0.74rem;
-    font-weight: 800;
+.items-table td:first-child {
+    min-width: 150px;
 }
 
-.row-tag.type-material { background: #dcfce7; color: #166534; }
-.row-tag.type-asset { background: #dbeafe; color: #1d4ed8; }
-.row-tag.type-manpower { background: #fef3c7; color: #92400e; }
-.row-tag.type-other { background: #f3e8ff; color: #7c3aed; }
+.item-type {
+    font-weight: 700;
+}
+
+.item-type option[value="material"] {
+    color: #166534;
+}
+
+.item-type option[value="asset"] {
+    color: #1d4ed8;
+}
+
+.item-type option[value="manpower"] {
+    color: #92400e;
+}
+
+.item-type option[value="other"] {
+    color: #7c3aed;
+}
 
 .catalog-grid,
 .timeline,
@@ -353,6 +331,14 @@ p {
     background: #f8fafc;
 }
 
+.form-actions {
+    justify-content: flex-end;
+}
+
+.form-actions .btn-ghost {
+    margin-right: auto;
+}
+
 @media (max-width: 1200px) {
     .grid.two {
         grid-template-columns: 1fr;
@@ -375,6 +361,14 @@ p {
     .btn-row > *,
     .top-actions .btn-row > * {
         width: 100%;
+    }
+
+    .form-actions {
+        justify-content: stretch;
+    }
+
+    .form-actions .btn-ghost {
+        margin-right: 0;
     }
 
     .items-table {

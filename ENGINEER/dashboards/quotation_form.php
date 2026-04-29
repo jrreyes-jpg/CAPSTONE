@@ -90,12 +90,11 @@ if (empty($items)) {
                         <h1><?php echo $quotation ? 'Quotation ' . htmlspecialchars((string)$quotation['quotation_no']) : 'Create New Quotation'; ?></h1>
                         <p class="helper-copy">Engineer owns the quotation draft. Foreman reviews only. Super Admin gives final approval.</p>
                     </div>
-                    <div class="btn-row">
-                        <a class="btn-secondary" href="/codesamplecaps/ENGINEER/dashboards/quotations.php">Back to List</a>
-                        <?php if ($quotation): ?>
+                    <?php if ($quotation): ?>
+                        <div class="btn-row">
                             <span class="status-pill <?php echo htmlspecialchars(quotation_module_status_class((string)$quotation['status'])); ?>"><?php echo htmlspecialchars(quotation_module_status_label((string)$quotation['status'])); ?></span>
-                        <?php endif; ?>
-                    </div>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </section>
 
@@ -176,10 +175,6 @@ if (empty($items)) {
                                     </button>
                                 </div>
                                 <input id="estimated_duration_days" type="number" min="1" name="estimated_duration_days" value="<?php echo htmlspecialchars((string)($quotation['estimated_duration_days'] ?? '')); ?>" readonly required>
-                                <div class="field-inline-meta">
-                                    <span class="field-chip">Auto-synced from project</span>
-                                    <span class="validation-note" id="durationMeta">Select a project to load the saved timeline duration.</span>
-                                </div>
                             </div>
                         </div>
                         <div class="form-group">
@@ -228,7 +223,6 @@ if (empty($items)) {
                                     <?php foreach ($items as $item): ?>
                                         <tr class="quotation-item-row">
                                             <td>
-                                                <span class="row-tag type-<?php echo htmlspecialchars((string)$item['item_type']); ?>"><?php echo htmlspecialchars(ucfirst((string)$item['item_type'])); ?></span>
                                                 <select name="item_type[]" class="item-type" <?php echo $canEditDraft ? '' : 'disabled'; ?>>
                                                     <?php foreach (['material', 'asset', 'manpower', 'other'] as $type): ?>
                                                         <option value="<?php echo $type; ?>" <?php echo (string)$item['item_type'] === $type ? 'selected' : ''; ?>><?php echo ucfirst($type); ?></option>
@@ -253,7 +247,8 @@ if (empty($items)) {
                     </section>
 
                     <section class="panel">
-                        <div class="btn-row">
+                        <div class="btn-row form-actions">
+                            <a class="btn-ghost" href="/codesamplecaps/ENGINEER/dashboards/quotations.php">Back to List</a>
                             <?php if ($canEditDraft): ?>
                                 <button class="btn-primary" type="submit" name="action" value="save_draft">Save Draft</button>
                             <?php endif; ?>
@@ -353,7 +348,6 @@ if (empty($items)) {
         var quotationForm = document.querySelector('form[action="/codesamplecaps/controllers/QuotationController.php"]');
         var projectField = document.getElementById('project_id');
         var durationField = document.getElementById('estimated_duration_days');
-        var durationMeta = document.getElementById('durationMeta');
         var foremanField = document.getElementById('foreman_reviewer_id');
 
         if (!tableBody || !quotationForm) {
@@ -364,18 +358,6 @@ if (empty($items)) {
             return 'PHP ' + Number(value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
         }
 
-        function updateRowTag(row, type) {
-            var tag = row.querySelector('.row-tag');
-            if (!tag) {
-                tag = document.createElement('span');
-                tag.className = 'row-tag';
-                row.querySelector('td').insertBefore(tag, row.querySelector('.item-type'));
-            }
-
-            tag.className = 'row-tag type-' + type;
-            tag.textContent = type.charAt(0).toUpperCase() + type.slice(1);
-        }
-
         function syncProjectDuration() {
             if (!projectField || !durationField) {
                 return;
@@ -383,21 +365,13 @@ if (empty($items)) {
 
             var selectedOption = projectField.options[projectField.selectedIndex];
             var durationDays = selectedOption ? String(selectedOption.getAttribute('data-duration-days') || '').trim() : '';
-            var startDate = selectedOption ? String(selectedOption.getAttribute('data-start-date') || '').trim() : '';
-            var endDate = selectedOption ? String(selectedOption.getAttribute('data-end-date') || '').trim() : '';
 
             if (durationDays !== '') {
                 durationField.value = durationDays;
                 durationField.setCustomValidity('');
-                if (durationMeta) {
-                    durationMeta.textContent = 'Project timeline: ' + startDate + ' to ' + endDate + ' | Auto duration: ' + durationDays + ' day(s).';
-                }
             } else {
                 durationField.value = '';
                 durationField.setCustomValidity('This project has no saved duration yet. Update the project timeline first.');
-                if (durationMeta) {
-                    durationMeta.textContent = 'This project has no saved timeline duration yet. Update it from Super Admin > Projects.';
-                }
             }
         }
 
@@ -411,8 +385,6 @@ if (empty($items)) {
             var quantity = parseFloat(quantityField.value || '0');
             var hours = parseFloat(hoursField.value || '0');
             var rate = parseFloat(rateField.value || '0');
-
-            updateRowTag(row, type);
 
             itemNameField.classList.toggle('is-invalid', itemNameField.value.trim().length < 2);
             rateField.classList.toggle('is-invalid', rate <= 0);
@@ -461,7 +433,7 @@ if (empty($items)) {
             var row = document.createElement('tr');
             row.className = 'quotation-item-row';
             row.innerHTML =
-                '<td><span class="row-tag type-other">Other</span><select name="item_type[]" class="item-type"><option value="material">Material</option><option value="asset">Asset</option><option value="manpower">Manpower</option><option value="other">Other</option></select><input type="hidden" name="source_table[]" value=""><input type="hidden" name="source_id[]" value=""></td>' +
+                '<td><select name="item_type[]" class="item-type"><option value="material">Material</option><option value="asset">Asset</option><option value="manpower">Manpower</option><option value="other">Other</option></select><input type="hidden" name="source_table[]" value=""><input type="hidden" name="source_id[]" value=""></td>' +
                 '<td><input type="text" name="item_name[]" data-quote-validate="item-name" minlength="2" maxlength="160" required></td>' +
                 '<td><input type="text" name="item_description[]"></td>' +
                 '<td><input type="text" name="unit[]" value="unit" required></td>' +
@@ -544,7 +516,6 @@ if (empty($items)) {
         }
 
         tableBody.querySelectorAll('.quotation-item-row').forEach(function (row) {
-            updateRowTag(row, row.querySelector('.item-type').value);
             validateRow(row);
         });
 
