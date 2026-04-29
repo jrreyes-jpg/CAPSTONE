@@ -130,5 +130,6 @@ $foremanNotifications = [
         </section>
     </div>
 </main>
+<script src="../js/sidebar_foreman.js"></script>
 </body>
 </html>

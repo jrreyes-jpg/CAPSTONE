@@ -157,6 +157,24 @@ p {
     font-weight: 700;
 }
 
+.helper-panel {
+    border: 1px solid #bae6fd;
+    background: linear-gradient(180deg, #f0fdfa, #ecfeff);
+    border-radius: 18px;
+    padding: 14px 16px;
+}
+
+.helper-panel strong {
+    display: block;
+    margin-bottom: 6px;
+    color: #155e75;
+}
+
+.helper-panel p {
+    margin: 0;
+    color: #0f172a;
+}
+
 .btn-primary,
 .btn-secondary,
 .btn-ghost,
@@ -294,6 +312,59 @@ p {
     color: #0f172a;
 }
 
+.catalog-panel {
+    display: grid;
+    gap: 16px;
+}
+
+.catalog-panel__header {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.catalog-tabs {
+    display: inline-flex;
+    gap: 8px;
+    padding: 6px;
+    border-radius: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.catalog-tab {
+    border: 0;
+    border-radius: 12px;
+    padding: 10px 14px;
+    background: transparent;
+    color: #475569;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.catalog-tab.is-active {
+    background: linear-gradient(135deg, #0f766e, #0f9f93);
+    color: #fff;
+    box-shadow: 0 10px 20px rgba(15, 118, 110, 0.2);
+}
+
+.catalog-section {
+    display: none;
+    gap: 12px;
+}
+
+.catalog-section.is-active {
+    display: grid;
+}
+
+.catalog-section__intro {
+    display: grid;
+    gap: 4px;
+}
+
 .catalog-card small,
 .review-card small,
 .timeline-card small {
@@ -373,5 +444,13 @@ p {
 
     .items-table {
         min-width: 760px;
+    }
+
+    .catalog-tabs {
+        width: 100%;
+    }
+
+    .catalog-tab {
+        flex: 1 1 0;
     }
 }

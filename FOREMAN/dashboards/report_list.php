@@ -200,5 +200,6 @@ $currentQueryString = http_build_query($returnParams);
         </section>
     </div>
 </main>
+<script src="../js/sidebar_foreman.js"></script>
 </body>
 </html>

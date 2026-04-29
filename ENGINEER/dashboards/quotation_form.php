@@ -179,13 +179,13 @@ if (empty($items)) {
                         </div>
                         <div class="form-group">
                             <div class="field-label-row">
-                                <label for="scope_summary">Scope Summary <span class="required-dot">*</span></label>
+                                <label for="scope_summary">Scope Summary</label>
                                 <button type="button" class="field-tip" aria-label="Scope summary help">
                                     <span class="field-tip__icon" aria-hidden="true">i</span>
-                                    <span class="field-tip__bubble">Summarize the actual deliverable, site work, major materials, and any execution notes that matter for review and approval.</span>
+                                    <span class="field-tip__bubble">Optional but recommended. Use this when the title alone is not enough to explain the deliverable, site work, major materials, or execution notes.</span>
                                 </button>
                             </div>
-                            <textarea id="scope_summary" name="scope_summary" rows="4" minlength="10" <?php echo $canEditDraft ? '' : 'readonly'; ?> required><?php echo htmlspecialchars((string)($quotation['scope_summary'] ?? '')); ?></textarea>
+                            <textarea id="scope_summary" name="scope_summary" rows="4" minlength="10" placeholder="Optional: brief scope, deliverables, major materials, or execution notes" <?php echo $canEditDraft ? '' : 'readonly'; ?>><?php echo htmlspecialchars((string)($quotation['scope_summary'] ?? '')); ?></textarea>
                         </div>
                     </section>
 
@@ -273,35 +273,50 @@ if (empty($items)) {
                         <div class="totals-row total-emphasis"><span>Selling Price</span><strong id="sellingPrice">PHP 0.00</strong></div>
                     </section>
 
-                    <section class="panel">
-                        <h2>Materials Catalog</h2>
-                        <p class="helper-copy">Quick-add from inventory to avoid retyping common material rows.</p>
-                        <div class="catalog-grid">
-                            <?php foreach ($inventoryOptions as $inventory): ?>
-                                <article class="catalog-card">
-                                    <strong><?php echo htmlspecialchars((string)$inventory['asset_name']); ?></strong>
-                                    <small><?php echo htmlspecialchars((string)($inventory['asset_category'] ?? 'Material')); ?> | Stock: <?php echo (int)$inventory['quantity']; ?></small>
-                                    <?php if ($canEditDraft): ?>
-                                        <button type="button" class="btn-ghost" data-catalog-item data-item-type="material" data-source-table="inventory" data-source-id="<?php echo (int)$inventory['id']; ?>" data-item-name="<?php echo htmlspecialchars((string)$inventory['asset_name']); ?>" data-unit="unit">Add Material Row</button>
-                                    <?php endif; ?>
-                                </article>
-                            <?php endforeach; ?>
+                    <section class="panel catalog-panel">
+                        <div class="catalog-panel__header">
+                            <div>
+                            </div>
+                            <div class="catalog-tabs" role="tablist" aria-label="Quotation catalogs">
+                                <button type="button" class="catalog-tab is-active" role="tab" aria-selected="true" data-catalog-tab="materials">Materials</button>
+                                <button type="button" class="catalog-tab" role="tab" aria-selected="false" data-catalog-tab="assets">Assets</button>
+                            </div>
                         </div>
-                    </section>
 
-                    <section class="panel">
-                        <h2>Assets Catalog</h2>
-                        <p class="helper-copy">Use this for equipment and tracked asset usage lines.</p>
-                        <div class="catalog-grid">
-                            <?php foreach ($assetOptions as $asset): ?>
-                                <article class="catalog-card">
-                                    <strong><?php echo htmlspecialchars((string)$asset['asset_name']); ?></strong>
-                                    <small><?php echo htmlspecialchars((string)($asset['asset_type'] ?? 'Asset')); ?> | <?php echo htmlspecialchars((string)($asset['asset_status'] ?? 'available')); ?></small>
-                                    <?php if ($canEditDraft): ?>
-                                        <button type="button" class="btn-ghost" data-catalog-item data-item-type="asset" data-source-table="assets" data-source-id="<?php echo (int)$asset['id']; ?>" data-item-name="<?php echo htmlspecialchars((string)$asset['asset_name']); ?>" data-unit="day">Add Asset Row</button>
-                                    <?php endif; ?>
-                                </article>
-                            <?php endforeach; ?>
+                        <div class="catalog-section is-active" data-catalog-panel="materials">
+                            <div class="catalog-section__intro">
+                                <strong>Materials Catalog</strong>
+                                <p class="helper-copy">Quick-add from inventory to avoid retyping common material rows.</p>
+                            </div>
+                            <div class="catalog-grid">
+                                <?php foreach ($inventoryOptions as $inventory): ?>
+                                    <article class="catalog-card">
+                                        <strong><?php echo htmlspecialchars((string)$inventory['asset_name']); ?></strong>
+                                        <small><?php echo htmlspecialchars((string)($inventory['asset_category'] ?? 'Material')); ?> | Stock: <?php echo (int)$inventory['quantity']; ?></small>
+                                        <?php if ($canEditDraft): ?>
+                                            <button type="button" class="btn-ghost" data-catalog-item data-item-type="material" data-source-table="inventory" data-source-id="<?php echo (int)$inventory['id']; ?>" data-item-name="<?php echo htmlspecialchars((string)$inventory['asset_name']); ?>" data-unit="unit">Add Material Row</button>
+                                        <?php endif; ?>
+                                    </article>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+
+                        <div class="catalog-section" data-catalog-panel="assets" hidden>
+                            <div class="catalog-section__intro">
+                                <strong>Assets Catalog</strong>
+                                <p class="helper-copy">Use this for equipment and tracked asset usage lines.</p>
+                            </div>
+                            <div class="catalog-grid">
+                                <?php foreach ($assetOptions as $asset): ?>
+                                    <article class="catalog-card">
+                                        <strong><?php echo htmlspecialchars((string)$asset['asset_name']); ?></strong>
+                                        <small><?php echo htmlspecialchars((string)($asset['asset_type'] ?? 'Asset')); ?> | <?php echo htmlspecialchars((string)($asset['asset_status'] ?? 'available')); ?></small>
+                                        <?php if ($canEditDraft): ?>
+                                            <button type="button" class="btn-ghost" data-catalog-item data-item-type="asset" data-source-table="assets" data-source-id="<?php echo (int)$asset['id']; ?>" data-item-name="<?php echo htmlspecialchars((string)$asset['asset_name']); ?>" data-unit="day">Add Asset Row</button>
+                                        <?php endif; ?>
+                                    </article>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
                     </section>
 
@@ -349,6 +364,8 @@ if (empty($items)) {
         var projectField = document.getElementById('project_id');
         var durationField = document.getElementById('estimated_duration_days');
         var foremanField = document.getElementById('foreman_reviewer_id');
+        var catalogTabs = document.querySelectorAll('[data-catalog-tab]');
+        var catalogPanels = document.querySelectorAll('[data-catalog-panel]');
 
         if (!tableBody || !quotationForm) {
             return;
@@ -431,27 +448,42 @@ if (empty($items)) {
 
         function buildRow(data) {
             var row = document.createElement('tr');
+            var type = data.item_type || 'other';
+            var defaultUnit = data.unit || (type === 'manpower' ? 'hour' : 'unit');
+            var defaultQuantity = type === 'manpower' ? '0' : String(data.quantity || '1');
+            var defaultHours = String(data.hours || '0');
+            var defaultDescription = data.description || (type === 'manpower' ? 'Crew or work package labor entry' : '');
             row.className = 'quotation-item-row';
             row.innerHTML =
                 '<td><select name="item_type[]" class="item-type"><option value="material">Material</option><option value="asset">Asset</option><option value="manpower">Manpower</option><option value="other">Other</option></select><input type="hidden" name="source_table[]" value=""><input type="hidden" name="source_id[]" value=""></td>' +
                 '<td><input type="text" name="item_name[]" data-quote-validate="item-name" minlength="2" maxlength="160" required></td>' +
-                '<td><input type="text" name="item_description[]"></td>' +
-                '<td><input type="text" name="unit[]" value="unit" required></td>' +
-                '<td><input type="number" step="0.01" min="0.01" name="quantity[]" class="item-quantity" data-quote-validate="quantity" value="1"></td>' +
-                '<td><input type="number" step="0.01" min="0" name="hours[]" class="item-hours" data-quote-validate="hours" value="0"></td>' +
+                '<td><input type="text" name="item_description[]" value="' + defaultDescription.replace(/"/g, '&quot;') + '"></td>' +
+                '<td><input type="text" name="unit[]" value="' + defaultUnit.replace(/"/g, '&quot;') + '" required></td>' +
+                '<td><input type="number" step="0.01" min="0.01" name="quantity[]" class="item-quantity" data-quote-validate="quantity" value="' + defaultQuantity + '"></td>' +
+                '<td><input type="number" step="0.01" min="0" name="hours[]" class="item-hours" data-quote-validate="hours" value="' + defaultHours + '"></td>' +
                 '<td><input type="number" step="0.01" min="0.01" name="rate[]" class="item-rate" data-quote-validate="rate" value="0"></td>' +
                 '<td><input type="text" class="item-total" value="0.00" readonly></td>' +
                 '<td><button type="button" class="btn-danger" data-remove-row>Remove</button></td>';
-            row.querySelector('.item-type').value = data.item_type || 'other';
+            row.querySelector('.item-type').value = type;
             row.querySelector('input[name="source_table[]"]').value = data.source_table || '';
             row.querySelector('input[name="source_id[]"]').value = data.source_id || '';
             row.querySelector('input[name="item_name[]"]').value = data.item_name || '';
-            row.querySelector('input[name="unit[]"]').value = data.unit || 'unit';
-            if (data.item_type === 'asset') {
-                row.querySelector('input[name="quantity[]"]').value = data.quantity || '1';
-            }
             tableBody.appendChild(row);
             recalcTotals();
+        }
+
+        function activateCatalogTab(tabName) {
+            catalogTabs.forEach(function (tab) {
+                var isActive = tab.getAttribute('data-catalog-tab') === tabName;
+                tab.classList.toggle('is-active', isActive);
+                tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+
+            catalogPanels.forEach(function (panel) {
+                var isActive = panel.getAttribute('data-catalog-panel') === tabName;
+                panel.classList.toggle('is-active', isActive);
+                panel.hidden = !isActive;
+            });
         }
 
         tableBody.addEventListener('input', recalcTotals);
@@ -479,6 +511,12 @@ if (empty($items)) {
                     item_name: button.getAttribute('data-item-name'),
                     unit: button.getAttribute('data-unit')
                 });
+            });
+        });
+
+        catalogTabs.forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                activateCatalogTab(tab.getAttribute('data-catalog-tab'));
             });
         });
 
@@ -519,6 +557,7 @@ if (empty($items)) {
             validateRow(row);
         });
 
+        activateCatalogTab('materials');
         syncProjectDuration();
         recalcTotals();
     })();

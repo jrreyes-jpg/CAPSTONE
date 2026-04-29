@@ -143,5 +143,6 @@ if ($isDownload) {
     </div>
 </main>
 <?php endif; ?>
+<script src="../js/sidebar_foreman.js"></script>
 </body>
 </html>

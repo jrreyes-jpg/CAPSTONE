@@ -36,13 +36,15 @@ $isWorkers = $currentFile === 'worker_summary.php';
                 </svg>
             </span>
         </button>
-        <div class="sidebar-toggle-title" aria-hidden="true">
-            <span class="sidebar-toggle-title__shine">Foreman</span>
+        <div class="sidebar-toggle-title sidebar-toggle-title--brand" aria-hidden="true">
+            <span class="sidebar-toggle-title__eyebrow">Field Ops</span>
+            <span class="sidebar-toggle-title__shine">Foreman Workspace</span>
         </div>
     </div>
 
     <div class="nav-divider"></div>
 
+    <div class="sidebar-section-label">Workspace</div>
     <ul class="nav-menu">
         <li>
             <a href="/codesamplecaps/FOREMAN/dashboards/foreman_dashboard.php" class="menu-link<?php echo $isOverview ? ' active' : ''; ?>">
@@ -189,6 +191,11 @@ $isWorkers = $currentFile === 'worker_summary.php';
                 <span class="menu-text">Worker Summary</span>
             </a>
         </li>
+    </ul>
+
+    <div class="nav-divider"></div>
+    <div class="sidebar-section-label">Account</div>
+    <ul class="nav-menu nav-menu--utility">
         <li>
             <a href="/codesamplecaps/LOGIN/php/forgot.php" class="menu-link">
                 <span class="menu-visual" aria-hidden="true">

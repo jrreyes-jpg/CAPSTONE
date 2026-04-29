@@ -49,10 +49,6 @@ try {
             throw new RuntimeException('Project duration is missing. Update the project timeline first.');
         }
 
-        if (trim((string)($payload['scope_summary'] ?? '')) === '') {
-            throw new RuntimeException('Scope summary is required.');
-        }
-
         foreach ($items as $item) {
             $itemType = (string)($item['item_type'] ?? 'other');
             $itemName = trim((string)($item['item_name'] ?? ''));
