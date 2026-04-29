@@ -5,6 +5,7 @@ $currentFile = basename($currentPath);
 $isOverview = $currentFile === 'engineer_dashboard.php';
 $isProjects = $currentFile === 'projects.php';
 $isProcurement = $currentFile === 'procurement.php';
+$isQuotations = in_array($currentFile, ['quotations.php', 'quotation_form.php'], true);
 $isTasks = $currentFile === 'tasks.php';
 $isUpdates = $currentFile === 'progress_updates.php';
 $isProfile = $currentFile === 'profile.php';
@@ -102,6 +103,22 @@ $isProfile = $currentFile === 'profile.php';
                     <span class="menu-mini-label">PO</span>
                 </span>
                 <span class="menu-text">Procurement</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/ENGINEER/dashboards/quotations.php" class="menu-link<?php echo $isQuotations ? ' active-link' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M7 4h10"></path>
+                            <path d="M7 8h10"></path>
+                            <path d="M7 12h6"></path>
+                            <path d="M6 20h12a2 2 0 0 0 2-2V6l-4-4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Quote</span>
+                </span>
+                <span class="menu-text">Quotations</span>
             </a>
         </li>
         <li>
