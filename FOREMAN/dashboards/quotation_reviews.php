@@ -38,7 +38,6 @@ if ($quotationId > 0 && $tablesReady) {
 }
 
 $items = $selectedQuotation ? quotation_module_fetch_quotation_items($conn, (int)$selectedQuotation['id']) : [];
-$reviews = $selectedQuotation ? quotation_module_fetch_reviews($conn, (int)$selectedQuotation['id']) : [];
 $isUnderReview = $selectedQuotation && (string)$selectedQuotation['status'] === 'under_review';
 ?>
 <!DOCTYPE html>
@@ -155,7 +154,7 @@ $isUnderReview = $selectedQuotation && (string)$selectedQuotation['status'] === 
 
                             <div class="review-note-banner">
                                 <strong>Foreman role in this step</strong>
-                                <p>Review manpower feasibility, field execution concerns, schedule realism, and missing scope notes. Hindi ito direct edit screen ng quotation rows.</p>
+                                <p>Review manpower feasibility, field execution concerns, schedule realism, and missing scope notes. Hindi ito direct edit screen at hindi rin ito casual comment thread.</p>
                             </div>
 
                             <div class="summary-grid">
@@ -213,30 +212,6 @@ $isUnderReview = $selectedQuotation && (string)$selectedQuotation['status'] === 
                             </div>
                         </article>
 
-                        <article class="panel-card">
-                            <div class="section-heading section-heading--responsive">
-                                <div>
-                                    <span class="section-badge">Thread</span>
-                                    <h2>Review Notes</h2>
-                                    <p>All comments stay visible so Engineer can trace review decisions.</p>
-                                </div>
-                            </div>
-
-                            <div class="review-thread">
-                                <?php if (!empty($reviews)): ?>
-                                    <?php foreach ($reviews as $review): ?>
-                                        <article class="review-card">
-                                            <small><?php echo htmlspecialchars((string)$review['full_name'] . ' | ' . quotation_module_format_datetime((string)$review['created_at'])); ?></small>
-                                            <strong><?php echo htmlspecialchars(ucwords(str_replace('_', ' ', (string)$review['review_type']))); ?></strong>
-                                            <p><?php echo nl2br(htmlspecialchars((string)$review['message'])); ?></p>
-                                        </article>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <div class="empty-state">No review notes yet.</div>
-                                <?php endif; ?>
-                            </div>
-                        </article>
-
                         <?php if ($isUnderReview): ?>
                             <form method="POST" action="/codesamplecaps/controllers/QuotationReviewController.php" class="panel-card review-form-panel">
                                 <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
@@ -245,15 +220,15 @@ $isUnderReview = $selectedQuotation && (string)$selectedQuotation['status'] === 
                                 <div class="section-heading section-heading--responsive">
                                     <div>
                                         <span class="section-badge">Action</span>
-                                        <h2>Suggestion-Only Review Panel</h2>
-                                        <p>Mag-iwan ng recommendation para sa Engineer, o ibalik ang quotation kung kailangan talagang i-revise ang draft.</p>
+                                        <h2>Foreman Feedback Panel</h2>
+                                        <p>Pwede kang magbigay ng structured feedback tungkol sa ginawa ni Engineer, pero hindi bilang open comment thread. Gamitin ito para sa feasibility note o para ibalik ang quotation kapag may issue.</p>
                                     </div>
                                 </div>
 
-                                <label class="review-form-label" for="reviewMessage">Review Message</label>
+                                <label class="review-form-label" for="reviewMessage">Foreman Feedback</label>
                                 <textarea id="reviewMessage" name="message" class="review-textarea" placeholder="Add manpower, duration, execution feasibility, or missing-scope notes..." required></textarea>
                                 <div class="review-form-actions">
-                                    <button class="btn-primary" type="submit" name="action" value="add_foreman_comment">Save Suggestion</button>
+                                    <button class="btn-primary" type="submit" name="action" value="save_suggestion">Save Suggestion</button>
                                     <button class="btn-secondary btn-secondary--danger" type="submit" name="action" value="return_to_engineer">Return To Engineer</button>
                                 </div>
                             </form>

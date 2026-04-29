@@ -31,9 +31,9 @@ try {
         throw new RuntimeException('Please enter your review note.');
     }
 
-    if ($action === 'add_foreman_comment') {
+    if ($action === 'save_suggestion') {
         $service->addForemanReview($quotationId, $userId, $role, $message, false);
-        quotation_module_set_flash('success', 'Review note added for the engineer.');
+        quotation_module_set_flash('success', 'Foreman feedback saved for the engineer.');
     } elseif ($action === 'return_to_engineer') {
         $service->addForemanReview($quotationId, $userId, $role, $message, true);
         quotation_module_set_flash('success', 'Quotation returned to the engineer.');
