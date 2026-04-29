@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../controllers/UserController.php';
 
@@ -8,12 +9,16 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] != 'super_admin') {
     exit();
 }
 
+$csrfToken = auth_csrf_token('super_admin');
 $userController = new UserController();
 
 $error = "";
 $success = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_engineer'])) {
+    if (!auth_is_valid_csrf($_POST['csrf_token'] ?? null, 'super_admin')) {
+        $error = "Security check failed. Please try again.";
+    } else {
     $full_name = trim($_POST['full_name']);
     $email = trim($_POST['email']);
     $password = trim($_POST['password']);
@@ -32,6 +37,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['create_engineer'])) {
                 $error = "Error creating account. Please try again.";
             }
         }
+    }
     }
 }
 
@@ -207,6 +213,7 @@ $engineers_result = $conn->query("SELECT id AS user_id, full_name, email, create
             <?php endif; ?>
             
             <form method="POST">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                 <input type="text" name="full_name" placeholder="Full Name" required 
                        value="<?php echo htmlspecialchars($_POST['full_name'] ?? ''); ?>">
                 

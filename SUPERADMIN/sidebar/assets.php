@@ -8,6 +8,7 @@ use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions as QRCodeOptions;
 
 require_role('super_admin');
+$csrfToken = auth_csrf_token('super_admin');
 
 $message = '';
 $error = '';
@@ -587,6 +588,11 @@ function getAssetSnapshot(mysqli $conn, int $assetId): ?array {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
+
+    if (!auth_is_valid_csrf($_POST['csrf_token'] ?? null, 'super_admin')) {
+        $_SESSION['assets_error'] = 'Security check failed. Please try again.';
+        redirect_assets_page();
+    }
 
     if ($action === 'save_asset_category_default') {
         $categoryDefaultId = (int)($_POST['category_default_id'] ?? 0);
@@ -1383,6 +1389,7 @@ if ($createdAssetId > 0) {
         <section class="form-section">
             <h2 class="dashboard-section-title">Create New Asset</h2>
             <form method="POST" class="asset-form">
+                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                 <input type="hidden" name="action" value="create_asset">
                 <div class="form-row">
                     <div class="form-group">
@@ -1600,12 +1607,14 @@ if ($createdAssetId > 0) {
                                         <div class="asset-row-actions">
                                             <?php if ($isTrashView): ?>
                                                 <form method="POST" class="asset-inline-form" onsubmit="return confirm('Restore this asset from trash bin?');">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                     <input type="hidden" name="action" value="restore_asset">
                                                     <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
                                                     <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
                                                     <button type="submit" class="btn-secondary">Restore</button>
                                                 </form>
                                                 <form method="POST" class="asset-inline-form" onsubmit="return confirm('Permanently delete this asset from trash bin?');">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                     <input type="hidden" name="action" value="permanently_delete_asset">
                                                     <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
                                                     <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
@@ -1614,6 +1623,7 @@ if ($createdAssetId > 0) {
                                             <?php else: ?>
                                                 <?php if ($availableUnits > 0): ?>
                                                     <form method="POST" class="asset-inline-form asset-action-form" data-confirm-lost="Mark the selected quantity as lost?">
+                                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                         <input type="hidden" name="action" value="mark_asset_maintenance" class="asset-action-input">
                                                         <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
                                                         <div class="asset-action-card">
@@ -1645,6 +1655,7 @@ if ($createdAssetId > 0) {
                                                 <?php endif; ?>
                                                 <?php if ($deployedUnits > 0 || $maintenanceUnits > 0 || $lostUnits > 0): ?>
                                                     <form method="POST" class="asset-inline-form asset-recovery-form">
+                                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                         <input type="hidden" name="action" value="<?php echo $deployedUnits > 0 ? 'return_asset' : ($maintenanceUnits > 0 ? 'resolve_asset_maintenance' : 'recover_asset_lost'); ?>" class="asset-recovery-action-input">
                                                         <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
                                                         <div class="asset-action-card asset-action-card--muted">
@@ -1680,6 +1691,7 @@ if ($createdAssetId > 0) {
                                                 <?php endif; ?>
                                                 <div class="asset-row-actions__secondary">
                                                     <form method="POST" class="asset-inline-form" onsubmit="return confirm('Move this asset to trash bin?');">
+                                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                         <input type="hidden" name="action" value="trash_asset">
                                                         <input type="hidden" name="asset_id" value="<?php echo $asset['id']; ?>">
                                                         <button type="submit" class="btn-danger">Delete</button>

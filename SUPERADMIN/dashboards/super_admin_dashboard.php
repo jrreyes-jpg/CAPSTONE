@@ -48,19 +48,11 @@ function isStrongPassword(string $password): bool {
 }
 
 function getCsrfToken(): string {
-    if (empty($_SESSION['csrf_token'])) {
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    }
-
-    return $_SESSION['csrf_token'];
+    return auth_csrf_token('super_admin');
 }
 
 function isValidCsrfToken(?string $token): bool {
-    if (!isset($_SESSION['csrf_token']) || !is_string($token) || $token === '') {
-        return false;
-    }
-
-    return hash_equals($_SESSION['csrf_token'], $token);
+    return auth_is_valid_csrf($token, 'super_admin');
 }
 
 function setDashboardFlash(string $type, string $text): void {

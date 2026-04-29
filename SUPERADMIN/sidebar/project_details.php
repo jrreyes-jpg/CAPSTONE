@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/asset_unit_helpers.php';
 
 require_role('super_admin');
+$csrfToken = auth_csrf_token('super_admin');
 
 function pm_get_column_type(mysqli $conn, string $tableName, string $columnName): ?string {
     $stmt = $conn->prepare(
@@ -825,6 +826,7 @@ if ($projectId > 0) {
                         <?php endif; ?>
                     </div>
                     <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" data-project-edit-form id="project-details-edit-form">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                         <input type="hidden" name="action" value="update_project_details">
                         <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                         <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -1117,6 +1119,7 @@ if ($projectId > 0) {
 
                     <div class="project-finance-forms">
                         <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form project-finance-form" data-inline-edit-form>
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                             <input type="hidden" name="action" value="save_project_budget">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -1141,6 +1144,7 @@ if ($projectId > 0) {
                         </form>
 
                         <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form project-finance-form" data-inline-edit-form>
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                             <input type="hidden" name="action" value="add_project_cost_entry">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -1177,7 +1181,8 @@ if ($projectId > 0) {
                         <?php elseif ($remainingBalance <= 0): ?>
                             <div class="empty-state">This project is already fully paid.</div>
                         <?php else: ?>
-                            <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form project-finance-form" data-inline-edit-form>
+                        <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form project-finance-form" data-inline-edit-form>
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                 <input type="hidden" name="action" value="add_project_payment">
                                 <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                                 <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -1217,6 +1222,7 @@ if ($projectId > 0) {
                     <?php if ($isCompleted): ?>
                         <div class="lock-note">This project is locked because it is already completed.</div>
                         <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form">
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                             <input type="hidden" name="action" value="reopen_project">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -1229,6 +1235,7 @@ if ($projectId > 0) {
                             <div class="alert alert-warning">Moving this project to Ongoing without a budget is allowed. Set a budget later if you want planned versus actual tracking.</div>
                         <?php endif; ?>
                         <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form" data-inline-edit-form>
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                             <input type="hidden" name="action" value="update_project_status">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -1259,6 +1266,7 @@ if ($projectId > 0) {
                             <div class="status-quick-actions">
                                 <?php if ($supportsCancelledStatus && ($project['status'] ?? '') !== 'cancelled'): ?>
                                     <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="inline-form" data-confirm-action="Cancel this project? This is for projects that will not continue.">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                         <input type="hidden" name="action" value="update_project_status">
                                         <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                                         <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -1269,6 +1277,7 @@ if ($projectId > 0) {
 
                                 <?php if ($supportsArchivedStatus && ($project['status'] ?? '') !== 'archived'): ?>
                                     <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="inline-form" data-confirm-action="Archive this project? It will stay in history but should no longer be active.">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                         <input type="hidden" name="action" value="update_project_status">
                                         <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                                         <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -1308,6 +1317,7 @@ if ($projectId > 0) {
                         <div class="empty-state">Task creation is disabled while this project is still in draft.</div>
                     <?php else: ?>
                         <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form" data-inline-edit-form>
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                             <input type="hidden" name="action" value="add_task">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -1374,6 +1384,7 @@ if ($projectId > 0) {
                                     <span>Deployed At: <?php echo htmlspecialchars($deployment['deployed_at']); ?></span>
                                     <span>Notes: <?php echo htmlspecialchars($deployment['notes'] ?: 'None'); ?></span>
                                     <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                         <input type="hidden" name="action" value="return_project_inventory">
                                         <input type="hidden" name="deployment_id" value="<?php echo (int)$deployment['id']; ?>">
                                         <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">
@@ -1404,6 +1415,7 @@ if ($projectId > 0) {
                         <div class="empty-state">No available inventory to deploy right now.</div>
                     <?php else: ?>
                         <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/projects.php" class="mini-form" data-inline-edit-form>
+                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                             <input type="hidden" name="action" value="deploy_inventory_to_project">
                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars($detailsPath); ?>">

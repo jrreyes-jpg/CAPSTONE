@@ -87,25 +87,14 @@ if (!function_exists('quotation_module_consume_flash')) {
 if (!function_exists('quotation_module_csrf_token')) {
     function quotation_module_csrf_token(): string
     {
-        auth_start_session();
-        if (empty($_SESSION['quotation_module_csrf'])) {
-            $_SESSION['quotation_module_csrf'] = bin2hex(random_bytes(32));
-        }
-
-        return $_SESSION['quotation_module_csrf'];
+        return auth_csrf_token('quotation_module');
     }
 }
 
 if (!function_exists('quotation_module_is_valid_csrf')) {
     function quotation_module_is_valid_csrf(?string $token): bool
     {
-        auth_start_session();
-
-        if (!isset($_SESSION['quotation_module_csrf']) || !is_string($token) || $token === '') {
-            return false;
-        }
-
-        return hash_equals($_SESSION['quotation_module_csrf'], $token);
+        return auth_is_valid_csrf($token, 'quotation_module');
     }
 }
 
@@ -193,7 +182,20 @@ if (!function_exists('quotation_module_fetch_engineer_projects')) {
     function quotation_module_fetch_engineer_projects(mysqli $conn, int $engineerId): array
     {
         $stmt = $conn->prepare(
-            "SELECT p.id, p.project_name, p.status, client.full_name AS client_name
+            "SELECT
+                p.id,
+                p.project_name,
+                p.status,
+                p.project_start_date,
+                p.estimated_completion_date,
+                client.full_name AS client_name,
+                CASE
+                    WHEN p.project_start_date IS NOT NULL
+                    AND p.estimated_completion_date IS NOT NULL
+                    AND p.estimated_completion_date >= p.project_start_date
+                    THEN DATEDIFF(p.estimated_completion_date, p.project_start_date) + 1
+                    ELSE NULL
+                END AS project_duration_days
              FROM projects p
              INNER JOIN project_assignments pa ON pa.project_id = p.id
              INNER JOIN users client ON client.id = p.client_id
@@ -318,6 +320,15 @@ if (!function_exists('quotation_module_fetch_quotation')) {
                 p.project_name,
                 p.project_code,
                 p.project_address,
+                p.project_start_date,
+                p.estimated_completion_date,
+                CASE
+                    WHEN p.project_start_date IS NOT NULL
+                    AND p.estimated_completion_date IS NOT NULL
+                    AND p.estimated_completion_date >= p.project_start_date
+                    THEN DATEDIFF(p.estimated_completion_date, p.project_start_date) + 1
+                    ELSE NULL
+                END AS project_duration_days,
                 c.full_name AS client_name,
                 c.email AS client_email,
                 e.full_name AS engineer_name,
@@ -468,7 +479,16 @@ if (!function_exists('quotation_module_build_form_payload')) {
         }
 
         $projectStmt = $conn->prepare(
-            "SELECT p.id, p.client_id
+            "SELECT
+                p.id,
+                p.client_id,
+                CASE
+                    WHEN p.project_start_date IS NOT NULL
+                    AND p.estimated_completion_date IS NOT NULL
+                    AND p.estimated_completion_date >= p.project_start_date
+                    THEN DATEDIFF(p.estimated_completion_date, p.project_start_date) + 1
+                    ELSE NULL
+                END AS project_duration_days
              FROM projects p
              INNER JOIN project_assignments pa ON pa.project_id = p.id
              WHERE p.id = ?
@@ -492,7 +512,7 @@ if (!function_exists('quotation_module_build_form_payload')) {
             'title' => $title,
             'scope_summary' => quotation_module_normalize_nullable_text($post['scope_summary'] ?? null),
             'currency_code' => 'PHP',
-            'estimated_duration_days' => ($post['estimated_duration_days'] ?? '') !== '' ? (int)$post['estimated_duration_days'] : null,
+            'estimated_duration_days' => isset($project['project_duration_days']) ? (int)$project['project_duration_days'] : null,
             'profit_margin_percent' => 0,
         ];
     }

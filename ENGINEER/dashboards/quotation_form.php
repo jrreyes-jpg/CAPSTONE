@@ -61,54 +61,7 @@ if (empty($items)) {
     <title>Engineer Quotation Form - Edge Automation</title>
     <link rel="stylesheet" href="../css/engineer-sidebar.css">
     <link rel="stylesheet" href="../css/engineer.css">
-    <style>
-        .quotation-shell { padding: 24px; display: grid; gap: 24px; }
-        .panel { background: #fff; border-radius: 18px; box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08); padding: 24px; }
-        .grid { display: grid; gap: 16px; }
-        .grid.two { grid-template-columns: 2fr 1fr; align-items: start; }
-        .grid.form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .flash { padding: 14px 16px; border-radius: 14px; font-weight: 600; }
-        .flash.success { background: #dcfce7; color: #166534; }
-        .flash.error { background: #fee2e2; color: #b91c1c; }
-        h1, h2, h3 { margin: 0; color: #0f172a; }
-        p { color: #475569; }
-        .helper-copy { margin-top: 8px; color: #64748b; }
-        .form-group { display: grid; gap: 8px; }
-        .form-group label { font-weight: 700; color: #334155; font-size: 0.92rem; }
-        .form-group input, .form-group select, .form-group textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 12px; padding: 12px 14px; font: inherit; }
-        .catalog-grid { display: grid; gap: 12px; max-height: 420px; overflow: auto; }
-        .catalog-card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; display: grid; gap: 8px; }
-        .catalog-card strong { color: #0f172a; }
-        .catalog-card small { color: #64748b; }
-        .btn-row, .top-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-        .btn-primary, .btn-secondary, .btn-ghost, .btn-danger { border: 0; border-radius: 12px; padding: 12px 18px; text-decoration: none; font-weight: 700; cursor: pointer; }
-        .btn-primary { background: #0f766e; color: #fff; }
-        .btn-secondary { background: #e2e8f0; color: #0f172a; }
-        .btn-ghost { background: #f8fafc; color: #0f172a; border: 1px solid #cbd5e1; }
-        .btn-danger { background: #fee2e2; color: #b91c1c; }
-        .status-pill { display: inline-flex; padding: 6px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; }
-        .status-pill.is-draft { background: #e2e8f0; color: #334155; }
-        .status-pill.is-review { background: #fef3c7; color: #92400e; }
-        .status-pill.is-approval { background: #dbeafe; color: #1d4ed8; }
-        .status-pill.is-approved { background: #dcfce7; color: #166534; }
-        .status-pill.is-sent { background: #ede9fe; color: #6d28d9; }
-        .status-pill.is-accepted { background: #ccfbf1; color: #115e59; }
-        .status-pill.is-rejected { background: #fee2e2; color: #b91c1c; }
-        .items-table { width: 100%; border-collapse: collapse; }
-        .items-table th, .items-table td { border-bottom: 1px solid #e2e8f0; padding: 10px 8px; vertical-align: top; }
-        .items-table th { color: #475569; font-size: 0.8rem; text-transform: uppercase; }
-        .items-table input, .items-table select { min-width: 100px; }
-        .totals-card { display: grid; gap: 12px; }
-        .totals-row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid #e2e8f0; }
-        .totals-row strong { color: #0f172a; }
-        .timeline, .review-thread { display: grid; gap: 12px; }
-        .timeline-card, .review-card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; }
-        .review-card small, .timeline-card small { color: #64748b; display: block; margin-bottom: 8px; }
-        .notice-card { border: 1px dashed #cbd5e1; border-radius: 14px; padding: 18px; color: #64748b; }
-        .readonly-banner { background: #eff6ff; color: #1d4ed8; padding: 14px 16px; border-radius: 14px; font-weight: 600; }
-        @media (max-width: 1200px) { .grid.two { grid-template-columns: 1fr; } }
-        @media (max-width: 760px) { .grid.form { grid-template-columns: 1fr; } .quotation-shell { padding: 16px; } }
-    </style>
+    <link rel="stylesheet" href="../css/quotation-form.css">
 </head>
 <body>
 <?php include __DIR__ . '/../sidebar/sidebar_engineer.php'; ?>
@@ -133,6 +86,7 @@ if (empty($items)) {
             <section class="panel">
                 <div class="top-actions">
                     <div>
+                        <p class="section-eyebrow">Engineer Draft Builder</p>
                         <h1><?php echo $quotation ? 'Quotation ' . htmlspecialchars((string)$quotation['quotation_no']) : 'Create New Quotation'; ?></h1>
                         <p class="helper-copy">Engineer owns the quotation draft. Foreman reviews only. Super Admin gives final approval.</p>
                     </div>
@@ -161,20 +115,27 @@ if (empty($items)) {
                         </div>
                         <div class="grid form">
                             <div class="form-group">
-                                <label for="project_id">Project</label>
+                                <label for="project_id">Project <span class="required-dot">*</span></label>
                                 <select id="project_id" name="project_id" <?php echo $canEditDraft ? '' : 'disabled'; ?> required>
                                     <option value="">Select project</option>
                                     <?php foreach ($projects as $project): ?>
                                         <?php $selectedProjectId = (int)($quotation['project_id'] ?? $prefillProjectId); ?>
-                                        <option value="<?php echo (int)$project['id']; ?>" <?php echo $selectedProjectId === (int)$project['id'] ? 'selected' : ''; ?>>
+                                        <option
+                                            value="<?php echo (int)$project['id']; ?>"
+                                            data-duration-days="<?php echo htmlspecialchars((string)($project['project_duration_days'] ?? '')); ?>"
+                                            data-start-date="<?php echo htmlspecialchars((string)($project['project_start_date'] ?? '')); ?>"
+                                            data-end-date="<?php echo htmlspecialchars((string)($project['estimated_completion_date'] ?? '')); ?>"
+                                            <?php echo $selectedProjectId === (int)$project['id'] ? 'selected' : ''; ?>
+                                        >
                                             <?php echo htmlspecialchars((string)$project['project_name'] . ' | ' . (string)$project['client_name']); ?>
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
+                                <span class="validation-note">Required. Duration syncs automatically from the project timeline.</span>
                                 <?php if (!$canEditDraft): ?><input type="hidden" name="project_id" value="<?php echo (int)$quotation['project_id']; ?>"><?php endif; ?>
                             </div>
                             <div class="form-group">
-                                <label for="foreman_reviewer_id">Foreman Reviewer</label>
+                                <label for="foreman_reviewer_id">Foreman Reviewer <span class="required-dot">*</span></label>
                                 <select id="foreman_reviewer_id" name="foreman_reviewer_id" <?php echo $canEditDraft ? '' : 'disabled'; ?>>
                                     <option value="">Select foreman</option>
                                     <?php foreach ($foremen as $foreman): ?>
@@ -183,20 +144,27 @@ if (empty($items)) {
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
+                                <span class="validation-note">Required before sending the quotation for foreman review.</span>
                                 <?php if (!$canEditDraft && !empty($quotation['foreman_reviewer_id'])): ?><input type="hidden" name="foreman_reviewer_id" value="<?php echo (int)$quotation['foreman_reviewer_id']; ?>"><?php endif; ?>
                             </div>
                             <div class="form-group">
-                                <label for="title">Quotation Title</label>
-                                <input id="title" type="text" name="title" value="<?php echo htmlspecialchars((string)($quotation['title'] ?? '')); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?> required>
+                                <label for="title">Quotation Title <span class="required-dot">*</span></label>
+                                <input id="title" type="text" name="title" minlength="5" maxlength="160" value="<?php echo htmlspecialchars((string)($quotation['title'] ?? '')); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?> required>
+                                <span class="validation-note">Required. Use a clear scope/title with at least 5 characters.</span>
                             </div>
                             <div class="form-group">
-                                <label for="estimated_duration_days">Estimated Duration (Days)</label>
-                                <input id="estimated_duration_days" type="number" min="1" name="estimated_duration_days" value="<?php echo htmlspecialchars((string)($quotation['estimated_duration_days'] ?? '')); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?>>
+                                <label for="estimated_duration_days">Estimated Duration (Days) <span class="required-dot">*</span></label>
+                                <input id="estimated_duration_days" type="number" min="1" name="estimated_duration_days" value="<?php echo htmlspecialchars((string)($quotation['estimated_duration_days'] ?? '')); ?>" readonly required>
+                                <div class="meta-strip">
+                                    <span class="field-chip">Auto-synced from project</span>
+                                    <span class="validation-note" id="durationMeta">Select a project to load the saved timeline duration.</span>
+                                </div>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="scope_summary">Scope Summary</label>
-                            <textarea id="scope_summary" name="scope_summary" rows="4" <?php echo $canEditDraft ? '' : 'readonly'; ?>><?php echo htmlspecialchars((string)($quotation['scope_summary'] ?? '')); ?></textarea>
+                            <label for="scope_summary">Scope Summary <span class="required-dot">*</span></label>
+                            <textarea id="scope_summary" name="scope_summary" rows="4" minlength="10" <?php echo $canEditDraft ? '' : 'readonly'; ?> required><?php echo htmlspecialchars((string)($quotation['scope_summary'] ?? '')); ?></textarea>
+                            <span class="validation-note">Required. Summarize the work scope, materials, or site requirement in at least 10 characters.</span>
                         </div>
                     </section>
 
@@ -215,7 +183,7 @@ if (empty($items)) {
                             <?php endif; ?>
                         </div>
 
-                        <div style="overflow:auto;">
+                        <div class="items-table-wrap">
                             <table class="items-table" id="itemsTable">
                                 <thead>
                                     <tr>
@@ -234,6 +202,7 @@ if (empty($items)) {
                                     <?php foreach ($items as $item): ?>
                                         <tr class="quotation-item-row">
                                             <td>
+                                                <span class="row-tag type-<?php echo htmlspecialchars((string)$item['item_type']); ?>"><?php echo htmlspecialchars(ucfirst((string)$item['item_type'])); ?></span>
                                                 <select name="item_type[]" class="item-type" <?php echo $canEditDraft ? '' : 'disabled'; ?>>
                                                     <?php foreach (['material', 'asset', 'manpower', 'other'] as $type): ?>
                                                         <option value="<?php echo $type; ?>" <?php echo (string)$item['item_type'] === $type ? 'selected' : ''; ?>><?php echo ucfirst($type); ?></option>
@@ -242,12 +211,12 @@ if (empty($items)) {
                                                 <input type="hidden" name="source_table[]" value="<?php echo htmlspecialchars((string)($item['source_table'] ?? '')); ?>">
                                                 <input type="hidden" name="source_id[]" value="<?php echo htmlspecialchars((string)($item['source_id'] ?? '')); ?>">
                                             </td>
-                                            <td><input type="text" name="item_name[]" value="<?php echo htmlspecialchars((string)$item['item_name']); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?> required></td>
+                                            <td><input type="text" name="item_name[]" data-quote-validate="item-name" minlength="2" maxlength="160" value="<?php echo htmlspecialchars((string)$item['item_name']); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?> required></td>
                                             <td><input type="text" name="item_description[]" value="<?php echo htmlspecialchars((string)($item['description'] ?? '')); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?>></td>
-                                            <td><input type="text" name="unit[]" value="<?php echo htmlspecialchars((string)($item['unit'] ?? 'unit')); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?>></td>
-                                            <td><input type="number" step="0.01" min="0" name="quantity[]" class="item-quantity" value="<?php echo htmlspecialchars((string)($item['quantity'] ?? 0)); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?>></td>
-                                            <td><input type="number" step="0.01" min="0" name="hours[]" class="item-hours" value="<?php echo htmlspecialchars((string)($item['hours'] ?? 0)); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?>></td>
-                                            <td><input type="number" step="0.01" min="0" name="rate[]" class="item-rate" value="<?php echo htmlspecialchars((string)($item['rate'] ?? 0)); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?>></td>
+                                            <td><input type="text" name="unit[]" value="<?php echo htmlspecialchars((string)($item['unit'] ?? 'unit')); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?> required></td>
+                                            <td><input type="number" step="0.01" min="0.01" name="quantity[]" class="item-quantity" data-quote-validate="quantity" value="<?php echo htmlspecialchars((string)($item['quantity'] ?? 0)); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?>></td>
+                                            <td><input type="number" step="0.01" min="0" name="hours[]" class="item-hours" data-quote-validate="hours" value="<?php echo htmlspecialchars((string)($item['hours'] ?? 0)); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?>></td>
+                                            <td><input type="number" step="0.01" min="0.01" name="rate[]" class="item-rate" data-quote-validate="rate" value="<?php echo htmlspecialchars((string)($item['rate'] ?? 0)); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?> required></td>
                                             <td><input type="text" class="item-total" value="<?php echo htmlspecialchars(number_format((float)($item['line_total'] ?? 0), 2)); ?>" readonly></td>
                                             <?php if ($canEditDraft): ?><td><button type="button" class="btn-danger" data-remove-row>Remove</button></td><?php endif; ?>
                                         </tr>
@@ -279,8 +248,8 @@ if (empty($items)) {
                         <div class="totals-row"><span>Assets</span><strong id="assetsTotal">PHP 0.00</strong></div>
                         <div class="totals-row"><span>Manpower</span><strong id="manpowerTotal">PHP 0.00</strong></div>
                         <div class="totals-row"><span>Other</span><strong id="otherTotal">PHP 0.00</strong></div>
-                        <div class="totals-row"><span>Total Cost</span><strong id="totalCost">PHP 0.00</strong></div>
-                        <div class="totals-row"><span>Selling Price</span><strong id="sellingPrice">PHP 0.00</strong></div>
+                        <div class="totals-row total-emphasis"><span>Total Cost</span><strong id="totalCost">PHP 0.00</strong></div>
+                        <div class="totals-row total-emphasis"><span>Selling Price</span><strong id="sellingPrice">PHP 0.00</strong></div>
                     </section>
 
                     <section class="panel">
@@ -355,7 +324,13 @@ if (empty($items)) {
 <script>
     (function () {
         var tableBody = document.getElementById('quotationItemsBody');
-        if (!tableBody) {
+        var quotationForm = document.querySelector('form[action="/codesamplecaps/controllers/QuotationController.php"]');
+        var projectField = document.getElementById('project_id');
+        var durationField = document.getElementById('estimated_duration_days');
+        var durationMeta = document.getElementById('durationMeta');
+        var foremanField = document.getElementById('foreman_reviewer_id');
+
+        if (!tableBody || !quotationForm) {
             return;
         }
 
@@ -363,11 +338,79 @@ if (empty($items)) {
             return 'PHP ' + Number(value || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
         }
 
+        function updateRowTag(row, type) {
+            var tag = row.querySelector('.row-tag');
+            if (!tag) {
+                tag = document.createElement('span');
+                tag.className = 'row-tag';
+                row.querySelector('td').insertBefore(tag, row.querySelector('.item-type'));
+            }
+
+            tag.className = 'row-tag type-' + type;
+            tag.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+        }
+
+        function syncProjectDuration() {
+            if (!projectField || !durationField) {
+                return;
+            }
+
+            var selectedOption = projectField.options[projectField.selectedIndex];
+            var durationDays = selectedOption ? String(selectedOption.getAttribute('data-duration-days') || '').trim() : '';
+            var startDate = selectedOption ? String(selectedOption.getAttribute('data-start-date') || '').trim() : '';
+            var endDate = selectedOption ? String(selectedOption.getAttribute('data-end-date') || '').trim() : '';
+
+            if (durationDays !== '') {
+                durationField.value = durationDays;
+                durationField.setCustomValidity('');
+                if (durationMeta) {
+                    durationMeta.textContent = 'Project timeline: ' + startDate + ' to ' + endDate + ' | Auto duration: ' + durationDays + ' day(s).';
+                }
+            } else {
+                durationField.value = '';
+                durationField.setCustomValidity('This project has no saved duration yet. Update the project timeline first.');
+                if (durationMeta) {
+                    durationMeta.textContent = 'This project has no saved timeline duration yet. Update it from Super Admin > Projects.';
+                }
+            }
+        }
+
+        function validateRow(row) {
+            var type = row.querySelector('.item-type').value;
+            var quantityField = row.querySelector('.item-quantity');
+            var hoursField = row.querySelector('.item-hours');
+            var rateField = row.querySelector('.item-rate');
+            var itemNameField = row.querySelector('input[name="item_name[]"]');
+            var isManpower = type === 'manpower';
+            var quantity = parseFloat(quantityField.value || '0');
+            var hours = parseFloat(hoursField.value || '0');
+            var rate = parseFloat(rateField.value || '0');
+
+            updateRowTag(row, type);
+
+            itemNameField.classList.toggle('is-invalid', itemNameField.value.trim().length < 2);
+            rateField.classList.toggle('is-invalid', rate <= 0);
+
+            if (isManpower) {
+                quantityField.value = quantityField.value === '' ? '0' : quantityField.value;
+                quantityField.setCustomValidity('');
+                hoursField.setCustomValidity(hours > 0 ? '' : 'Manpower rows require hours greater than zero.');
+                hoursField.classList.toggle('is-invalid', !(hours > 0));
+                quantityField.classList.remove('is-invalid');
+            } else {
+                quantityField.setCustomValidity(quantity > 0 ? '' : 'Quantity must be greater than zero.');
+                hoursField.setCustomValidity('');
+                quantityField.classList.toggle('is-invalid', !(quantity > 0));
+                hoursField.classList.remove('is-invalid');
+            }
+        }
+
         function calculateRow(row) {
             var type = row.querySelector('.item-type').value;
             var quantity = parseFloat(row.querySelector('.item-quantity').value || '0');
             var hours = parseFloat(row.querySelector('.item-hours').value || '0');
             var rate = parseFloat(row.querySelector('.item-rate').value || '0');
+            validateRow(row);
             var total = type === 'manpower' ? hours * rate : quantity * rate;
             row.querySelector('.item-total').value = total.toFixed(2);
             return {type: type, total: total};
@@ -392,13 +435,13 @@ if (empty($items)) {
             var row = document.createElement('tr');
             row.className = 'quotation-item-row';
             row.innerHTML =
-                '<td><select name="item_type[]" class="item-type"><option value="material">Material</option><option value="asset">Asset</option><option value="manpower">Manpower</option><option value="other">Other</option></select><input type="hidden" name="source_table[]" value=""><input type="hidden" name="source_id[]" value=""></td>' +
-                '<td><input type="text" name="item_name[]" required></td>' +
+                '<td><span class="row-tag type-other">Other</span><select name="item_type[]" class="item-type"><option value="material">Material</option><option value="asset">Asset</option><option value="manpower">Manpower</option><option value="other">Other</option></select><input type="hidden" name="source_table[]" value=""><input type="hidden" name="source_id[]" value=""></td>' +
+                '<td><input type="text" name="item_name[]" data-quote-validate="item-name" minlength="2" maxlength="160" required></td>' +
                 '<td><input type="text" name="item_description[]"></td>' +
-                '<td><input type="text" name="unit[]" value="unit"></td>' +
-                '<td><input type="number" step="0.01" min="0" name="quantity[]" class="item-quantity" value="1"></td>' +
-                '<td><input type="number" step="0.01" min="0" name="hours[]" class="item-hours" value="0"></td>' +
-                '<td><input type="number" step="0.01" min="0" name="rate[]" class="item-rate" value="0"></td>' +
+                '<td><input type="text" name="unit[]" value="unit" required></td>' +
+                '<td><input type="number" step="0.01" min="0.01" name="quantity[]" class="item-quantity" data-quote-validate="quantity" value="1"></td>' +
+                '<td><input type="number" step="0.01" min="0" name="hours[]" class="item-hours" data-quote-validate="hours" value="0"></td>' +
+                '<td><input type="number" step="0.01" min="0.01" name="rate[]" class="item-rate" data-quote-validate="rate" value="0"></td>' +
                 '<td><input type="text" class="item-total" value="0.00" readonly></td>' +
                 '<td><button type="button" class="btn-danger" data-remove-row>Remove</button></td>';
             row.querySelector('.item-type').value = data.item_type || 'other';
@@ -441,8 +484,48 @@ if (empty($items)) {
             });
         });
 
+        quotationForm.addEventListener('submit', function (event) {
+            var submitter = event.submitter;
+            var actionValue = submitter ? submitter.value : '';
+            var hasRow = tableBody.querySelectorAll('.quotation-item-row').length > 0;
+
+            syncProjectDuration();
+            recalcTotals();
+
+            if (!hasRow) {
+                event.preventDefault();
+                window.alert('Add at least one quotation item first.');
+                return;
+            }
+
+            if ((actionValue === 'submit_review' || actionValue === 'save_draft') && foremanField && !foremanField.value.trim()) {
+                if (actionValue === 'submit_review') {
+                    event.preventDefault();
+                    foremanField.focus();
+                    foremanField.setCustomValidity('Select a foreman reviewer before submitting for review.');
+                    foremanField.reportValidity();
+                    return;
+                }
+            }
+
+            if (foremanField) {
+                foremanField.setCustomValidity('');
+            }
+        });
+
+        if (projectField) {
+            projectField.addEventListener('change', syncProjectDuration);
+        }
+
+        tableBody.querySelectorAll('.quotation-item-row').forEach(function (row) {
+            updateRowTag(row, row.querySelector('.item-type').value);
+            validateRow(row);
+        });
+
+        syncProjectDuration();
         recalcTotals();
     })();
 </script>
+<script src="../js/engineer.js"></script>
 </body>
 </html>

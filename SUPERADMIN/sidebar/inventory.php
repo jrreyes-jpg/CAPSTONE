@@ -5,6 +5,7 @@ require_once __DIR__ . '/../../config/audit_log.php';
 require_once __DIR__ . '/../../config/asset_unit_helpers.php';
 
 require_role('super_admin');
+$csrfToken = auth_csrf_token('super_admin');
 
 function determine_inventory_status_for_page(int $quantity, ?int $minStock): string {
     if ($quantity <= 0) {
@@ -64,6 +65,11 @@ ensure_asset_unit_tracking_schema($conn);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
+
+    if (!auth_is_valid_csrf($_POST['csrf_token'] ?? null, 'super_admin')) {
+        set_inventory_flash('error', 'Security check failed. Please try again.');
+        redirect_inventory_page();
+    }
 
     if ($action === 'create_inventory_item') {
         $assetId = (int)($_POST['asset_id'] ?? 0);
@@ -454,6 +460,7 @@ foreach ($inventoryItems as $item) {
                     <div class="empty-state">All assets already have inventory records.</div>
                 <?php else: ?>
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                         <input type="hidden" name="action" value="create_inventory_item">
                         <div class="form-grid">
                             <div class="input-group">
@@ -579,6 +586,7 @@ foreach ($inventoryItems as $item) {
                                 <?php endif; ?>
 
                                 <form method="POST" class="mini-form">
+                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                     <input type="hidden" name="action" value="update_inventory_item">
                                     <input type="hidden" name="inventory_id" value="<?php echo (int)$item['id']; ?>">
 

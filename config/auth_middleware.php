@@ -115,3 +115,37 @@ if (!function_exists('current_user_role')) {
         return $_SESSION['role'] ?? null;
     }
 }
+
+if (!function_exists('auth_csrf_token')) {
+    function auth_csrf_token(string $namespace = 'default'): string
+    {
+        auth_start_session();
+
+        if (!isset($_SESSION['csrf_tokens']) || !is_array($_SESSION['csrf_tokens'])) {
+            $_SESSION['csrf_tokens'] = [];
+        }
+
+        if (
+            empty($_SESSION['csrf_tokens'][$namespace])
+            || !is_string($_SESSION['csrf_tokens'][$namespace])
+        ) {
+            $_SESSION['csrf_tokens'][$namespace] = bin2hex(random_bytes(32));
+        }
+
+        return $_SESSION['csrf_tokens'][$namespace];
+    }
+}
+
+if (!function_exists('auth_is_valid_csrf')) {
+    function auth_is_valid_csrf(?string $token, string $namespace = 'default'): bool
+    {
+        auth_start_session();
+
+        $sessionToken = $_SESSION['csrf_tokens'][$namespace] ?? null;
+
+        return is_string($token)
+            && $token !== ''
+            && is_string($sessionToken)
+            && hash_equals($sessionToken, $token);
+    }
+}

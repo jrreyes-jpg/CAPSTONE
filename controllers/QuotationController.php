@@ -45,6 +45,38 @@ try {
             throw new RuntimeException('Project, title, and at least one quotation item are required.');
         }
 
+        if (($payload['estimated_duration_days'] ?? null) === null || (int)$payload['estimated_duration_days'] <= 0) {
+            throw new RuntimeException('Project duration is missing. Update the project timeline first.');
+        }
+
+        if (trim((string)($payload['scope_summary'] ?? '')) === '') {
+            throw new RuntimeException('Scope summary is required.');
+        }
+
+        foreach ($items as $item) {
+            $itemType = (string)($item['item_type'] ?? 'other');
+            $itemName = trim((string)($item['item_name'] ?? ''));
+            $rate = (float)($item['rate'] ?? 0);
+            $quantity = (float)($item['quantity'] ?? 0);
+            $hours = (float)($item['hours'] ?? 0);
+
+            if ($itemName === '') {
+                throw new RuntimeException('Every quotation row needs an item name.');
+            }
+
+            if ($rate <= 0) {
+                throw new RuntimeException('Every quotation row needs a rate greater than zero.');
+            }
+
+            if ($itemType === 'manpower') {
+                if ($hours <= 0) {
+                    throw new RuntimeException('Manpower rows require hours greater than zero.');
+                }
+            } elseif ($quantity <= 0) {
+                throw new RuntimeException('Material, asset, and other rows require quantity greater than zero.');
+            }
+        }
+
         if ($quotationId > 0) {
             $service->updateDraft($quotationId, $payload, $items, $userId, $role);
             quotation_module_set_flash('success', 'Quotation draft updated.');
@@ -57,6 +89,10 @@ try {
     }
 
     if ($action === 'submit_review') {
+        if ((int)($_POST['foreman_reviewer_id'] ?? 0) <= 0) {
+            throw new RuntimeException('Please assign a foreman reviewer before submitting this quotation.');
+        }
+
         $service->submitForReview($quotationId, $userId, $role, 'Engineer submitted quotation for foreman review.');
         quotation_module_set_flash('success', 'Quotation submitted to foreman review.');
         quotation_module_redirect('/codesamplecaps/ENGINEER/dashboards/quotation_form.php?id=' . $quotationId);

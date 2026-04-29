@@ -199,9 +199,15 @@ $foremanNotifications = [
 ];
 $projectRoleSummary = project_role_summary_label('foreman');
 $flash = foreman_procurement_consume_flash();
+$csrfToken = auth_csrf_token('foreman_module');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
+
+    if (!auth_is_valid_csrf($_POST['csrf_token'] ?? null, 'foreman_module')) {
+        foreman_procurement_set_flash('error', 'Security check failed. Please try again.');
+        foreman_procurement_redirect();
+    }
 
     if ($action === 'create_purchase_request' || $action === 'update_purchase_request') {
         $projectId = (int)($_POST['project_id'] ?? 0);
@@ -532,6 +538,7 @@ foreach ($requestRows as $requestRow) {
                 <div class="empty-state">You need an assigned project first before creating a purchase request.</div>
             <?php else: ?>
                 <form method="POST" class="foreman-form-grid">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                     <input type="hidden" name="action" value="<?php echo $editRequest ? 'update_purchase_request' : 'create_purchase_request'; ?>">
                     <?php if ($editRequest): ?>
                         <input type="hidden" name="purchase_request_id" value="<?php echo (int)$editRequest['id']; ?>">
@@ -666,6 +673,7 @@ foreach ($requestRows as $requestRow) {
                                 <div class="project-card__actions">
                                     <a href="/codesamplecaps/FOREMAN/dashboards/procurement.php?edit=<?php echo (int)$requestRow['id']; ?>#create-purchase-request" class="btn-secondary">Edit</a>
                                     <form method="POST" onsubmit="return confirm('Cancel this submitted purchase request?');">
+                                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                         <input type="hidden" name="action" value="cancel_purchase_request">
                                         <input type="hidden" name="purchase_request_id" value="<?php echo (int)$requestRow['id']; ?>">
                                         <button type="submit" class="btn-danger">Cancel Request</button>

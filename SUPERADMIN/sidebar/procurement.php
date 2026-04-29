@@ -8,17 +8,12 @@ require_role('super_admin');
 
 function procurement_get_csrf_token(): string
 {
-    if (empty($_SESSION['procurement_csrf_token']) || !is_string($_SESSION['procurement_csrf_token'])) {
-        $_SESSION['procurement_csrf_token'] = bin2hex(random_bytes(32));
-    }
-
-    return $_SESSION['procurement_csrf_token'];
+    return auth_csrf_token('super_admin');
 }
 
 function procurement_is_valid_csrf_token(?string $token): bool
 {
-    $sessionToken = $_SESSION['procurement_csrf_token'] ?? null;
-    return is_string($token) && is_string($sessionToken) && hash_equals($sessionToken, $token);
+    return auth_is_valid_csrf($token, 'super_admin');
 }
 
 function procurement_redirect(): void

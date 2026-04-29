@@ -455,6 +455,7 @@ $initialStatusOptions = $supportsDraftStatus
     ? ['draft', 'pending']
     : ['pending', 'ongoing'];
 $todayDate = today_date();
+$csrfToken = auth_csrf_token('super_admin');
 
 ensure_project_inventory_deployments_table($conn);
 ensure_project_inventory_return_logs_table($conn);
@@ -994,6 +995,11 @@ function getActiveProjectInventoryDeployment(mysqli $conn, int $deploymentId): ?
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
+
+    if (!auth_is_valid_csrf($_POST['csrf_token'] ?? null, 'super_admin')) {
+        set_projects_flash('error', 'Security check failed. Please try again.');
+        redirect_projects_page();
+    }
 
     if ($action === 'restore_user') {
         $userId = (int)($_POST['user_id'] ?? 0);
@@ -3146,6 +3152,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                     <button type="button" class="btn-secondary" id="create-project-clear-details">Clear Details</button>
                 </div>
                 <form method="POST" id="create-project-form" class="project-create-form">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                     <input type="hidden" name="action" value="create_project">
 
                     <div class="project-create-top-grid">
@@ -3282,6 +3289,11 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                 </button>
                             </div>
                             <input type="date" id="estimated_completion_date" name="estimated_completion_date" value="<?php echo htmlspecialchars($createProjectValues['estimated_completion_date']); ?>" required>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="project_duration_days">Estimated Duration Days</label>
+                            <input type="number" id="project_duration_days" value="" readonly>
                         </div>
 
 
@@ -3723,12 +3735,14 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                 <div class="form-actions project-card__actions">
                                     <?php if ($isTrashView): ?>
                                         <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Restore this project from trash?');">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                             <input type="hidden" name="action" value="restore_project">
                                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                                             <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
                                             <button type="submit" class="btn-secondary">Restore</button>
                                         </form>
                                         <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Permanently delete this project? This cannot be undone.');">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                             <input type="hidden" name="action" value="permanently_delete_project">
                                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                                             <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
@@ -3737,6 +3751,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                     <?php else: ?>
                                         <a href="<?php echo htmlspecialchars($detailsPath); ?>" class="btn-primary project-card__details-btn">View Details</a>
                                         <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Move this project to trash? It will be permanently deleted after 30 days.');">
+                                            <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                             <input type="hidden" name="action" value="delete_project">
                                             <input type="hidden" name="project_id" value="<?php echo (int)$project['id']; ?>">
                                             <input type="hidden" name="redirect_to" value="<?php echo htmlspecialchars('/codesamplecaps/SUPERADMIN/sidebar/projects.php' . ($statusFilter !== '' || $searchQuery !== '' ? '?' . http_build_query(array_filter(['q' => $searchQuery, 'status' => $statusFilter])) : '')); ?>">
@@ -3802,11 +3817,13 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                         </div>
                                         <div class="form-actions project-card__actions">
                                             <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Restore this user from trash?');">
+                                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                 <input type="hidden" name="action" value="restore_user">
                                                 <input type="hidden" name="user_id" value="<?php echo (int)$trashedUser['id']; ?>">
                                                 <button type="submit" class="btn-secondary">Restore</button>
                                             </form>
                                             <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Permanently delete this user? This cannot be undone.');">
+                                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                 <input type="hidden" name="action" value="permanently_delete_user">
                                                 <input type="hidden" name="user_id" value="<?php echo (int)$trashedUser['id']; ?>">
                                                 <button type="submit" class="btn-danger">Delete Permanently</button>
@@ -3852,6 +3869,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                         <?php endif; ?>
                                         <div class="form-actions project-card__actions">
                                             <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Restore this purchase request from trash?');">
+                                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                 <input type="hidden" name="action" value="restore_purchase_request">
                                                 <input type="hidden" name="purchase_request_id" value="<?php echo (int)$trashedRequest['id']; ?>">
                                                 <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
@@ -3861,6 +3879,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                                 <div class="lock-note">Cannot permanently delete. This request already has a purchase order.</div>
                                             <?php else: ?>
                                                 <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Permanently delete this purchase request? This cannot be undone.');">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                     <input type="hidden" name="action" value="permanently_delete_purchase_request">
                                                     <input type="hidden" name="purchase_request_id" value="<?php echo (int)$trashedRequest['id']; ?>">
                                                     <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
@@ -3906,6 +3925,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                         <?php endif; ?>
                                         <div class="form-actions project-card__actions">
                                             <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Restore this supplier from trash?');">
+                                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                 <input type="hidden" name="action" value="restore_supplier">
                                                 <input type="hidden" name="supplier_id" value="<?php echo (int)$trashedSupplier['id']; ?>">
                                                 <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
@@ -3915,6 +3935,7 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                                 <div class="lock-note">Cannot permanently delete. This supplier is linked to purchase orders.</div>
                                             <?php else: ?>
                                                 <form method="POST" class="project-card__inline-form" onsubmit="return confirm('Permanently delete this supplier? This cannot be undone.');">
+                                                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                     <input type="hidden" name="action" value="permanently_delete_supplier">
                                                     <input type="hidden" name="supplier_id" value="<?php echo (int)$trashedSupplier['id']; ?>">
                                                     <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
@@ -3959,12 +3980,14 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                         </div>
                                         <div class="form-actions project-card__actions">
                                             <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/assets.php" class="project-card__inline-form" onsubmit="return confirm('Restore this asset from trash?');">
+                                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                 <input type="hidden" name="action" value="restore_asset">
                                                 <input type="hidden" name="asset_id" value="<?php echo (int)$trashedAsset['id']; ?>">
                                                 <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
                                                 <button type="submit" class="btn-secondary">Restore</button>
                                             </form>
                                             <form method="POST" action="/codesamplecaps/SUPERADMIN/sidebar/assets.php" class="project-card__inline-form" onsubmit="return confirm('Permanently delete this asset? This cannot be undone.');">
+                                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
                                                 <input type="hidden" name="action" value="permanently_delete_asset">
                                                 <input type="hidden" name="asset_id" value="<?php echo (int)$trashedAsset['id']; ?>">
                                                 <input type="hidden" name="redirect_to" value="/codesamplecaps/SUPERADMIN/sidebar/projects.php?view=trash">
@@ -4337,6 +4360,23 @@ function initCreateProjectForm() {
 
     const projectStartDateField = createProjectForm.elements.namedItem('project_start_date');
     const estimatedCompletionDateField = createProjectForm.elements.namedItem('estimated_completion_date');
+    const projectDurationField = createProjectForm.querySelector('#project_duration_days');
+
+    function calculateDurationDays(startDate, endDate) {
+        if (!startDate || !endDate) {
+            return '';
+        }
+
+        const start = new Date(startDate + 'T00:00:00');
+        const end = new Date(endDate + 'T00:00:00');
+        const diff = end.getTime() - start.getTime();
+
+        if (Number.isNaN(diff) || diff < 0) {
+            return '';
+        }
+
+        return String(Math.floor(diff / 86400000) + 1);
+    }
 
     function syncProjectTimelineValidation() {
         if (!projectStartDateField || !estimatedCompletionDateField) {
@@ -4350,6 +4390,10 @@ function initCreateProjectForm() {
             estimatedCompletionDateField.setCustomValidity('Estimated Completion Date must be the same as or later than Project Start Date.');
         } else {
             estimatedCompletionDateField.setCustomValidity('');
+        }
+
+        if (projectDurationField) {
+            projectDurationField.value = calculateDurationDays(projectStartDate, String(estimatedCompletionDateField.value || ''));
         }
     }
 
