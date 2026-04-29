@@ -115,7 +115,13 @@ if (empty($items)) {
                         </div>
                         <div class="grid form">
                             <div class="form-group">
-                                <label for="project_id">Project <span class="required-dot">*</span></label>
+                                <div class="field-label-row">
+                                    <label for="project_id">Project <span class="required-dot">*</span></label>
+                                    <button type="button" class="field-tip" aria-label="Project selection help">
+                                        <span class="field-tip__icon" aria-hidden="true">i</span>
+                                        <span class="field-tip__bubble">Select one of your assigned projects. The duration below is pulled automatically from that project's saved timeline.</span>
+                                    </button>
+                                </div>
                                 <select id="project_id" name="project_id" <?php echo $canEditDraft ? '' : 'disabled'; ?> required>
                                     <option value="">Select project</option>
                                     <?php foreach ($projects as $project): ?>
@@ -131,11 +137,16 @@ if (empty($items)) {
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
-                                <span class="validation-note">Required. Duration syncs automatically from the project timeline.</span>
                                 <?php if (!$canEditDraft): ?><input type="hidden" name="project_id" value="<?php echo (int)$quotation['project_id']; ?>"><?php endif; ?>
                             </div>
                             <div class="form-group">
-                                <label for="foreman_reviewer_id">Foreman Reviewer <span class="required-dot">*</span></label>
+                                <div class="field-label-row">
+                                    <label for="foreman_reviewer_id">Foreman Reviewer <span class="required-dot">*</span></label>
+                                    <button type="button" class="field-tip" aria-label="Foreman reviewer help">
+                                        <span class="field-tip__icon" aria-hidden="true">i</span>
+                                        <span class="field-tip__bubble">Assign the foreman who will review manpower feasibility, execution concerns, and revision notes before admin approval.</span>
+                                    </button>
+                                </div>
                                 <select id="foreman_reviewer_id" name="foreman_reviewer_id" <?php echo $canEditDraft ? '' : 'disabled'; ?>>
                                     <option value="">Select foreman</option>
                                     <?php foreach ($foremen as $foreman): ?>
@@ -144,27 +155,42 @@ if (empty($items)) {
                                         </option>
                                     <?php endforeach; ?>
                                 </select>
-                                <span class="validation-note">Required before sending the quotation for foreman review.</span>
                                 <?php if (!$canEditDraft && !empty($quotation['foreman_reviewer_id'])): ?><input type="hidden" name="foreman_reviewer_id" value="<?php echo (int)$quotation['foreman_reviewer_id']; ?>"><?php endif; ?>
                             </div>
                             <div class="form-group">
-                                <label for="title">Quotation Title <span class="required-dot">*</span></label>
+                                <div class="field-label-row">
+                                    <label for="title">Quotation Title <span class="required-dot">*</span></label>
+                                    <button type="button" class="field-tip" aria-label="Quotation title help">
+                                        <span class="field-tip__icon" aria-hidden="true">i</span>
+                                        <span class="field-tip__bubble">Use a short but clear title for the work package, site scope, or phase so reviewers can identify the quotation quickly.</span>
+                                    </button>
+                                </div>
                                 <input id="title" type="text" name="title" minlength="5" maxlength="160" value="<?php echo htmlspecialchars((string)($quotation['title'] ?? '')); ?>" <?php echo $canEditDraft ? '' : 'readonly'; ?> required>
-                                <span class="validation-note">Required. Use a clear scope/title with at least 5 characters.</span>
                             </div>
                             <div class="form-group">
-                                <label for="estimated_duration_days">Estimated Duration (Days) <span class="required-dot">*</span></label>
+                                <div class="field-label-row">
+                                    <label for="estimated_duration_days">Estimated Duration (Days) <span class="required-dot">*</span></label>
+                                    <button type="button" class="field-tip" aria-label="Estimated duration help">
+                                        <span class="field-tip__icon" aria-hidden="true">i</span>
+                                        <span class="field-tip__bubble">This is read-only here because the system syncs it directly from the project timeline set by Super Admin.</span>
+                                    </button>
+                                </div>
                                 <input id="estimated_duration_days" type="number" min="1" name="estimated_duration_days" value="<?php echo htmlspecialchars((string)($quotation['estimated_duration_days'] ?? '')); ?>" readonly required>
-                                <div class="meta-strip">
+                                <div class="field-inline-meta">
                                     <span class="field-chip">Auto-synced from project</span>
                                     <span class="validation-note" id="durationMeta">Select a project to load the saved timeline duration.</span>
                                 </div>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label for="scope_summary">Scope Summary <span class="required-dot">*</span></label>
+                            <div class="field-label-row">
+                                <label for="scope_summary">Scope Summary <span class="required-dot">*</span></label>
+                                <button type="button" class="field-tip" aria-label="Scope summary help">
+                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                    <span class="field-tip__bubble">Summarize the actual deliverable, site work, major materials, and any execution notes that matter for review and approval.</span>
+                                </button>
+                            </div>
                             <textarea id="scope_summary" name="scope_summary" rows="4" minlength="10" <?php echo $canEditDraft ? '' : 'readonly'; ?> required><?php echo htmlspecialchars((string)($quotation['scope_summary'] ?? '')); ?></textarea>
-                            <span class="validation-note">Required. Summarize the work scope, materials, or site requirement in at least 10 characters.</span>
                         </div>
                     </section>
 

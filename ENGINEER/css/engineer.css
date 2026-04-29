@@ -11,12 +11,18 @@ body {
         linear-gradient(180deg, #effaf3 0%, #f7faf8 45%, #eef4f0 100%);
 }
 
+img {
+    max-width: 100%;
+    height: auto;
+}
+
 .main-content {
     margin-left: 270px;
     min-height: 100vh;
     padding: 32px;
     transition: margin-left 0.28s ease, width 0.28s ease, padding 0.28s ease;
     width: calc(100% - 270px);
+    overflow-x: hidden;
 }
 
 .main-content.sidebar-shrink {
@@ -30,6 +36,7 @@ body {
     padding: 32px;
     transition: margin-left 0.28s ease, width 0.28s ease, padding 0.28s ease;
     width: calc(100% - 270px);
+    overflow-x: hidden;
 }
 
 .dashboard-main.sidebar-shrink {
@@ -198,6 +205,7 @@ body {
     padding: 24px;
     border-radius: 24px;
     background: rgba(255, 255, 255, 0.9);
+    min-width: 0;
 }
 
 .panel-header {
@@ -261,6 +269,71 @@ body {
 .project-list {
     display: grid;
     gap: 18px;
+}
+
+.field-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.field-tip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: help;
+    flex-shrink: 0;
+}
+
+.field-tip__icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #dcfce7;
+    border: 1px solid #86efac;
+    color: #166534;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.field-tip__bubble {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: min(260px, 80vw);
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #0f172a;
+    color: #ffffff;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    text-align: left;
+    box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+    opacity: 0;
+    transform: translateY(-4px);
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    z-index: 30;
+}
+
+.field-tip:hover .field-tip__bubble,
+.field-tip:focus-visible .field-tip__bubble {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.field-tip:focus-visible {
+    outline: 2px solid #16a34a;
+    outline-offset: 3px;
+    border-radius: 999px;
 }
 
 .stat-card {
@@ -467,6 +540,18 @@ body {
 .task-item {
     border-radius: 22px;
     background: rgba(255, 255, 255, 0.92);
+    min-width: 0;
+}
+
+.projects-grid,
+.project-list,
+.updates-list,
+.tasks-list,
+.profile-form,
+.project-card,
+.task-item,
+.update-card {
+    min-width: 0;
 }
 
 .project-card {
@@ -1514,7 +1599,8 @@ body {
     .procurement-hero,
     .panel-header,
     .project-card-header,
-    .task-update-fields {
+    .task-update-fields,
+    .field-label-row {
         display: grid;
         grid-template-columns: 1fr;
     }
@@ -1552,6 +1638,16 @@ body {
 
     .procurement-card-grid {
         grid-template-columns: 1fr;
+    }
+
+    .field-tip {
+        justify-self: start;
+    }
+
+    .field-tip__bubble {
+        left: 0;
+        right: auto;
+        width: min(240px, calc(100vw - 40px));
     }
 }
 

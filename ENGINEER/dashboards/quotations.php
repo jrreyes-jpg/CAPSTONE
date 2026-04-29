@@ -86,17 +86,17 @@ foreach ($quotations as $quotation) {
                             <tbody>
                             <?php foreach ($projects as $project): ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars((string)$project['project_name']); ?></td>
-                                    <td><?php echo htmlspecialchars((string)$project['client_name']); ?></td>
-                                    <td>
+                                    <td data-label="Project"><?php echo htmlspecialchars((string)$project['project_name']); ?></td>
+                                    <td data-label="Client"><?php echo htmlspecialchars((string)$project['client_name']); ?></td>
+                                    <td data-label="Project Duration">
                                         <?php if (!empty($project['project_duration_days'])): ?>
                                             <span class="project-duration-badge"><?php echo (int)$project['project_duration_days']; ?> day(s)</span>
                                         <?php else: ?>
                                             <span class="helper-copy">Missing project timeline</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td><span class="project-status-pill status-<?php echo htmlspecialchars((string)$project['status']); ?>"><?php echo htmlspecialchars(ucfirst((string)$project['status'])); ?></span></td>
-                                    <td><a class="btn-secondary" href="/codesamplecaps/ENGINEER/dashboards/quotation_form.php?project_id=<?php echo (int)$project['id']; ?>">Start Quotation</a></td>
+                                    <td data-label="Status"><span class="project-status-pill status-<?php echo htmlspecialchars((string)$project['status']); ?>"><?php echo htmlspecialchars(ucfirst((string)$project['status'])); ?></span></td>
+                                    <td data-label="Action"><a class="btn-secondary" href="/codesamplecaps/ENGINEER/dashboards/quotation_form.php?project_id=<?php echo (int)$project['id']; ?>">Start Quotation</a></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>
@@ -128,14 +128,14 @@ foreach ($quotations as $quotation) {
                             <tbody>
                             <?php foreach ($quotations as $quotation): ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars((string)$quotation['quotation_no']); ?></td>
-                                    <td><?php echo htmlspecialchars((string)$quotation['project_name']); ?></td>
-                                    <td><?php echo htmlspecialchars((string)($quotation['foreman_name'] ?? 'Not assigned')); ?></td>
-                                    <td><?php echo htmlspecialchars(quotation_module_format_currency($quotation['total_cost'] ?? 0)); ?></td>
-                                    <td><?php echo htmlspecialchars(quotation_module_format_currency($quotation['selling_price'] ?? 0)); ?></td>
-                                    <td><span class="status-pill <?php echo htmlspecialchars(quotation_module_status_class((string)$quotation['status'])); ?>"><?php echo htmlspecialchars(quotation_module_status_label((string)$quotation['status'])); ?></span></td>
-                                    <td><?php echo htmlspecialchars(quotation_module_format_datetime((string)$quotation['updated_at'])); ?></td>
-                                    <td><a class="btn-secondary" href="/codesamplecaps/ENGINEER/dashboards/quotation_form.php?id=<?php echo (int)$quotation['id']; ?>">Open</a></td>
+                                    <td data-label="Quotation No."><?php echo htmlspecialchars((string)$quotation['quotation_no']); ?></td>
+                                    <td data-label="Project"><?php echo htmlspecialchars((string)$quotation['project_name']); ?></td>
+                                    <td data-label="Foreman Reviewer"><?php echo htmlspecialchars((string)($quotation['foreman_name'] ?? 'Not assigned')); ?></td>
+                                    <td data-label="Total Cost"><?php echo htmlspecialchars(quotation_module_format_currency($quotation['total_cost'] ?? 0)); ?></td>
+                                    <td data-label="Selling Price"><?php echo htmlspecialchars(quotation_module_format_currency($quotation['selling_price'] ?? 0)); ?></td>
+                                    <td data-label="Status"><span class="status-pill <?php echo htmlspecialchars(quotation_module_status_class((string)$quotation['status'])); ?>"><?php echo htmlspecialchars(quotation_module_status_label((string)$quotation['status'])); ?></span></td>
+                                    <td data-label="Updated"><?php echo htmlspecialchars(quotation_module_format_datetime((string)$quotation['updated_at'])); ?></td>
+                                    <td data-label="Action"><a class="btn-secondary" href="/codesamplecaps/ENGINEER/dashboards/quotation_form.php?id=<?php echo (int)$quotation['id']; ?>">Open</a></td>
                                 </tr>
                             <?php endforeach; ?>
                             </tbody>

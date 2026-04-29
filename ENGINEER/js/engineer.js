@@ -1,4 +1,22 @@
-const setSidebarState = (isShrink) => {
+const ENGINEER_SIDEBAR_STORAGE_KEY = 'engineer.sidebar.shrink';
+
+const persistSidebarState = (isShrink) => {
+    try {
+        window.localStorage.setItem(ENGINEER_SIDEBAR_STORAGE_KEY, isShrink ? '1' : '0');
+    } catch (error) {
+        // Ignore storage failures.
+    }
+};
+
+const readSidebarState = () => {
+    try {
+        return window.localStorage.getItem(ENGINEER_SIDEBAR_STORAGE_KEY) === '1';
+    } catch (error) {
+        return false;
+    }
+};
+
+const setSidebarState = (isShrink, shouldPersist = false) => {
     const sidebar = document.querySelector('.sidebar');
     const mainContent = document.querySelector('.main-content, .dashboard-main');
     const toggleButton = document.querySelector('[data-sidebar-toggle]');
@@ -13,6 +31,10 @@ const setSidebarState = (isShrink) => {
     if (toggleButton) {
         toggleButton.setAttribute('aria-label', isShrink ? 'Expand menu' : 'Collapse menu');
         toggleButton.setAttribute('aria-expanded', String(!isShrink));
+    }
+
+    if (shouldPersist) {
+        persistSidebarState(isShrink);
     }
 };
 
@@ -127,11 +149,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidebarToggle = document.querySelector('[data-sidebar-toggle]');
     const mobileToggle = document.querySelector('[data-sidebar-mobile-toggle]');
     const overlay = document.querySelector('[data-sidebar-overlay]');
+    const applyStoredSidebarState = () => {
+        const isDesktop = window.innerWidth > 768;
+        setSidebarState(isDesktop ? readSidebarState() : false, false);
+    };
 
     sidebarToggle?.addEventListener('click', () => {
         const sidebar = document.querySelector('.sidebar');
         const nextShrinkState = !sidebar?.classList.contains('shrink');
-        setSidebarState(nextShrinkState);
+        setSidebarState(nextShrinkState, true);
     });
 
     mobileToggle?.addEventListener('click', () => {
@@ -147,6 +173,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.innerWidth > 768) {
             closeMobileSidebar();
         }
+
+        applyStoredSidebarState();
     });
 
     document.querySelectorAll('.menu-link').forEach((link) => {
@@ -159,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const taskFromQuery = new URLSearchParams(window.location.search).get('task');
     initTaskFilters();
-    setSidebarState(false);
+    applyStoredSidebarState();
 
     if (taskFromQuery) {
         window.setTimeout(() => {

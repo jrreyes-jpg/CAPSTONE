@@ -250,4 +250,57 @@
     .stats-grid {
         grid-template-columns: 1fr;
     }
+
+    .quotation-table-wrap {
+        overflow: visible;
+        border: 0;
+    }
+
+    .quotation-table,
+    .quotation-table thead,
+    .quotation-table tbody,
+    .quotation-table tr,
+    .quotation-table td {
+        display: block;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .quotation-table thead {
+        display: none;
+    }
+
+    .quotation-table tr {
+        margin-bottom: 14px;
+        padding: 14px;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        background: #fff;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .quotation-table td {
+        padding: 10px 0;
+        border-bottom: 1px solid #edf2f7;
+    }
+
+    .quotation-table td:last-child {
+        border-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .quotation-table td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 4px;
+        color: #64748b;
+        font-size: 0.76rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+
+    .quotation-table td .btn-secondary {
+        width: 100%;
+    }
 }
