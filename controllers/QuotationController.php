@@ -18,8 +18,18 @@ if (!quotation_module_is_valid_csrf($_POST['csrf_token'] ?? null)) {
 }
 
 if (!quotation_module_tables_ready($conn)) {
-    quotation_module_set_flash('error', 'Quotation tables are not ready yet. Run scripts/setup_quotation_tables.php first.');
-    quotation_module_redirect('/codesamplecaps/ENGINEER/dashboards/quotations.php');
+    $bootstrap = quotation_module_bootstrap_tables($conn);
+    if (!($bootstrap['ready'] ?? false)) {
+        $message = 'Quotation tables are not ready yet.';
+        if (!empty($bootstrap['errors'])) {
+            $message .= ' ' . implode(' | ', array_unique(array_map('strval', $bootstrap['errors'])));
+        } else {
+            $message .= ' Run scripts/setup_quotation_tables.php first.';
+        }
+
+        quotation_module_set_flash('error', $message);
+        quotation_module_redirect('/codesamplecaps/ENGINEER/dashboards/quotations.php');
+    }
 }
 
 $action = trim((string)($_POST['action'] ?? ''));

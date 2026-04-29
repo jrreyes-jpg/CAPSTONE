@@ -9,7 +9,8 @@ $userId = (int)($_SESSION['user_id'] ?? 0);
 $quotationId = (int)($_GET['id'] ?? 0);
 $prefillProjectId = (int)($_GET['project_id'] ?? 0);
 $flash = quotation_module_consume_flash();
-$tablesReady = quotation_module_tables_ready($conn);
+$bootstrap = quotation_module_bootstrap_tables($conn);
+$tablesReady = (bool)($bootstrap['ready'] ?? false);
 $csrfToken = quotation_module_csrf_token();
 $projects = $tablesReady ? quotation_module_fetch_engineer_projects($conn, $userId) : [];
 $foremen = $tablesReady ? quotation_module_fetch_foremen($conn) : [];
@@ -117,10 +118,16 @@ if (empty($items)) {
             <div class="flash <?php echo htmlspecialchars((string)$flash['type']); ?>"><?php echo htmlspecialchars((string)$flash['message']); ?></div>
         <?php endif; ?>
 
+        <?php if (!empty($bootstrap['errors'])): ?>
+            <div class="flash error">
+                Quotation setup failed: <?php echo htmlspecialchars(implode(' | ', array_unique(array_map('strval', $bootstrap['errors'])))); ?>
+            </div>
+        <?php endif; ?>
+
         <?php if (!$tablesReady): ?>
             <section class="panel">
                 <h1>Quotation Setup Needed</h1>
-                <p class="helper-copy">Run <code>scripts/setup_quotation_tables.php</code> before using the quotation module.</p>
+                <p class="helper-copy">The app tried to create the quotation tables automatically, but they are still unavailable. Run <code>scripts/setup_quotation_tables.php</code> if the database account blocks table creation.</p>
             </section>
         <?php else: ?>
             <section class="panel">

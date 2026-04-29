@@ -3,6 +3,7 @@
 require_once __DIR__ . '/auth_middleware.php';
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/quotation_access.php';
+require_once __DIR__ . '/quotation_schema.php';
 
 if (!function_exists('quotation_module_table_exists')) {
     function quotation_module_table_exists(mysqli $conn, string $tableName): bool
@@ -30,13 +31,34 @@ if (!function_exists('quotation_module_table_exists')) {
 if (!function_exists('quotation_module_tables_ready')) {
     function quotation_module_tables_ready(mysqli $conn): bool
     {
-        foreach (['quotations', 'quotation_items', 'quotation_reviews', 'quotation_status_history'] as $tableName) {
+        foreach (quotation_module_required_tables() as $tableName) {
             if (!quotation_module_table_exists($conn, $tableName)) {
                 return false;
             }
         }
 
         return true;
+    }
+}
+
+if (!function_exists('quotation_module_bootstrap_tables')) {
+    function quotation_module_bootstrap_tables(mysqli $conn): array
+    {
+        if (quotation_module_tables_ready($conn)) {
+            return [
+                'ready' => true,
+                'created' => false,
+                'errors' => [],
+            ];
+        }
+
+        $result = quotation_module_ensure_schema($conn);
+
+        return [
+            'ready' => quotation_module_tables_ready($conn),
+            'created' => (bool)($result['success'] ?? false),
+            'errors' => is_array($result['errors'] ?? null) ? $result['errors'] : [],
+        ];
     }
 }
 

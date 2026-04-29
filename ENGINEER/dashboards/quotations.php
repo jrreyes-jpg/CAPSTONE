@@ -7,7 +7,8 @@ require_role('engineer');
 
 $userId = (int)($_SESSION['user_id'] ?? 0);
 $flash = quotation_module_consume_flash();
-$tablesReady = quotation_module_tables_ready($conn);
+$bootstrap = quotation_module_bootstrap_tables($conn);
+$tablesReady = (bool)($bootstrap['ready'] ?? false);
 $quotations = $tablesReady ? quotation_module_fetch_quotations($conn, 'engineer', $userId) : [];
 $projects = $tablesReady ? quotation_module_fetch_engineer_projects($conn, $userId) : [];
 
@@ -83,6 +84,12 @@ foreach ($quotations as $quotation) {
             </div>
         <?php endif; ?>
 
+        <?php if (!empty($bootstrap['errors'])): ?>
+            <div class="flash error">
+                Quotation setup failed: <?php echo htmlspecialchars(implode(' | ', array_unique(array_map('strval', $bootstrap['errors'])))); ?>
+            </div>
+        <?php endif; ?>
+
         <section class="quotation-hero">
             <div>
                 <h1>Quotation Workspace</h1>
@@ -97,7 +104,7 @@ foreach ($quotations as $quotation) {
         <?php if (!$tablesReady): ?>
             <section class="quotation-panel">
                 <h2>Setup Needed</h2>
-                <p class="helper-copy">Run <code>scripts/setup_quotation_tables.php</code> first so the quotation module tables exist.</p>
+                <p class="helper-copy">The system tried to prepare quotation tables automatically, but they are still unavailable. Run <code>scripts/setup_quotation_tables.php</code> if the database user cannot create tables from the app.</p>
             </section>
         <?php else: ?>
             <section class="stats-grid" aria-label="Quotation summary">
