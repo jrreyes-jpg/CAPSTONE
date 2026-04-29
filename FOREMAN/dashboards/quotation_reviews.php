@@ -152,10 +152,6 @@ $isUnderReview = $selectedQuotation && (string)$selectedQuotation['status'] === 
                                 </div>
                             </div>
 
-                            <div class="review-note-banner">
-                                <strong>Foreman role in this step</strong>
-                                <p>Review manpower feasibility, field execution concerns, schedule realism, and missing scope notes. Hindi ito direct edit screen at hindi rin ito casual comment thread.</p>
-                            </div>
 
                             <div class="summary-grid">
                                 <article class="summary-card">
@@ -172,6 +168,47 @@ $isUnderReview = $selectedQuotation && (string)$selectedQuotation['status'] === 
                                 </article>
                             </div>
                         </article>
+
+                        <?php if ($isUnderReview): ?>
+                            <form method="POST" action="/codesamplecaps/controllers/QuotationReviewController.php" class="panel-card review-form-panel review-form-panel--priority">
+                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
+                                <input type="hidden" name="quotation_id" value="<?php echo (int)$selectedQuotation['id']; ?>">
+
+                                <div class="section-heading section-heading--responsive">
+                                    <div>
+                                        <span class="section-badge">Action Required</span>
+                                        <h2>Foreman Feedback Panel</h2>
+                                        <p>Dito ka mag-iinput ng feedback. Isulat ang note sa textbox sa ibaba, tapos piliin kung suggestion lang ba ito o ibabalik sa Engineer.</p>
+                                    </div>
+                                </div>
+
+                                <div class="review-action-guide">
+                                    <article class="review-action-card">
+                                        <strong>Save Suggestion</strong>
+                                        <p>Mag-type ng feedback sa textbox, then pindutin ito kung recommendation lang at hindi kailangan ibalik ang quotation.</p>
+                                    </article>
+                                    <article class="review-action-card review-action-card--danger">
+                                        <strong>Return To Engineer</strong>
+                                        <p>Mag-type ng reason sa textbox, then pindutin ito kung may issue na kailangan talagang i-revise ni Engineer.</p>
+                                    </article>
+                                </div>
+
+                                <label class="review-form-label" for="reviewMessage">Input Your Feedback Here</label>
+                                <textarea id="reviewMessage" name="message" class="review-textarea" placeholder="Halimbawa: Kulang ang manpower para matapos sa 7 days. Recommend additional 2 helpers for conduit installation." required></textarea>
+                                <p class="review-form-helper">Textbox ito para sa note ni Foreman. Pagkatapos magsulat, piliin ang button sa ibaba.</p>
+                                <div class="review-form-actions">
+                                    <button class="btn-primary" type="submit" name="action" value="save_suggestion">Save Suggestion</button>
+                                    <button class="btn-secondary btn-secondary--danger" type="submit" name="action" value="return_to_engineer">Return To Engineer</button>
+                                </div>
+                            </form>
+                        <?php else: ?>
+                            <article class="panel-card review-status-panel">
+                                <div class="review-status-banner">
+                                    <strong>Feedback actions are currently unavailable</strong>
+                                    <p>Makikita lang ang input box at ang buttons kapag ang quotation status ay <code>Under Review</code>. Ang current status nito ay <strong><?php echo htmlspecialchars(quotation_module_status_label((string)$selectedQuotation['status'])); ?></strong>.</p>
+                                </div>
+                            </article>
+                        <?php endif; ?>
 
                         <article class="panel-card">
                             <div class="section-heading section-heading--responsive">
@@ -211,32 +248,6 @@ $isUnderReview = $selectedQuotation && (string)$selectedQuotation['status'] === 
                                 </table>
                             </div>
                         </article>
-
-                        <?php if ($isUnderReview): ?>
-                            <form method="POST" action="/codesamplecaps/controllers/QuotationReviewController.php" class="panel-card review-form-panel">
-                                <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($csrfToken); ?>">
-                                <input type="hidden" name="quotation_id" value="<?php echo (int)$selectedQuotation['id']; ?>">
-
-                                <div class="section-heading section-heading--responsive">
-                                    <div>
-                                        <span class="section-badge">Action</span>
-                                        <h2>Foreman Feedback Panel</h2>
-                                        <p>Pwede kang magbigay ng structured feedback tungkol sa ginawa ni Engineer, pero hindi bilang open comment thread. Gamitin ito para sa feasibility note o para ibalik ang quotation kapag may issue.</p>
-                                    </div>
-                                </div>
-
-                                <label class="review-form-label" for="reviewMessage">Foreman Feedback</label>
-                                <textarea id="reviewMessage" name="message" class="review-textarea" placeholder="Add manpower, duration, execution feasibility, or missing-scope notes..." required></textarea>
-                                <div class="review-form-actions">
-                                    <button class="btn-primary" type="submit" name="action" value="save_suggestion">Save Suggestion</button>
-                                    <button class="btn-secondary btn-secondary--danger" type="submit" name="action" value="return_to_engineer">Return To Engineer</button>
-                                </div>
-                            </form>
-                        <?php else: ?>
-                            <article class="panel-card">
-                                <div class="empty-state">This quotation is no longer in the active foreman review stage. Notes remain viewable for audit and coordination.</div>
-                            </article>
-                        <?php endif; ?>
                     <?php else: ?>
                         <article class="panel-card">
                             <div class="empty-state">Select a quotation from your queue to review it.</div>

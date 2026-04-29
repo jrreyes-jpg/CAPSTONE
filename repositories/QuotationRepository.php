@@ -79,7 +79,7 @@ class QuotationRepository
         );
 
         $stmt->bind_param(
-            'ssiiddddddddiii',
+            'ssiidddddddddii',
             $payload['title'],
             $payload['scope_summary'],
             $payload['foreman_reviewer_id'],
@@ -193,7 +193,7 @@ class QuotationRepository
         $approvedBy = $approvedAt !== null ? $actedBy : null;
         $sentBy = $sentAt !== null ? $actedBy : null;
         $stmt->bind_param(
-            'siiiissiisiii',
+            'siiiissisiii',
             $status,
             $approvedBy,
             $approvedBy,
