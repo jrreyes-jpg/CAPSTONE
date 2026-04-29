@@ -506,6 +506,7 @@ function set_projects_old_input(array $input, ?string $focusField = null): void 
         'start_date' => trim((string)($input['start_date'] ?? '')),
         'project_start_date' => trim((string)($input['project_start_date'] ?? '')),
         'estimated_completion_date' => trim((string)($input['estimated_completion_date'] ?? '')),
+        'estimated_duration_days' => trim((string)($input['estimated_duration_days'] ?? '')),
         'budget_amount' => trim((string)($input['budget_amount'] ?? '')),
         'budget_notes' => trim((string)($input['budget_notes'] ?? '')),
         'focus_field' => $focusField,
@@ -523,6 +524,48 @@ function normalize_text(?string $value): string {
 function normalize_date_or_null(?string $value): ?string {
     $value = trim((string)$value);
     return $value === '' ? null : $value;
+}
+
+function normalize_positive_int_or_null($value): ?int {
+    $value = trim((string)$value);
+    if ($value === '') {
+        return null;
+    }
+
+    $normalized = (int)$value;
+    return $normalized > 0 ? $normalized : null;
+}
+
+function calculate_estimated_completion_date(?string $projectStartDate, ?int $estimatedDurationDays): ?string {
+    if ($projectStartDate === null || $estimatedDurationDays === null || $estimatedDurationDays <= 0) {
+        return null;
+    }
+
+    try {
+        $startDate = new DateTimeImmutable($projectStartDate);
+        return $startDate->modify('+' . ($estimatedDurationDays - 1) . ' days')->format('Y-m-d');
+    } catch (Throwable $exception) {
+        return null;
+    }
+}
+
+function calculate_project_duration_days(?string $projectStartDate, ?string $estimatedCompletionDate): ?int {
+    if ($projectStartDate === null || $estimatedCompletionDate === null) {
+        return null;
+    }
+
+    try {
+        $startDate = new DateTimeImmutable($projectStartDate);
+        $endDate = new DateTimeImmutable($estimatedCompletionDate);
+
+        if ($endDate < $startDate) {
+            return null;
+        }
+
+        return ((int)$startDate->diff($endDate)->format('%a')) + 1;
+    } catch (Throwable $exception) {
+        return null;
+    }
 }
 
 function blank_project_additional_info_row(): array {
@@ -1130,6 +1173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $startDate = normalize_date_or_null($_POST['start_date'] ?? null);
         $projectStartDate = $hasProjectStartDateColumn ? normalize_date_or_null($_POST['project_start_date'] ?? null) : null;
         $estimatedCompletionDate = $hasEstimatedCompletionDateColumn ? normalize_date_or_null($_POST['estimated_completion_date'] ?? null) : null;
+        $estimatedDurationDays = normalize_positive_int_or_null($_POST['estimated_duration_days'] ?? null);
         $endDate = null;
         $budgetAmount = normalize_money_or_null($_POST['budget_amount'] ?? null);
         $budgetNotes = normalize_text_or_null($_POST['budget_notes'] ?? null);
@@ -1151,6 +1195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'start_date' => $_POST['start_date'] ?? '',
             'project_start_date' => $_POST['project_start_date'] ?? '',
             'estimated_completion_date' => $_POST['estimated_completion_date'] ?? '',
+            'estimated_duration_days' => $_POST['estimated_duration_days'] ?? '',
             'budget_amount' => $_POST['budget_amount'] ?? '',
             'budget_notes' => $_POST['budget_notes'] ?? '',
         ];
@@ -1275,6 +1320,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             set_projects_old_input($createProjectInput, 'project_start_date');
             set_projects_flash('error', 'Project Start Date must be the same as or later than P.O Date.');
             redirect_projects_page();
+        }
+
+        if (($_POST['estimated_duration_days'] ?? '') !== '' && $estimatedDurationDays === null) {
+            set_projects_old_input($createProjectInput, 'estimated_duration_days');
+            set_projects_flash('error', 'Estimated Duration Days must be greater than zero.');
+            redirect_projects_page();
+        }
+
+        if ($projectStartDate !== null && $estimatedDurationDays !== null) {
+            $estimatedCompletionDate = calculate_estimated_completion_date($projectStartDate, $estimatedDurationDays);
         }
 
         if ($hasEstimatedCompletionDateColumn && $estimatedCompletionDate === null) {
@@ -2854,6 +2909,7 @@ $createProjectValues = [
     'start_date' => array_key_exists('start_date', $createProjectOldInput) ? (string)$createProjectOldInput['start_date'] : $todayDate,
     'project_start_date' => (string)($createProjectOldInput['project_start_date'] ?? ''),
     'estimated_completion_date' => (string)($createProjectOldInput['estimated_completion_date'] ?? ''),
+    'estimated_duration_days' => (string)($createProjectOldInput['estimated_duration_days'] ?? ''),
     'budget_amount' => (string)($createProjectOldInput['budget_amount'] ?? ''),
     'budget_notes' => (string)($createProjectOldInput['budget_notes'] ?? ''),
 ];
@@ -3269,15 +3325,34 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                             </div>
                         </div>
                         
-                            <div class="input-group">
+                        <div class="input-group">
                             <div class="field-label-row">
                                 <label for="project_start_date">Project Start Date <span class="required-indicator" aria-hidden="true">*</span></label>
                                 <button type="button" class="field-tip" aria-label="Project start date help">
                                     <span class="field-tip__icon" aria-hidden="true">i</span>
-                                    <span class="field-tip__bubble">Set the planned date when project work should begin.</span>
+                                    <span class="field-tip__bubble">Set the planned date when project work should begin. This must be the same as or later than the P.O Date.</span>
                                 </button>
                             </div>
                             <input type="date" id="project_start_date" name="project_start_date" value="<?php echo htmlspecialchars($createProjectValues['project_start_date']); ?>" required>
+                        </div>
+
+                        <div class="input-group">
+                            <div class="field-label-row">
+                                <label for="estimated_duration_days">Estimated Duration Days <span class="required-indicator" aria-hidden="true">*</span></label>
+                                <button type="button" class="field-tip" aria-label="Estimated duration days help">
+                                    <span class="field-tip__icon" aria-hidden="true">i</span>
+                                    <span class="field-tip__bubble">Enter the planned number of working days for this project. Once filled, the Estimated Completion Date updates automatically.</span>
+                                </button>
+                            </div>
+                            <input
+                                type="number"
+                                id="estimated_duration_days"
+                                name="estimated_duration_days"
+                                min="1"
+                                step="1"
+                                value="<?php echo htmlspecialchars($createProjectValues['estimated_duration_days'] !== '' ? $createProjectValues['estimated_duration_days'] : (string)(calculate_project_duration_days(normalize_date_or_null($createProjectValues['project_start_date']), normalize_date_or_null($createProjectValues['estimated_completion_date'])) ?? '')); ?>"
+                                required
+                            >
                         </div>
 
                         <div class="input-group">
@@ -3289,11 +3364,6 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                 </button>
                             </div>
                             <input type="date" id="estimated_completion_date" name="estimated_completion_date" value="<?php echo htmlspecialchars($createProjectValues['estimated_completion_date']); ?>" required>
-                        </div>
-
-                        <div class="input-group">
-                            <label for="project_duration_days">Estimated Duration Days</label>
-                            <input type="number" id="project_duration_days" value="" readonly>
                         </div>
 
 
@@ -4360,7 +4430,8 @@ function initCreateProjectForm() {
 
     const projectStartDateField = createProjectForm.elements.namedItem('project_start_date');
     const estimatedCompletionDateField = createProjectForm.elements.namedItem('estimated_completion_date');
-    const projectDurationField = createProjectForm.querySelector('#project_duration_days');
+    const projectDurationField = createProjectForm.elements.namedItem('estimated_duration_days');
+    const poDateField = createProjectForm.elements.namedItem('start_date');
 
     function calculateDurationDays(startDate, endDate) {
         if (!startDate || !endDate) {
@@ -4378,13 +4449,57 @@ function initCreateProjectForm() {
         return String(Math.floor(diff / 86400000) + 1);
     }
 
-    function syncProjectTimelineValidation() {
+    function calculateEstimatedCompletionDate(startDate, durationDays) {
+        if (!startDate || !durationDays) {
+            return '';
+        }
+
+        const normalizedDuration = Number(durationDays);
+        if (!Number.isFinite(normalizedDuration) || normalizedDuration <= 0) {
+            return '';
+        }
+
+        const start = new Date(startDate + 'T00:00:00');
+        if (Number.isNaN(start.getTime())) {
+            return '';
+        }
+
+        start.setDate(start.getDate() + normalizedDuration - 1);
+        const year = start.getFullYear();
+        const month = String(start.getMonth() + 1).padStart(2, '0');
+        const day = String(start.getDate()).padStart(2, '0');
+
+        return year + '-' + month + '-' + day;
+    }
+
+    function syncProjectTimelineValidation(source) {
         if (!projectStartDateField || !estimatedCompletionDateField) {
             return;
         }
 
+        const poDate = poDateField ? String(poDateField.value || '') : '';
         const projectStartDate = String(projectStartDateField.value || '');
+        if (poDateField) {
+            projectStartDateField.min = poDate;
+        }
         estimatedCompletionDateField.min = projectStartDate;
+
+        if (source === 'duration' && projectDurationField) {
+            const nextCompletionDate = calculateEstimatedCompletionDate(projectStartDate, String(projectDurationField.value || ''));
+            if (nextCompletionDate !== '') {
+                estimatedCompletionDateField.value = nextCompletionDate;
+            }
+        }
+
+        if (source === 'completion' && projectDurationField) {
+            projectDurationField.value = calculateDurationDays(projectStartDate, String(estimatedCompletionDateField.value || ''));
+        }
+
+        if (poDate !== '' && projectStartDate !== '' && projectStartDate < poDate) {
+            projectStartDateField.setCustomValidity('Project Start Date must be the same as or later than P.O Date.');
+        } else {
+            projectStartDateField.setCustomValidity('');
+        }
 
         if (projectStartDate !== '' && String(estimatedCompletionDateField.value || '') !== '' && estimatedCompletionDateField.value < projectStartDate) {
             estimatedCompletionDateField.setCustomValidity('Estimated Completion Date must be the same as or later than Project Start Date.');
@@ -4392,15 +4507,29 @@ function initCreateProjectForm() {
             estimatedCompletionDateField.setCustomValidity('');
         }
 
-        if (projectDurationField) {
+        if (projectDurationField && source !== 'completion') {
             projectDurationField.value = calculateDurationDays(projectStartDate, String(estimatedCompletionDateField.value || ''));
         }
     }
 
     if (projectStartDateField && estimatedCompletionDateField) {
-        projectStartDateField.addEventListener('input', syncProjectTimelineValidation);
-        estimatedCompletionDateField.addEventListener('input', syncProjectTimelineValidation);
-        syncProjectTimelineValidation();
+        if (poDateField) {
+            poDateField.addEventListener('input', function () {
+                syncProjectTimelineValidation('po');
+            });
+        }
+        projectStartDateField.addEventListener('input', function () {
+            syncProjectTimelineValidation('start');
+        });
+        estimatedCompletionDateField.addEventListener('input', function () {
+            syncProjectTimelineValidation('completion');
+        });
+        if (projectDurationField) {
+            projectDurationField.addEventListener('input', function () {
+                syncProjectTimelineValidation('duration');
+            });
+        }
+        syncProjectTimelineValidation('init');
     }
 
     if (focusFieldName !== '') {
