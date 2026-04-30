@@ -90,6 +90,61 @@ $foremanNotifications = [
             <article class="panel-card">
                 <div class="section-heading">
                     <div>
+                        <span class="section-badge">Foreman Scope</span>
+                        <h2>Reports You Actually Need</h2>
+                        <p>Foreman reporting stays focused on field execution, manpower, materials, and assigned-project follow-through.</p>
+                    </div>
+                </div>
+
+                <div class="reports-preview-list">
+                    <article class="reports-preview-item">
+                        <div class="reports-preview-item__main">
+                            <div class="reports-preview-item__top">
+                                <span class="report-pill report-pill--neutral">Daily Site</span>
+                            </div>
+                            <h3>Daily site and progress reports</h3>
+                            <p>Use this workspace for assigned-project field updates and issue follow-up.</p>
+                        </div>
+                        <a class="btn-secondary reports-inline-action" href="/codesamplecaps/FOREMAN/dashboards/report_list.php">Open</a>
+                    </article>
+                    <article class="reports-preview-item">
+                        <div class="reports-preview-item__main">
+                            <div class="reports-preview-item__top">
+                                <span class="report-pill report-pill--neutral">Manpower</span>
+                            </div>
+                            <h3>Attendance and worker summary</h3>
+                            <p>Review manpower visibility and team-level field status.</p>
+                        </div>
+                        <a class="btn-secondary reports-inline-action" href="/codesamplecaps/FOREMAN/dashboards/worker_summary.php">Open</a>
+                    </article>
+                    <article class="reports-preview-item">
+                        <div class="reports-preview-item__main">
+                            <div class="reports-preview-item__top">
+                                <span class="report-pill report-pill--neutral">Materials</span>
+                            </div>
+                            <h3>Material usage and site asset logs</h3>
+                            <p>Track actual field consumption and on-site movement.</p>
+                        </div>
+                        <a class="btn-secondary reports-inline-action" href="/codesamplecaps/FOREMAN/dashboards/usage_logs.php">Open</a>
+                    </article>
+                    <article class="reports-preview-item">
+                        <div class="reports-preview-item__main">
+                            <div class="reports-preview-item__top">
+                                <span class="report-pill report-pill--neutral">Procurement</span>
+                            </div>
+                            <h3>Material requests and task completion flow</h3>
+                            <p>Follow requests that support site delivery and execution.</p>
+                        </div>
+                        <a class="btn-secondary reports-inline-action" href="/codesamplecaps/FOREMAN/dashboards/procurement.php">Open</a>
+                    </article>
+                </div>
+            </article>
+        </section>
+
+        <section class="content-grid reports-dashboard-grid">
+            <article class="panel-card">
+                <div class="section-heading">
+                    <div>
                         <span class="section-badge">Critical Queue</span>
                         <h2>Top 5 Priority Items</h2>
                         <p>This preview stays intentionally short so the dashboard remains useful even when the report list grows.</p>

@@ -6,6 +6,7 @@ $isOverview = $currentFile === 'engineer_dashboard.php';
 $isProjects = $currentFile === 'projects.php';
 $isProcurement = $currentFile === 'procurement.php';
 $isQuotations = in_array($currentFile, ['quotations.php', 'quotation_form.php'], true);
+$isReports = $currentFile === 'reports.php';
 $isTasks = $currentFile === 'tasks.php';
 $isUpdates = $currentFile === 'progress_updates.php';
 $isProfile = $currentFile === 'profile.php';
@@ -119,6 +120,22 @@ $isProfile = $currentFile === 'profile.php';
                     <span class="menu-mini-label">Quote</span>
                 </span>
                 <span class="menu-text">Quotations</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/ENGINEER/dashboards/reports.php" class="menu-link<?php echo $isReports ? ' active-link' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M5 19h14"></path>
+                            <path d="M7 16V9"></path>
+                            <path d="M12 16V5"></path>
+                            <path d="M17 16v-4"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Rpt</span>
+                </span>
+                <span class="menu-text">Reports</span>
             </a>
         </li>
         <li>

@@ -13,6 +13,7 @@ $isProjectsTrash = $isProjects && str_contains($currentQuery, 'view=trash');
 $isInventory = str_contains($currentPath, '/SUPERADMIN/sidebar/inventory.php');
 $isAssets = str_contains($currentPath, '/SUPERADMIN/sidebar/assets.php');
 $isQuotations = str_contains($currentPath, '/SUPERADMIN/sidebar/quotations.php');
+$isReports = str_contains($currentPath, '/SUPERADMIN/sidebar/reports.php');
 $isScanHistory = str_contains($currentPath, '/SUPERADMIN/sidebar/scan_history.php');
 $isActivityHistory = str_contains($currentPath, '/SUPERADMIN/sidebar/activity_history.php');
 $superAdminProfileName = (string)($_SESSION['name'] ?? 'Super Admin');
@@ -459,6 +460,22 @@ $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName
                     <span class="menu-mini-label">Quote</span>
                 </span>
                 <span class="menu-text">Quotations</span>
+            </a>
+        </li>
+        <li>
+            <a href="/codesamplecaps/SUPERADMIN/sidebar/reports.php" class="menu-link<?php echo $isReports ? ' active' : ''; ?>">
+                <span class="menu-visual" aria-hidden="true">
+                    <span class="menu-icon">
+                        <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+                            <path d="M5 19h14"></path>
+                            <path d="M7 16V9"></path>
+                            <path d="M12 16V5"></path>
+                            <path d="M17 16v-4"></path>
+                        </svg>
+                    </span>
+                    <span class="menu-mini-label">Rpt</span>
+                </span>
+                <span class="menu-text">Reports</span>
             </a>
         </li>
         <li>

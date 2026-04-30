@@ -1,3 +1,10 @@
+<?php
+$currentPath = str_replace('\\', '/', parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '');
+$currentFile = basename($currentPath);
+$isClientDashboard = $currentFile === 'client_dashboard.php';
+$isClientQuotations = $currentFile === 'quotations.php';
+$isClientReports = $currentFile === 'reports.php';
+?>
 <button id="sidebarMobileToggle" class="sidebar-mobile-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">
     <span></span>
     <span></span>
@@ -22,7 +29,7 @@
     <nav class="nav-menu" aria-label="Client menu">
         <ul class="sidebar-menu">
             <li>
-                <a href="../dashboards/client_dashboard.php#overview-section" class="menu-link" data-section-link="overview-section">
+                <a href="../dashboards/client_dashboard.php#overview-section" class="menu-link<?php echo $isClientDashboard ? ' active-link active' : ''; ?>" data-section-link="overview-section">
                     <span class="menu-visual" aria-hidden="true">
                         <span class="menu-icon">
                             <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false">
@@ -35,7 +42,7 @@
                 </a>
             </li>
             <li>
-                <a href="../dashboards/client_dashboard.php#projects-tab" class="menu-link" data-section-link="projects-tab">
+                <a href="../dashboards/client_dashboard.php#projects-tab" class="menu-link<?php echo $isClientDashboard ? ' active-link active' : ''; ?>" data-section-link="projects-tab">
                     <span class="menu-visual" aria-hidden="true">
                         <span class="menu-icon">
                             <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false">
@@ -48,7 +55,7 @@
                 </a>
             </li>
             <li>
-                <a href="../dashboards/quotations.php" class="menu-link">
+                <a href="../dashboards/quotations.php" class="menu-link<?php echo $isClientQuotations ? ' active-link active' : ''; ?>">
                     <span class="menu-visual" aria-hidden="true">
                         <span class="menu-icon">
                             <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false">
@@ -64,7 +71,23 @@
                 </a>
             </li>
             <li>
-                <a href="../dashboards/client_dashboard.php#profile-tab" class="menu-link" data-section-link="profile-tab">
+                <a href="../dashboards/reports.php" class="menu-link<?php echo $isClientReports ? ' active-link active' : ''; ?>">
+                    <span class="menu-visual" aria-hidden="true">
+                        <span class="menu-icon">
+                            <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false">
+                                <path d="M5 19h14"></path>
+                                <path d="M7 16V9"></path>
+                                <path d="M12 16V5"></path>
+                                <path d="M17 16v-4"></path>
+                            </svg>
+                        </span>
+                        <span class="menu-mini-label">Rpt</span>
+                    </span>
+                    <span class="menu-text">Reports</span>
+                </a>
+            </li>
+            <li>
+                <a href="../dashboards/client_dashboard.php#profile-tab" class="menu-link<?php echo $isClientDashboard ? ' active-link active' : ''; ?>" data-section-link="profile-tab">
                     <span class="menu-visual" aria-hidden="true">
                         <span class="menu-icon">
                             <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false">
