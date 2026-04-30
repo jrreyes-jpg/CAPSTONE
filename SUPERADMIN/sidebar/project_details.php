@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/asset_unit_helpers.php';
+require_once __DIR__ . '/../../config/project_progress.php';
 
 require_role('super_admin');
 $csrfToken = auth_csrf_token('super_admin');
@@ -668,17 +669,10 @@ if ($projectId > 0) {
                 $assignedEngineerIds = array_values(array_filter(array_map('intval', explode(',', (string)($project['engineer_ids_csv'] ?? '')))));
                 $assignedEngineerNames = trim((string)($project['engineer_names'] ?? ''));
                 $defaultTaskEngineerId = $assignedEngineerIds[0] ?? 0;
-                $totalTasks = (int)($project['total_tasks'] ?? 0);
-                $completedTasks = (int)($project['completed_tasks'] ?? 0);
-                $completionRate = $totalTasks > 0
-                    ? (int)round(($completedTasks / $totalTasks) * 100)
-                    : ($isCompleted ? 100 : 0);
-                $progressSummary = $totalTasks > 0
-                    ? $completedTasks . ' of ' . $totalTasks . ' tasks finished'
-                    : ($isCompleted ? 'Project completed with no tracked tasks' : 'No tasks tracked yet');
-                $progressStatSummary = $totalTasks > 0
-                    ? $completedTasks . ' / ' . $totalTasks . ' tasks done'
-                    : ($isCompleted ? 'No tracked tasks' : '0 / 0 tasks done');
+                $projectProgress = build_role_project_progress($project, 'super_admin');
+                $completionRate = (int)$projectProgress['percent'];
+                $progressSummary = (string)$projectProgress['summary'];
+                $progressStatSummary = (string)$projectProgress['hint'];
                 $budgetAmount = (float)($projectFinancials['budget_amount'] ?? 0);
                 $budgetNotes = trim((string)($projectFinancials['budget_notes'] ?? ''));
                 $totalCost = (float)($projectFinancials['total_cost'] ?? 0);

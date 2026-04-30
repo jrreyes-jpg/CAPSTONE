@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/project_access.php';
+require_once __DIR__ . '/../../config/project_progress.php';
 require_once __DIR__ . '/../includes/foreman_helpers.php';
 
 require_role('foreman');
@@ -87,9 +88,7 @@ $projectRoleSummary = project_role_summary_label('foreman');
                     <?php foreach ($assignedProjects as $project): ?>
                         <?php
                         $projectStatus = (string)($project['status'] ?? 'pending');
-                        $totalTasks = (int)($project['total_tasks'] ?? 0);
-                        $completedTasks = (int)($project['completed_tasks'] ?? 0);
-                        $progressPercent = $totalTasks > 0 ? (int)round(($completedTasks / $totalTasks) * 100) : 0;
+                        $projectProgress = build_role_project_progress($project, 'foreman');
                         $deadlineMeta = foreman_build_deadline_meta($project['next_deadline'] ?? null, $projectStatus);
                         ?>
                         <article class="project-card">
@@ -126,8 +125,8 @@ $projectRoleSummary = project_role_summary_label('foreman');
 
                             <div class="project-meta">
                                 <div>
-                                    <span>Progress</span>
-                                    <strong><?php echo $completedTasks; ?> / <?php echo $totalTasks; ?> tasks done</strong>
+                                    <span><?php echo htmlspecialchars((string)$projectProgress['label']); ?></span>
+                                    <strong><?php echo htmlspecialchars((string)$projectProgress['summary']); ?></strong>
                                 </div>
                                 <div>
                                     <span>Open Work</span>
@@ -135,13 +134,14 @@ $projectRoleSummary = project_role_summary_label('foreman');
                                 </div>
                                 <div>
                                     <span>Completion</span>
-                                    <strong><?php echo $progressPercent; ?>%</strong>
+                                    <strong><?php echo (int)$projectProgress['percent']; ?>%</strong>
                                 </div>
                                 <div>
                                     <span>Deadline</span>
                                     <strong><span class="status-badge <?php echo htmlspecialchars($deadlineMeta['class']); ?>"><?php echo htmlspecialchars($deadlineMeta['label']); ?></span></strong>
                                 </div>
                             </div>
+                            <p class="page-hero__copy page-hero__copy--compact"><?php echo htmlspecialchars((string)$projectProgress['hint']); ?></p>
                         </article>
                     <?php endforeach; ?>
                 </div>

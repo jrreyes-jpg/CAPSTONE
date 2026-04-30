@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/project_progress.php';
 require_once __DIR__ . '/../../config/quotation_module.php';
 require_once __DIR__ . '/../includes/client_shell.php';
 
@@ -100,7 +101,11 @@ foreach ($quotationRows as $quotationRow) {
     }
 }
 
-$overallProgress = $overallTasks > 0 ? (int)round(($completedTasks / $overallTasks) * 100) : 0;
+$clientProgressTotals = 0;
+foreach ($projectRows as $projectRow) {
+    $clientProgressTotals += (int)build_role_project_progress($projectRow, 'client')['percent'];
+}
+$overallProgress = $totalProjects > 0 ? (int)round($clientProgressTotals / $totalProjects) : 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -319,14 +324,16 @@ $overallProgress = $overallTasks > 0 ? (int)round(($completedTasks / $overallTas
             <div class="project-report-list">
                 <?php if (!empty($projectRows)): ?>
                     <?php foreach ($projectRows as $projectRow): ?>
+                        <?php $projectProgress = build_role_project_progress($projectRow, 'client'); ?>
                         <article class="project-report-card">
                             <h3><?php echo htmlspecialchars((string)$projectRow['project_name']); ?></h3>
-                            <p>Status: <?php echo htmlspecialchars(ucfirst((string)$projectRow['status'])); ?></p>
+                            <p><?php echo htmlspecialchars((string)$projectProgress['label']); ?>: <?php echo (int)$projectProgress['percent']; ?>% | Status: <?php echo htmlspecialchars(ucfirst((string)$projectRow['status'])); ?></p>
                             <div class="report-meta">
                                 <span>Start: <?php echo htmlspecialchars(client_reports_format_date($projectRow['start_date'] ?? null)); ?></span>
                                 <span>End: <?php echo htmlspecialchars(client_reports_format_date($projectRow['end_date'] ?? null)); ?></span>
-                                <span>Tasks done: <?php echo (int)($projectRow['completed_tasks'] ?? 0); ?>/<?php echo (int)($projectRow['total_tasks'] ?? 0); ?></span>
+                                <span><?php echo htmlspecialchars((string)$projectProgress['summary']); ?></span>
                             </div>
+                            <p><?php echo htmlspecialchars((string)$projectProgress['hint']); ?></p>
                         </article>
                     <?php endforeach; ?>
                 <?php else: ?>

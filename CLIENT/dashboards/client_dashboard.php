@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/project_progress.php';
 
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'client') {
     header('Location: ../../LOGIN/php/login.php');
@@ -230,9 +231,11 @@ foreach ($projectRows as $project) {
 }
 
 $activeProjectCount = $ongoingCount + $pendingCount + $onHoldCount;
-$overallProgressPercent = $overallTasks > 0
-    ? (int)round(($overallCompletedTasks / $overallTasks) * 100)
-    : ($totalCount > 0 ? (int)round(($completedCount / max(1, $totalCount)) * 100) : 0);
+$clientProgressTotals = 0;
+foreach ($projectRows as $project) {
+    $clientProgressTotals += (int)build_role_project_progress($project, 'client')['percent'];
+}
+$overallProgressPercent = $totalCount > 0 ? (int)round($clientProgressTotals / $totalCount) : 0;
 $nextDeadlineDisplay = $nextDeadlineValue !== null ? client_format_date($nextDeadlineValue) : 'No active deadline';
 $nextDeadlineHint = $nextDeadlineValue !== null
     ? 'Closest open target across your current projects'
@@ -491,11 +494,7 @@ $notificationItems = [
                         <?php foreach ($projectRows as $project): ?>
                             <?php
                             $projectStatus = (string)($project['status'] ?? 'pending');
-                            $projectTotalTasks = (int)($project['total_tasks'] ?? 0);
-                            $projectCompletedTasks = (int)($project['completed_tasks'] ?? 0);
-                            $projectProgressPercent = $projectTotalTasks > 0
-                                ? (int)round(($projectCompletedTasks / $projectTotalTasks) * 100)
-                                : ($projectStatus === 'completed' ? 100 : 0);
+                            $projectProgress = build_role_project_progress($project, 'client');
                             $deadlineMeta = client_build_deadline_meta($project['next_deadline'] ?? null, $projectStatus);
                             $projectDescription = trim((string)($project['description'] ?? ''));
                             if ($projectDescription === '') {
@@ -544,13 +543,14 @@ $notificationItems = [
 
                                 <div class="project-progress">
                                     <div class="project-progress__meta">
-                                        <strong><?php echo $projectProgressPercent; ?>%</strong>
-                                        <span><?php echo $projectCompletedTasks; ?> of <?php echo $projectTotalTasks; ?> tasks completed</span>
+                                        <strong><?php echo (int)$projectProgress['percent']; ?>%</strong>
+                                        <span><?php echo htmlspecialchars((string)$projectProgress['summary']); ?></span>
                                     </div>
                                     <div class="project-progress__bar" aria-hidden="true">
-                                        <span style="width: <?php echo $projectProgressPercent; ?>%;"></span>
+                                        <span style="width: <?php echo (int)$projectProgress['percent']; ?>%;"></span>
                                     </div>
                                 </div>
+                                <p class="project-card__description"><?php echo htmlspecialchars((string)$projectProgress['hint']); ?></p>
 
                                 <div class="project-card__footer">
                                     <span class="project-pill"><?php echo (int)($project['ongoing_tasks'] ?? 0); ?> active tasks</span>

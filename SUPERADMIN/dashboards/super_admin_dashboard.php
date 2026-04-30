@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/audit_log.php';
+require_once __DIR__ . '/../../config/project_progress.php';
 require_once __DIR__ . '/../../config/profile_photo_storage.php';
 
 require_role('super_admin');
@@ -1059,7 +1060,13 @@ $activeDeployments = hasTable($conn, 'project_inventory_deployments')
 $activeEngineerCount = count(array_filter($engineers, static fn(array $user): bool => ($user['status'] ?? 'inactive') === 'active'));
 $activeForemanCount = count(array_filter($foremen, static fn(array $user): bool => ($user['status'] ?? 'inactive') === 'active'));
 $activeClientCount = count(array_filter($clients, static fn(array $user): bool => ($user['status'] ?? 'inactive') === 'active'));
-$projectCompletionRate = $totalProjects > 0 ? (int)round(($completedProjects / $totalProjects) * 100) : 0;
+$projectCompletionRate = $totalProjects > 0
+    ? project_progress_clamp(
+        (($completedProjects / $totalProjects) * 100)
+        + (($ongoingProjects / $totalProjects) * 35)
+        - (($onHoldProjects / $totalProjects) * 10)
+    )
+    : 0;
 $taskDelayRate = $totalTasks > 0 ? (int)round(($delayedTasks / $totalTasks) * 100) : 0;
 $inventoryAlertCount = $lowStockItems + $outOfStockItems;
 $inventoryAlertRate = $inventoryItems > 0 ? (int)round(($inventoryAlertCount / $inventoryItems) * 100) : 0;

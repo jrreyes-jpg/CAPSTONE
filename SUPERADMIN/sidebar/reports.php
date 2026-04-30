@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../config/project_progress.php';
 require_once __DIR__ . '/../../config/quotation_module.php';
 
 require_role('super_admin');
@@ -42,6 +43,8 @@ $activeUsers = super_admin_reports_scalar($conn, "SELECT COUNT(*) FROM users WHE
 $totalProjects = super_admin_reports_scalar($conn, "SELECT COUNT(*) FROM projects");
 $activeProjects = super_admin_reports_scalar($conn, "SELECT COUNT(*) FROM projects WHERE status IN ('pending', 'ongoing', 'on-hold')");
 $completedProjects = super_admin_reports_scalar($conn, "SELECT COUNT(*) FROM projects WHERE status = 'completed'");
+$ongoingProjects = super_admin_reports_scalar($conn, "SELECT COUNT(*) FROM projects WHERE status = 'ongoing'");
+$onHoldProjects = super_admin_reports_scalar($conn, "SELECT COUNT(*) FROM projects WHERE status = 'on-hold'");
 $taskCount = super_admin_reports_scalar($conn, 'SELECT COUNT(*) FROM tasks');
 $auditLogCount = super_admin_reports_table_exists($conn, 'audit_logs')
     ? super_admin_reports_scalar($conn, 'SELECT COUNT(*) FROM audit_logs')
@@ -54,6 +57,13 @@ $pendingPurchaseOrders = super_admin_reports_table_exists($conn, 'purchase_order
     : 0;
 $inventoryAlerts = super_admin_reports_table_exists($conn, 'inventory')
     ? super_admin_reports_scalar($conn, "SELECT COUNT(*) FROM inventory WHERE status IN ('low-stock', 'out-of-stock')")
+    : 0;
+$portfolioProgress = $totalProjects > 0
+    ? project_progress_clamp(
+        (($completedProjects / $totalProjects) * 100)
+        + (($ongoingProjects / $totalProjects) * 35)
+        - (($onHoldProjects / $totalProjects) * 10)
+    )
     : 0;
 ?>
 <!DOCTYPE html>
@@ -251,12 +261,16 @@ $inventoryAlerts = super_admin_reports_table_exists($conn, 'inventory')
                         <strong><?php echo $totalProjects; ?></strong>
                     </div>
                     <div class="report-stat-card">
-                        <span>Total tasks</span>
-                        <strong><?php echo $taskCount; ?></strong>
+                        <span>Portfolio progress</span>
+                        <strong><?php echo $portfolioProgress; ?>%</strong>
                     </div>
                     <div class="report-stat-card">
                         <span>Audit rows</span>
                         <strong><?php echo $auditLogCount; ?></strong>
+                    </div>
+                    <div class="report-stat-card">
+                        <span>Total tasks</span>
+                        <strong><?php echo $taskCount; ?></strong>
                     </div>
                 </div>
             </div>

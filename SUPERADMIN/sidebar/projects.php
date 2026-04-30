@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/audit_log.php';
 require_once __DIR__ . '/../../config/asset_unit_helpers.php';
+require_once __DIR__ . '/../../config/project_progress.php';
 require_once __DIR__ . '/project_search_support.php';
 
 require_role('super_admin');
@@ -3709,7 +3710,10 @@ $portfolioRemainingBudget = $totalBudgetAmount - $totalTrackedCost;
                                             <div><strong>Address:</strong> <?php echo htmlspecialchars($project['project_address'] ?? 'Not set'); ?></div>
                                         <?php endif; ?>
                                         <div><strong>Completed:</strong> <?php echo htmlspecialchars($project['end_date'] ?? 'N/A'); ?></div>
-                                        <div><strong>Tasks:</strong> <?php echo (int)$project['completed_tasks']; ?> / <?php echo (int)$project['total_tasks']; ?> completed</div>
+                                        <?php $projectProgress = build_role_project_progress($project, 'super_admin'); ?>
+                                        <div><strong><?php echo htmlspecialchars((string)$projectProgress['label']); ?>:</strong> <?php echo (int)$projectProgress['percent']; ?>%</div>
+                                        <div><strong>Progress Summary:</strong> <?php echo htmlspecialchars((string)$projectProgress['summary']); ?></div>
+                                        <div><strong>Admin Insight:</strong> <?php echo htmlspecialchars((string)$projectProgress['hint']); ?></div>
                                     </div>
                                 </div>
 

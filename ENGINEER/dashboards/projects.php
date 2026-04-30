@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/audit_log.php';
+require_once __DIR__ . '/../../config/project_progress.php';
 require_once __DIR__ . '/../includes/engineer_helpers.php';
 
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'engineer') {
@@ -39,9 +40,7 @@ $data = engineer_fetch_data($conn, $userId, $taskStatusOptions);
         <?php if (!empty($data['assigned_projects'])): ?>
             <?php foreach ($data['assigned_projects'] as $project): ?>
                 <?php
-                $projectTotalTasks = (int)($project['total_tasks'] ?? 0);
-                $projectCompletedTasks = (int)($project['completed_tasks'] ?? 0);
-                $projectProgressPercent = $projectTotalTasks > 0 ? (int)round(($projectCompletedTasks / $projectTotalTasks) * 100) : 0;
+                $projectProgress = build_role_project_progress($project, 'engineer');
                 $projectDeadlineMeta = engineer_build_deadline_meta($project['next_deadline'] ?? null, (string)($project['status'] ?? 'pending'));
                 ?>
                 <div class="project-card">
@@ -58,13 +57,14 @@ $data = engineer_fetch_data($conn, $userId, $taskStatusOptions);
                     </p>
                     <div class="project-progress">
                         <div class="project-progress__meta">
-                            <strong><?php echo $projectProgressPercent; ?>%</strong>
-                            <span><?php echo $projectCompletedTasks; ?> of <?php echo $projectTotalTasks; ?> tasks done</span>
+                            <strong><?php echo (int)$projectProgress['percent']; ?>%</strong>
+                            <span><?php echo htmlspecialchars((string)$projectProgress['summary']); ?></span>
                         </div>
                         <div class="project-progress__bar">
-                            <span style="width: <?php echo $projectProgressPercent; ?>%;"></span>
+                            <span style="width: <?php echo (int)$projectProgress['percent']; ?>%;"></span>
                         </div>
                     </div>
+                    <p class="section-caption"><?php echo htmlspecialchars((string)$projectProgress['hint']); ?></p>
                     <div class="project-mini-stats">
                         <span>Ongoing: <?php echo (int)($project['ongoing_tasks'] ?? 0); ?></span>
                         <span>Delayed: <?php echo (int)($project['delayed_tasks'] ?? 0); ?></span>

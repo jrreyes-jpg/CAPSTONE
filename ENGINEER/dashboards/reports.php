@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/quotation_module.php';
+require_once __DIR__ . '/../../config/project_progress.php';
 require_once __DIR__ . '/../includes/engineer_helpers.php';
 
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'engineer') {
@@ -295,6 +296,7 @@ foreach ($quotationRows as $quotationRow) {
         <div class="report-project-list">
             <?php if (!empty($assignedProjects)): ?>
                 <?php foreach ($assignedProjects as $project): ?>
+                    <?php $projectProgress = build_role_project_progress($project, 'engineer'); ?>
                     <article class="report-project-card">
                         <h3><?php echo htmlspecialchars((string)$project['project_name']); ?></h3>
                         <p><?php echo htmlspecialchars((string)($project['description'] ?? 'Assigned project reporting workspace.')); ?></p>
@@ -302,7 +304,9 @@ foreach ($quotationRows as $quotationRow) {
                             <span>Status: <?php echo htmlspecialchars(ucfirst((string)($project['status'] ?? 'pending'))); ?></span>
                             <span>Start: <?php echo htmlspecialchars(engineer_format_project_date($project['start_date'] ?? null)); ?></span>
                             <span>End: <?php echo htmlspecialchars(engineer_format_project_date($project['end_date'] ?? null)); ?></span>
+                            <span><?php echo htmlspecialchars((string)$projectProgress['label']); ?>: <?php echo (int)$projectProgress['percent']; ?>%</span>
                         </div>
+                        <p><?php echo htmlspecialchars((string)$projectProgress['summary']); ?></p>
                     </article>
                 <?php endforeach; ?>
             <?php else: ?>
