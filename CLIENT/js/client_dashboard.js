@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const tabButtons = document.querySelectorAll('[data-tab-target]');
     const jumpButtons = document.querySelectorAll('[data-jump-section], [data-jump-tab]');
     const sectionPanels = document.querySelectorAll('.tab-content');
+    const hasDashboardSections = sectionPanels.length > 0;
     const projectSearchRoot = document.querySelector('[data-client-project-search]');
     const projectSearchInput = document.getElementById('client-project-search');
     const projectSearchClear = document.getElementById('client-project-search-clear');
@@ -75,6 +76,10 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     const syncNavigationState = function (activeSectionId) {
+        if (!hasDashboardSections) {
+            return;
+        }
+
         sectionLinks.forEach(function (link) {
             const isActive = link.dataset.sectionLink === activeSectionId;
             link.classList.toggle('active-link', isActive);
@@ -90,6 +95,10 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     const activateSection = function (sectionId, options) {
+        if (!hasDashboardSections) {
+            return;
+        }
+
         const settings = Object.assign({ updateHash: true }, options || {});
         let targetPanel = document.getElementById(sectionId);
 
@@ -325,6 +334,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     sectionLinks.forEach(function (link) {
         link.addEventListener('click', function (event) {
+            if (!hasDashboardSections) {
+                return;
+            }
+
             const sectionId = link.dataset.sectionLink;
 
             if (!sectionId) {
@@ -339,6 +352,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     jumpButtons.forEach(function (button) {
         button.addEventListener('click', function () {
+            if (!hasDashboardSections) {
+                return;
+            }
+
             const sectionId = button.dataset.jumpSection || button.dataset.jumpTab;
 
             if (!sectionId) {
@@ -352,6 +369,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     tabButtons.forEach(function (button) {
         button.addEventListener('click', function () {
+            if (!hasDashboardSections) {
+                return;
+            }
+
             const sectionId = button.dataset.tabTarget;
             if (!sectionId) {
                 return;
@@ -508,11 +529,15 @@ document.addEventListener('DOMContentLoaded', function () {
         mobileMedia.addListener(applyResponsiveSidebarState);
     }
 
-    activateSection(window.location.hash.replace('#', '') || defaultSectionId, { updateHash: false });
+    if (hasDashboardSections) {
+        activateSection(window.location.hash.replace('#', '') || defaultSectionId, { updateHash: false });
+    }
     updateProjectSearchClear();
     applyProjectSearch();
 
-    window.addEventListener('hashchange', function () {
-        activateSection(window.location.hash.replace('#', '') || defaultSectionId, { updateHash: false });
-    });
+    if (hasDashboardSections) {
+        window.addEventListener('hashchange', function () {
+            activateSection(window.location.hash.replace('#', '') || defaultSectionId, { updateHash: false });
+        });
+    }
 });

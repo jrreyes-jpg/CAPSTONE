@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/quotation_module.php';
+require_once __DIR__ . '/../includes/client_shell.php';
 
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'client') {
     header('Location: ../../LOGIN/php/login.php');
@@ -10,6 +11,9 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'client') {
 
 $userId = (int)($_SESSION['user_id'] ?? 0);
 $clientName = trim((string)($_SESSION['name'] ?? 'Client User'));
+$clientEmail = trim((string)($_SESSION['email'] ?? ''));
+$clientEmailDisplay = $clientEmail !== '' ? $clientEmail : 'No email on record';
+$shellContext = client_shell_build_topbar_context($conn, $userId, $clientName, $clientEmailDisplay);
 
 function client_reports_format_date(?string $value): string
 {
@@ -242,6 +246,7 @@ $overallProgress = $overallTasks > 0 ? (int)round(($completedTasks / $overallTas
 </head>
 <body>
 <?php include __DIR__ . '/../sidebar/client_sidebar.php'; ?>
+<?php client_shell_render_topbar($shellContext); ?>
 <main class="main-content" id="mainContent">
     <div class="reports-shell">
         <section class="reports-hero">

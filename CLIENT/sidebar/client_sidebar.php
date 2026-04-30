@@ -1,7 +1,6 @@
 <?php
 $currentPath = str_replace('\\', '/', parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '');
 $currentFile = basename($currentPath);
-$isClientDashboard = $currentFile === 'client_dashboard.php';
 $isClientQuotations = $currentFile === 'quotations.php';
 $isClientReports = $currentFile === 'reports.php';
 ?>
@@ -29,7 +28,7 @@ $isClientReports = $currentFile === 'reports.php';
     <nav class="nav-menu" aria-label="Client menu">
         <ul class="sidebar-menu">
             <li>
-                <a href="../dashboards/client_dashboard.php#overview-section" class="menu-link<?php echo $isClientDashboard ? ' active-link active' : ''; ?>" data-section-link="overview-section">
+                <a href="../dashboards/client_dashboard.php#overview-section" class="menu-link" data-section-link="overview-section">
                     <span class="menu-visual" aria-hidden="true">
                         <span class="menu-icon">
                             <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false">
@@ -42,7 +41,7 @@ $isClientReports = $currentFile === 'reports.php';
                 </a>
             </li>
             <li>
-                <a href="../dashboards/client_dashboard.php#projects-tab" class="menu-link<?php echo $isClientDashboard ? ' active-link active' : ''; ?>" data-section-link="projects-tab">
+                <a href="../dashboards/client_dashboard.php#projects-tab" class="menu-link" data-section-link="projects-tab">
                     <span class="menu-visual" aria-hidden="true">
                         <span class="menu-icon">
                             <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false">
@@ -87,7 +86,7 @@ $isClientReports = $currentFile === 'reports.php';
                 </a>
             </li>
             <li>
-                <a href="../dashboards/client_dashboard.php#profile-tab" class="menu-link<?php echo $isClientDashboard ? ' active-link active' : ''; ?>" data-section-link="profile-tab">
+                <a href="../dashboards/client_dashboard.php#profile-tab" class="menu-link" data-section-link="profile-tab">
                     <span class="menu-visual" aria-hidden="true">
                         <span class="menu-icon">
                             <svg class="menu-icon-svg" viewBox="0 0 24 24" focusable="false">
