@@ -59,6 +59,39 @@ function pm_format_date(?string $value): string {
     }
 }
 
+function pm_relative_time_label(?string $value): string {
+    $value = trim((string)$value);
+    if ($value === '') {
+        return 'No recent update';
+    }
+
+    try {
+        $date = new DateTimeImmutable($value);
+        $now = new DateTimeImmutable();
+        $diff = $now->getTimestamp() - $date->getTimestamp();
+
+        if ($diff < 60) {
+            return 'Just now';
+        }
+
+        if ($diff < 3600) {
+            return floor($diff / 60) . ' mins ago';
+        }
+
+        if ($diff < 86400) {
+            return floor($diff / 3600) . ' hrs ago';
+        }
+
+        if ($diff < 604800) {
+            return floor($diff / 86400) . ' days ago';
+        }
+
+        return $date->format('M j, Y');
+    } catch (Throwable $exception) {
+        return $value;
+    }
+}
+
 function pm_build_budget_health(float $budgetAmount, float $totalCost): array {
     if ($budgetAmount <= 0) {
         return ['status' => 'unplanned', 'label' => 'No budget set'];
@@ -695,11 +728,104 @@ if ($projectId > 0) {
                 } else {
                     $paymentStatusDetail = 'No payment recorded yet';
                 }
+                $delayedTaskCount = 0;
+                $ongoingTaskCount = 0;
+                $pendingTaskCount = 0;
+                foreach ($tasks as $taskItem) {
+                    $taskStatus = strtolower(trim((string)($taskItem['status'] ?? 'pending')));
+                    if ($taskStatus === 'delayed') {
+                        $delayedTaskCount++;
+                    } elseif ($taskStatus === 'ongoing') {
+                        $ongoingTaskCount++;
+                    } elseif ($taskStatus === 'pending') {
+                        $pendingTaskCount++;
+                    }
+                }
+                $pulseSignal = max(12, min(100, (int)$completionRate));
+                $projectCreatedAt = trim((string)($project['created_at'] ?? ''));
+                $latestTrackedEventAt = $projectCreatedAt;
+                $paymentLatestAt = trim((string)($projectPaymentEntries[0]['payment_date'] ?? ''));
+                $costLatestAt = trim((string)($projectCostEntries[0]['cost_date'] ?? ''));
+                $deploymentLatestAt = trim((string)($deploymentHistory[0]['deployed_at'] ?? ''));
+                foreach ([$paymentLatestAt, $costLatestAt, $deploymentLatestAt] as $candidateDate) {
+                    if ($candidateDate !== '' && ($latestTrackedEventAt === '' || strtotime($candidateDate) > strtotime($latestTrackedEventAt))) {
+                        $latestTrackedEventAt = $candidateDate;
+                    }
+                }
                 $projectCode = trim((string)($project['project_code'] ?? ''));
                 $projectPoNumber = trim((string)($project['po_number'] ?? ''));
                 $projectContactPerson = trim((string)($project['contact_person'] ?? ''));
                 $projectContactNumber = trim((string)($project['contact_number'] ?? ''));
                 $projectEmail = trim((string)($project['project_email'] ?? ''));
+                $planningStageClass = $projectCreatedAt !== '' ? 'done' : 'pending';
+                $quotationStageClass = ($projectPoNumber !== '' || trim((string)($project['start_date'] ?? '')) !== '') ? 'done' : 'pending';
+                // Ensure $completedTasks is defined before use
+                $completedTasks = isset($project['completed_tasks']) ? (int)$project['completed_tasks'] : 0;
+                if (($project['status'] ?? '') === 'completed') {
+                    $executionStageClass = 'done';
+                } elseif ($delayedTaskCount > 0) {
+                    $executionStageClass = 'issue';
+                } elseif ($ongoingTaskCount > 0 || $pendingTaskCount > 0) {
+                    $executionStageClass = 'ongoing';
+                } else {
+                    $executionStageClass = 'pending';
+                }
+                if (($project['status'] ?? '') === 'completed') {
+                    $inspectionStageClass = 'done';
+                } elseif ($completionRate >= 80 || ($completedTasks > 0 && $ongoingTaskCount === 0 && $pendingTaskCount === 0)) {
+                    $inspectionStageClass = 'ongoing';
+                } else {
+                    $inspectionStageClass = 'pending';
+                }
+                $completedStageClass = ($project['status'] ?? '') === 'completed' ? 'done' : 'pending';
+                $taskPreview = array_slice($tasks, 0, 4);
+                $activityFeed = [];
+                if (!empty($taskPreview)) {
+                    $latestTaskPreview = $taskPreview[0];
+                    $activityFeed[] = [
+                        'actor' => 'Engineer',
+                        'text' => 'Task status tracked: ' . (string)($latestTaskPreview['task_name'] ?? 'Task'),
+                        'state' => (string)($latestTaskPreview['status'] ?? 'pending'),
+                    ];
+                }
+                if (!empty($projectCostEntries)) {
+                    $activityFeed[] = [
+                        'actor' => 'Admin',
+                        'text' => 'Cost entry logged for ' . (string)($projectCostEntries[0]['cost_category'] ?? 'project cost'),
+                        'state' => 'completed',
+                    ];
+                }
+                if (!empty($deploymentHistory)) {
+                    $activityFeed[] = [
+                        'actor' => 'Foreman',
+                        'text' => 'Deployment history updated for ' . (string)($deploymentHistory[0]['asset_name'] ?? 'site asset'),
+                        'state' => ((int)($deploymentHistory[0]['remaining_quantity'] ?? 0) > 0) ? 'ongoing' : 'completed',
+                    ];
+                }
+                if (empty($activityFeed)) {
+                    $activityFeed[] = [
+                        'actor' => 'System',
+                        'text' => 'No recent tracked activity yet',
+                        'state' => 'pending',
+                    ];
+                }
+                if ($delayedTaskCount > 0) {
+                    $pulseAlertTitle = 'Execution delay detected';
+                    $pulseAlertCopy = $delayedTaskCount . ' delayed task(s) need recovery planning.';
+                    $pulseAlertNote = 'Review assignees, blockers, and deadline slippage now.';
+                } elseif ($budgetHealth['status'] === 'over' || $budgetHealth['status'] === 'warning') {
+                    $pulseAlertTitle = $budgetHealth['status'] === 'over' ? 'Budget pressure is high' : 'Budget needs attention';
+                    $pulseAlertCopy = $budgetHealth['label'] . ' | Total cost: ' . pm_format_money($totalCost);
+                    $pulseAlertNote = $budgetAmount > 0 ? 'Budget set at ' . pm_format_money($budgetAmount) : 'Add a budget profile to improve control.';
+                } elseif ($paymentStatus['status'] !== 'paid') {
+                    $pulseAlertTitle = 'Payment follow-up pending';
+                    $pulseAlertCopy = $paymentStatusDetail;
+                    $pulseAlertNote = 'Track customer collection together with delivery progress.';
+                } else {
+                    $pulseAlertTitle = 'Project pulse is stable';
+                    $pulseAlertCopy = 'No active budget, payment, or execution red flag right now.';
+                    $pulseAlertNote = 'Keep monitoring tasks and deployment history for changes.';
+                }
                 ?>
 
                 <section class="form-panel project-details-shell">
@@ -726,18 +852,52 @@ if ($projectId > 0) {
                                 <div class="empty-state empty-state-solid project-details-hero__description"><?php echo nl2br(htmlspecialchars($project['description'])); ?></div>
                             <?php endif; ?>
 
-                            <div class="project-details-progress-card" aria-label="Project progress">
-                                <div class="project-details-progress-card__header">
-                                    <div>
-                                        <span class="project-details-progress-card__label">Project Progress</span>
-                                        <strong><?php echo $completionRate; ?>% complete</strong>
+                            <section class="project-pulse-panel" aria-label="Project pulse timeline">
+                                <div class="project-pulse-box">
+                                    <div class="project-pulse-box__copy">
+                                        <span class="project-pulse-box__eyebrow">Project Pulse</span>
+                                        <strong><?php echo htmlspecialchars((string)$projectProgress['label']); ?> | <?php echo $completionRate; ?>%</strong>
+                                        <small><?php echo htmlspecialchars($progressSummary); ?></small>
                                     </div>
-                                    <small><?php echo htmlspecialchars($progressSummary); ?></small>
+                                    <div class="project-pulse-bar" data-progress-width="<?php echo $pulseSignal; ?>">
+                                        <span class="project-pulse-bar__fill"></span>
+                                    </div>
+                                    <p class="project-pulse-box__time">Last tracked update: <?php echo htmlspecialchars(pm_relative_time_label($latestTrackedEventAt)); ?></p>
                                 </div>
-                                <div class="project-details-progress-card__track" aria-hidden="true">
-                                    <span class="project-details-progress-card__fill" style="width: <?php echo $completionRate; ?>%;"></span>
+
+                                <div class="project-pulse-timeline">
+                                    <div class="project-pulse-stage project-pulse-stage--<?php echo htmlspecialchars($planningStageClass); ?>">
+                                        <div class="project-pulse-stage__circle"><?php echo $planningStageClass === 'done' ? '✔' : '•'; ?></div>
+                                        <p>Planning</p>
+                                    </div>
+                                    <div class="project-pulse-stage project-pulse-stage--<?php echo htmlspecialchars($quotationStageClass); ?>">
+                                        <div class="project-pulse-stage__circle"><?php echo $quotationStageClass === 'done' ? '✔' : '•'; ?></div>
+                                        <p>Quotation</p>
+                                    </div>
+                                    <div class="project-pulse-stage project-pulse-stage--<?php echo htmlspecialchars($executionStageClass); ?>">
+                                        <div class="project-pulse-stage__circle"><?php echo $executionStageClass === 'done' ? '✔' : ($executionStageClass === 'ongoing' ? '⏳' : ($executionStageClass === 'issue' ? '!' : '•')); ?></div>
+                                        <p>Execution</p>
+                                    </div>
+                                    <div class="project-pulse-stage project-pulse-stage--<?php echo htmlspecialchars($inspectionStageClass); ?>">
+                                        <div class="project-pulse-stage__circle"><?php echo $inspectionStageClass === 'done' ? '✔' : ($inspectionStageClass === 'ongoing' ? '⏳' : '•'); ?></div>
+                                        <p>Inspection</p>
+                                    </div>
+                                    <div class="project-pulse-stage project-pulse-stage--<?php echo htmlspecialchars($completedStageClass); ?>">
+                                        <div class="project-pulse-stage__circle"><?php echo $completedStageClass === 'done' ? '✔' : '•'; ?></div>
+                                        <p>Completed</p>
+                                    </div>
                                 </div>
-                            </div>
+
+                               
+
+                                <div class="project-pulse-alert">
+                                    <strong><?php echo htmlspecialchars($pulseAlertTitle); ?></strong>
+                                    <p><?php echo htmlspecialchars($pulseAlertCopy); ?></p>
+                                    <p><?php echo htmlspecialchars($pulseAlertNote); ?></p>
+                                </div>
+                            </section>
+
+                            <!-- Progress Insight card removed as requested -->
                         </div>
 
                         <div class="project-details-stats">
@@ -1019,7 +1179,7 @@ if ($projectId > 0) {
 
                         <div class="budget-progress">
                             <div class="budget-progress__track">
-                                <span class="budget-progress__fill budget-progress__fill--<?php echo htmlspecialchars($budgetHealth['status']); ?>" style="width: <?php echo $budgetUsage; ?>%;"></span>
+                                <span class="budget-progress__fill budget-progress__fill--<?php echo htmlspecialchars($budgetHealth['status']); ?>" data-fill-width="<?php echo $budgetUsage; ?>"></span>
                             </div>
                             <small><?php echo $budgetAmount > 0 ? $budgetUsage . '% spent' : 'Budget is optional. Actual costs can be logged anytime.'; ?></small>
                         </div>
@@ -1086,7 +1246,7 @@ if ($projectId > 0) {
 
                         <div class="budget-progress">
                             <div class="budget-progress__track">
-                                <span class="budget-progress__fill payment-progress__fill payment-progress__fill--<?php echo htmlspecialchars($paymentStatus['status']); ?>" style="width: <?php echo $paymentUsage; ?>%;"></span>
+                                <span class="budget-progress__fill payment-progress__fill payment-progress__fill--<?php echo htmlspecialchars($paymentStatus['status']); ?>" data-fill-width="<?php echo $paymentUsage; ?>"></span>
                             </div>
                             <small><?php echo $totalCost > 0 ? $paymentUsage . '% paid' : 'Add a project cost first to start tracking payments'; ?></small>
                         </div>

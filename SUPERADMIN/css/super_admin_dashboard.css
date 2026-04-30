@@ -4885,6 +4885,213 @@ tbody tr:hover {
     background: linear-gradient(90deg, #22c55e, #10b981, #14b8a6);
 }
 
+.project-pulse-panel {
+    display: grid;
+    gap: 22px;
+    margin-top: 10px;
+}
+
+.project-pulse-box,
+.project-pulse-card,
+.project-pulse-alert {
+    background: #1e293b;
+    color: #e2e8f0;
+    border-radius: 18px;
+    box-shadow: 0 20px 44px rgba(15, 23, 42, 0.2);
+}
+
+.project-pulse-box {
+    padding: 18px 20px;
+}
+
+.project-pulse-box__copy {
+    display: grid;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.project-pulse-box__eyebrow {
+    font-size: 0.74rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+
+.project-pulse-box__copy strong {
+    font-size: 1.08rem;
+    color: #f8fafc;
+}
+
+.project-pulse-box__copy small,
+.project-pulse-box__time {
+    color: #94a3b8;
+}
+
+.project-pulse-bar {
+    position: relative;
+    height: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #334155;
+    --pulse-progress: 0%;
+}
+
+.project-pulse-bar__fill {
+    position: relative;
+    display: block;
+    width: var(--pulse-progress);
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #22c55e 0%, #14b8a6 100%);
+}
+
+.project-pulse-bar__fill::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -50%;
+    width: 50%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.32);
+    animation: projectPulseSweep 2s linear infinite;
+}
+
+@keyframes projectPulseSweep {
+    from {
+        left: -50%;
+    }
+
+    to {
+        left: 100%;
+    }
+}
+
+.project-pulse-timeline {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.project-pulse-stage {
+    position: relative;
+    flex: 1;
+    text-align: center;
+}
+
+.project-pulse-stage:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    top: 18px;
+    left: calc(50% + 20px);
+    width: calc(100% - 8px);
+    height: 4px;
+    border-radius: 999px;
+    background: #334155;
+    z-index: 0;
+}
+
+.project-pulse-stage__circle {
+    position: relative;
+    z-index: 1;
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 8px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+.project-pulse-stage p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #cbd5e1;
+}
+
+.project-pulse-stage--done .project-pulse-stage__circle {
+    background: #22c55e;
+}
+
+.project-pulse-stage--ongoing .project-pulse-stage__circle {
+    background: #eab308;
+}
+
+.project-pulse-stage--issue .project-pulse-stage__circle {
+    background: #ef4444;
+}
+
+.project-pulse-stage--pending .project-pulse-stage__circle {
+    background: #475569;
+}
+
+.project-pulse-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+}
+
+.project-pulse-card {
+    padding: 18px 20px;
+}
+
+.project-pulse-card h3 {
+    margin: 0 0 14px;
+    color: #f8fafc;
+}
+
+.project-pulse-task {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.project-pulse-task:last-child {
+    border-bottom: 0;
+}
+
+.project-pulse-activity {
+    margin: 0;
+    padding: 8px 0;
+    color: #e2e8f0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.project-pulse-activity:last-child {
+    border-bottom: 0;
+}
+
+.project-pulse-activity__state {
+    display: inline-flex;
+    margin-left: 8px;
+    color: #94a3b8;
+    font-size: 0.82rem;
+}
+
+.project-pulse-alert {
+    padding: 18px 20px;
+    background: linear-gradient(135deg, #7f1d1d, #991b1b);
+}
+
+.project-pulse-alert strong {
+    display: block;
+    margin-bottom: 8px;
+    color: #fff7ed;
+}
+
+.project-pulse-alert p {
+    margin: 0;
+    color: #fee2e2;
+}
+
+.project-pulse-alert p + p {
+    margin-top: 6px;
+}
+
 .project-details-stats {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5375,6 +5582,22 @@ input[data-inline-editable]:disabled {
     .project-details-progress-card__header {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .project-pulse-timeline {
+        flex-wrap: wrap;
+    }
+
+    .project-pulse-stage {
+        min-width: 96px;
+    }
+
+    .project-pulse-stage:not(:last-child)::after {
+        display: none;
+    }
+
+    .project-pulse-grid {
+        grid-template-columns: 1fr;
     }
 
     .project-details-panel__header {

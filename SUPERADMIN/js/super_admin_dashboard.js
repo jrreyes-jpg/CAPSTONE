@@ -200,6 +200,18 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    document.querySelectorAll('[data-progress-width]').forEach(function (bar) {
+        const rawValue = Number(bar.getAttribute('data-progress-width') || '0');
+        const normalized = Math.max(0, Math.min(100, rawValue));
+        bar.style.setProperty('--pulse-progress', normalized + '%');
+    });
+
+    document.querySelectorAll('[data-fill-width]').forEach(function (fill) {
+        const rawValue = Number(fill.getAttribute('data-fill-width') || '0');
+        const normalized = Math.max(0, Math.min(100, rawValue));
+        fill.style.width = normalized + '%';
+    });
+
     // Shared sidebar behavior for dashboard and sidebar pages.
     const sidebar = document.getElementById('sidebar');
     const toggleBtn = document.getElementById('sidebarToggle');
