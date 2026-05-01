@@ -9,9 +9,35 @@ session_start();
     <meta name="description" content="Edge Automation Technology Services, Co. - Professional engineering automation and technology solutions">
     <title>Edge Automation Technology Services, Co.</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../css/index.css">
+    <link rel="stylesheet" href="../css/loader.css">
+    <link rel="stylesheet" href="../css/index.css">
 </head>
 <body>
+    <div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading page">
+        <span class="page-loader__beam page-loader__beam--one"></span>
+        <span class="page-loader__beam page-loader__beam--two"></span>
+        <div class="page-loader__content">
+            <div class="page-loader__brand-mark" aria-hidden="true">
+                <span class="page-loader__orb page-loader__orb--primary"></span>
+                <span class="page-loader__orb page-loader__orb--secondary"></span>
+                <span class="page-loader__ring"></span>
+                <span class="page-loader__ring page-loader__ring--outer"></span>
+                <span class="page-loader__scan"></span>
+                <span class="page-loader__spark page-loader__spark--one"></span>
+                <span class="page-loader__spark page-loader__spark--two"></span>
+                <span class="page-loader__spark page-loader__spark--three"></span>
+                <span class="page-loader__spark page-loader__spark--four"></span>
+                <img src="../../IMAGES/edge.jpg" alt="" class="page-loader__logo">
+            </div>
+            <div class="page-loader__meta">
+                <span class="page-loader__text">Edge Automation Technology Services, Co.</span>
+                <span class="page-loader__rail" aria-hidden="true">
+                    <span class="page-loader__rail-fill"></span>
+                </span>
+            </div>
+        </div>
+    </div>
+
     <!-- Navigation -->
     <nav class="navbar">
         <div class="nav-container">
@@ -314,6 +340,7 @@ session_start();
         <button id="closeConsult" class="consult-close" type="button">Close</button>
     </div>
 </div>
+    <script src="../js/loader.js"></script>
     <script src="../js/index.js"></script>
 
 </body>
