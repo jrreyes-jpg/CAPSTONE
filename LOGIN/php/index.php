@@ -11,6 +11,8 @@ session_start();
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../css/loader.css">
     <link rel="stylesheet" href="../css/index.css">
+    <link rel="icon" type="image/x-icon" href="../../IMAGES/edge.jpg">
+
 </head>
 <body>
     <div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading page">
