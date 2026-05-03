@@ -1039,7 +1039,7 @@ $lowStockItems = (int)($inventoryMetricRow['low_stock_items'] ?? 0);
 $outOfStockItems = (int)($inventoryMetricRow['out_of_stock_items'] ?? 0);
 $totalAssets = (int)($assetMetricRow['total_assets'] ?? 0);
 $assetsThisMonth = (int)($assetMetricRow['assets_this_month'] ?? 0);
-$scansToday = getScalarInt($conn, "SELECT COUNT(*) FROM asset_scan_history WHERE DATE(scan_time) = CURDATE()");
+$scansToday = getScalarInt($conn, "SELECT COUNT(*) FROM asset_scan_history WHERE scan_time >= CURDATE() AND scan_time < (CURDATE() + INTERVAL 1 DAY)");
 $activeDeployments = hasTable($conn, 'project_inventory_deployments')
     ? getScalarInt(
         $conn,

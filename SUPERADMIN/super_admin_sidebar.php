@@ -50,6 +50,13 @@ SVG;
 
 if (!function_exists('super_admin_sidebar_table_exists')) {
     function super_admin_sidebar_table_exists(mysqli $conn, string $tableName): bool {
+        static $tableCache = [];
+        $cacheKey = $conn->thread_id . ':' . $tableName;
+
+        if (array_key_exists($cacheKey, $tableCache)) {
+            return $tableCache[$cacheKey];
+        }
+
         $stmt = $conn->prepare(
             'SELECT 1
              FROM INFORMATION_SCHEMA.TABLES
@@ -66,12 +73,20 @@ if (!function_exists('super_admin_sidebar_table_exists')) {
         $stmt->execute();
         $result = $stmt->get_result();
 
-        return (bool)($result && $result->fetch_assoc());
+        $tableCache[$cacheKey] = (bool)($result && $result->fetch_assoc());
+        return $tableCache[$cacheKey];
     }
 }
 
 if (!function_exists('super_admin_sidebar_column_exists')) {
     function super_admin_sidebar_column_exists(mysqli $conn, string $tableName, string $columnName): bool {
+        static $columnCache = [];
+        $cacheKey = $conn->thread_id . ':' . $tableName . ':' . $columnName;
+
+        if (array_key_exists($cacheKey, $columnCache)) {
+            return $columnCache[$cacheKey];
+        }
+
         $stmt = $conn->prepare(
             'SELECT 1
              FROM INFORMATION_SCHEMA.COLUMNS
@@ -89,7 +104,8 @@ if (!function_exists('super_admin_sidebar_column_exists')) {
         $stmt->execute();
         $result = $stmt->get_result();
 
-        return (bool)($result && $result->fetch_assoc());
+        $columnCache[$cacheKey] = (bool)($result && $result->fetch_assoc());
+        return $columnCache[$cacheKey];
     }
 }
 
@@ -135,6 +151,19 @@ if (!function_exists('super_admin_notification_action_label')) {
 
 if (!function_exists('super_admin_fetch_notification_data')) {
     function super_admin_fetch_notification_data(mysqli $conn): array {
+        $cacheKey = 'super_admin_sidebar_notification_data';
+        $cacheTtlSeconds = 30;
+        $cached = $_SESSION[$cacheKey] ?? null;
+
+        if (
+            is_array($cached)
+            && isset($cached['expires_at'], $cached['data'])
+            && (int)$cached['expires_at'] >= time()
+            && is_array($cached['data'])
+        ) {
+            return $cached['data'];
+        }
+
         $projectRiskCount = 0;
         $stockAlertCount = 0;
         $inactiveAssignmentCount = 0;
@@ -265,7 +294,7 @@ if (!function_exists('super_admin_fetch_notification_data')) {
             }
         }
 
-        return [
+        $data = [
             'project_risk_count' => $projectRiskCount,
             'stock_alert_count' => $stockAlertCount,
             'inactive_assignment_count' => $inactiveAssignmentCount,
@@ -275,6 +304,13 @@ if (!function_exists('super_admin_fetch_notification_data')) {
             'inactive_assignment_alerts' => $inactiveAssignmentAlerts,
             'recent_activity' => $recentActivity,
         ];
+
+        $_SESSION[$cacheKey] = [
+            'expires_at' => time() + $cacheTtlSeconds,
+            'data' => $data,
+        ];
+
+        return $data;
     }
 }
 

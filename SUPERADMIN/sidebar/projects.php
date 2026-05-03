@@ -2945,19 +2945,6 @@ $currentPage = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 8;
 $offset = ($currentPage - 1) * $perPage;
 
-$projectMetricsResult = $conn->query("
-    SELECT
-        COUNT(*) AS total_projects,
-        SUM(CASE WHEN p.status = 'ongoing' THEN 1 ELSE 0 END) AS ongoing_projects,
-        SUM(CASE WHEN p.status = 'completed' THEN 1 ELSE 0 END) AS completed_projects
-    FROM projects p
-    WHERE p.deleted_at IS NULL
-");
-$projectMetrics = $projectMetricsResult ? $projectMetricsResult->fetch_assoc() : [];
-$totalProjects = (int)($projectMetrics['total_projects'] ?? 0);
-$ongoingProjects = (int)($projectMetrics['ongoing_projects'] ?? 0);
-$completedProjects = (int)($projectMetrics['completed_projects'] ?? 0);
-
 $taskMetricsResult = $conn->query("SELECT COUNT(*) AS total_tasks FROM tasks");
 $taskMetrics = $taskMetricsResult ? $taskMetricsResult->fetch_assoc() : [];
 $totalTasks = (int)($taskMetrics['total_tasks'] ?? 0);
@@ -2977,6 +2964,9 @@ if ($statusCountsResult) {
         }
     }
 }
+$totalProjects = array_sum($statusCounts);
+$ongoingProjects = (int)($statusCounts['ongoing'] ?? 0);
+$completedProjects = (int)($statusCounts['completed'] ?? 0);
 
 $trashMetricsResult = $conn->query("
     SELECT COUNT(*) AS total_trashed

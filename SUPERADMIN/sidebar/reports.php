@@ -8,6 +8,13 @@ require_role('super_admin');
 
 function super_admin_reports_table_exists(mysqli $conn, string $tableName): bool
 {
+    static $tableCache = [];
+    $cacheKey = $conn->thread_id . ':' . $tableName;
+
+    if (array_key_exists($cacheKey, $tableCache)) {
+        return $tableCache[$cacheKey];
+    }
+
     $stmt = $conn->prepare(
         'SELECT 1
          FROM INFORMATION_SCHEMA.TABLES
@@ -24,7 +31,8 @@ function super_admin_reports_table_exists(mysqli $conn, string $tableName): bool
     $stmt->execute();
     $result = $stmt->get_result();
 
-    return (bool)($result && $result->fetch_assoc());
+    $tableCache[$cacheKey] = (bool)($result && $result->fetch_assoc());
+    return $tableCache[$cacheKey];
 }
 
 function super_admin_reports_scalar(mysqli $conn, string $sql): int
@@ -38,13 +46,32 @@ function super_admin_reports_scalar(mysqli $conn, string $sql): int
     return (int)($row[0] ?? 0);
 }
 
-$totalUsers = super_admin_reports_scalar($conn, "SELECT COUNT(*) FROM users WHERE role IN ('engineer', 'foreman', 'client')");
-$activeUsers = super_admin_reports_scalar($conn, "SELECT COUNT(*) FROM users WHERE role IN ('engineer', 'foreman', 'client') AND status = 'active'");
-$totalProjects = super_admin_reports_scalar($conn, "SELECT COUNT(*) FROM projects");
-$activeProjects = super_admin_reports_scalar($conn, "SELECT COUNT(*) FROM projects WHERE status IN ('pending', 'ongoing', 'on-hold')");
-$completedProjects = super_admin_reports_scalar($conn, "SELECT COUNT(*) FROM projects WHERE status = 'completed'");
-$ongoingProjects = super_admin_reports_scalar($conn, "SELECT COUNT(*) FROM projects WHERE status = 'ongoing'");
-$onHoldProjects = super_admin_reports_scalar($conn, "SELECT COUNT(*) FROM projects WHERE status = 'on-hold'");
+$userSummaryResult = $conn->query(
+    "SELECT
+        COUNT(*) AS total_users,
+        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_users
+     FROM users
+     WHERE role IN ('engineer', 'foreman', 'client')"
+);
+$userSummary = $userSummaryResult ? $userSummaryResult->fetch_assoc() : [];
+$totalUsers = (int)($userSummary['total_users'] ?? 0);
+$activeUsers = (int)($userSummary['active_users'] ?? 0);
+
+$projectSummaryResult = $conn->query(
+    "SELECT
+        COUNT(*) AS total_projects,
+        SUM(CASE WHEN status IN ('pending', 'ongoing', 'on-hold') THEN 1 ELSE 0 END) AS active_projects,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_projects,
+        SUM(CASE WHEN status = 'ongoing' THEN 1 ELSE 0 END) AS ongoing_projects,
+        SUM(CASE WHEN status = 'on-hold' THEN 1 ELSE 0 END) AS on_hold_projects
+     FROM projects"
+);
+$projectSummary = $projectSummaryResult ? $projectSummaryResult->fetch_assoc() : [];
+$totalProjects = (int)($projectSummary['total_projects'] ?? 0);
+$activeProjects = (int)($projectSummary['active_projects'] ?? 0);
+$completedProjects = (int)($projectSummary['completed_projects'] ?? 0);
+$ongoingProjects = (int)($projectSummary['ongoing_projects'] ?? 0);
+$onHoldProjects = (int)($projectSummary['on_hold_projects'] ?? 0);
 $taskCount = super_admin_reports_scalar($conn, 'SELECT COUNT(*) FROM tasks');
 $auditLogCount = super_admin_reports_table_exists($conn, 'audit_logs')
     ? super_admin_reports_scalar($conn, 'SELECT COUNT(*) FROM audit_logs')
