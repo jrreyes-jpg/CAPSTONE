@@ -338,11 +338,17 @@ function purge_expired_deleted_projects(mysqli $conn): void {
     }
 }
 
+/**
+ * @param mixed $value
+ */
 function normalize_positive_int($value): int {
     $normalized = (int)$value;
     return $normalized > 0 ? $normalized : 0;
 }
 
+/**
+ * @param mixed $value
+ */
 function normalize_money_or_null($value): ?float {
     $value = trim((string)$value);
     if ($value === '') {
@@ -358,6 +364,9 @@ function normalize_money_or_null($value): ?float {
     return round((float)$normalized, 2);
 }
 
+/**
+ * @param mixed $value
+ */
 function format_money($value): string {
     return 'PHP ' . number_format((float)$value, 2);
 }
@@ -527,6 +536,9 @@ function normalize_date_or_null(?string $value): ?string {
     return $value === '' ? null : $value;
 }
 
+/**
+ * @param mixed $value
+ */
 function normalize_positive_int_or_null($value): ?int {
     $value = trim((string)$value);
     if ($value === '') {
@@ -577,6 +589,9 @@ function blank_project_additional_info_row(): array {
     ];
 }
 
+/**
+ * @param mixed $rows
+ */
 function normalize_project_additional_info_input($rows): array {
     if (!is_array($rows)) {
         return [];
@@ -609,6 +624,9 @@ function normalize_project_additional_info_input($rows): array {
     return $normalizedRows;
 }
 
+/**
+ * @param mixed $rawValue
+ */
 function decode_project_additional_info($rawValue): array {
     if (is_array($rawValue)) {
         return normalize_project_additional_info_input($rawValue);
@@ -637,6 +655,9 @@ function encode_project_additional_info(array $rows): ?string {
     return $encoded === false ? null : $encoded;
 }
 
+/**
+ * @param mixed $rows
+ */
 function project_additional_info_rows_for_form($rows): array {
     $normalizedRows = is_array($rows) ? normalize_project_additional_info_input($rows) : [];
     return $normalizedRows === [] ? [blank_project_additional_info_row()] : array_values($normalizedRows);
@@ -942,6 +963,9 @@ function projectFieldValueExists(mysqli $conn, string $columnName, string $value
     return (bool)($result && $result->fetch_assoc());
 }
 
+/**
+ * @param mixed $value
+ */
 function normalize_engineer_ids($value): array {
     $rawValues = is_array($value) ? $value : [$value];
     $normalized = [];
