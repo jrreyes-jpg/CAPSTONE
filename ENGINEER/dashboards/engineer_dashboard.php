@@ -1,14 +1,10 @@
 <?php
-session_start();
+define('AUTH_REQUIRED_ROLE', 'engineer');
+require_once __DIR__ . '/../../config/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/audit_log.php';
 require_once __DIR__ . '/../../config/project_progress.php';
 require_once __DIR__ . '/../includes/engineer_helpers.php';
-
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'engineer') {
-    header('Location: /codesamplecaps/LOGIN/php/login.php');
-    exit();
-}
 
 $userId = (int)($_SESSION['user_id'] ?? 0);
 $taskStatusOptions = ['pending', 'ongoing', 'completed', 'delayed'];

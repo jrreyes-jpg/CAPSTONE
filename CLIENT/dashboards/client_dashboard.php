@@ -1,12 +1,8 @@
 <?php
-session_start();
+define('AUTH_REQUIRED_ROLE', 'client');
+require_once __DIR__ . '/../../config/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/project_progress.php';
-
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'client') {
-    header('Location: ../../LOGIN/php/login.php');
-    exit();
-}
 
 $userId = (int)($_SESSION['user_id'] ?? 0);
 $clientName = trim((string)($_SESSION['name'] ?? 'Client User'));

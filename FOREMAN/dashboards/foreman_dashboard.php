@@ -1,10 +1,9 @@
 <?php
-require_once __DIR__ . '/../../config/auth_middleware.php';
+define('AUTH_REQUIRED_ROLE', 'foreman');
+require_once __DIR__ . '/../../config/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/project_access.php';
 require_once __DIR__ . '/../includes/foreman_helpers.php';
-
-require_role('foreman');
 
 $userId = (int)($_SESSION['user_id'] ?? 0);
 $foremanProfileName = (string)($_SESSION['name'] ?? 'Foreman');

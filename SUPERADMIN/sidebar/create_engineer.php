@@ -1,13 +1,9 @@
 <?php
-session_start();
 require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../controllers/UserController.php';
 
-if (!isset($_SESSION['role']) || $_SESSION['role'] != 'super_admin') {
-    header("Location: ../../../LOGIN/php/login.php");
-    exit();
-}
+require_role('super_admin');
 
 $csrfToken = auth_csrf_token('super_admin');
 $userController = new UserController();
@@ -183,6 +179,7 @@ $engineers_result = $conn->query("SELECT id AS user_id, full_name, email, create
 </style>
 </head>
 <body>
+<?php auth_render_back_button_logout_script(); ?>
 
 <div class="admin-container">
     <div class="sidebar">
@@ -255,5 +252,6 @@ $engineers_result = $conn->query("SELECT id AS user_id, full_name, email, create
     </div>
 </div>
 
+<script src="/codesamplecaps/SUPERADMIN/js/super_admin_dashboard.js"></script>
 </body>
 </html>

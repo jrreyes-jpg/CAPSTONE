@@ -346,6 +346,7 @@ if ($superAdminProfilePhotoUrl === '') {
 
 $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName);
 ?>
+<?php auth_render_back_button_logout_script(); ?>
 <button id="sidebarMobileToggle" class="sidebar-mobile-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">
     <span></span>
     <span></span>

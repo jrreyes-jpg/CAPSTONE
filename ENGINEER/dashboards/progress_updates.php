@@ -1,13 +1,9 @@
 <?php
-session_start();
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/audit_log.php';
 require_once __DIR__ . '/../includes/engineer_helpers.php';
 
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'engineer') {
-    header('Location: /codesamplecaps/LOGIN/php/login.php');
-    exit();
-}
+require_role('engineer');
 
 $userId = (int)($_SESSION['user_id'] ?? 0);
 $taskStatusOptions = ['pending', 'ongoing', 'completed', 'delayed'];

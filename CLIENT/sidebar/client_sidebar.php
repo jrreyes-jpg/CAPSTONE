@@ -4,6 +4,7 @@ $currentFile = basename($currentPath);
 $isClientQuotations = $currentFile === 'quotations.php';
 $isClientReports = $currentFile === 'reports.php';
 ?>
+<?php auth_render_back_button_logout_script(); ?>
 <button id="sidebarMobileToggle" class="sidebar-mobile-toggle" type="button" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">
     <span></span>
     <span></span>

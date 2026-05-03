@@ -11,6 +11,7 @@ $isTasks = $currentFile === 'tasks.php';
 $isUpdates = $currentFile === 'progress_updates.php';
 $isProfile = $currentFile === 'profile.php';
 ?>
+<?php auth_render_back_button_logout_script(); ?>
 <button
     class="sidebar-mobile-toggle"
     type="button"

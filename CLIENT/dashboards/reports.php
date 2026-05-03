@@ -1,14 +1,11 @@
 <?php
-session_start();
+require_once __DIR__ . '/../../config/auth_middleware.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/project_progress.php';
 require_once __DIR__ . '/../../config/quotation_module.php';
 require_once __DIR__ . '/../includes/client_shell.php';
 
-if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'client') {
-    header('Location: ../../LOGIN/php/login.php');
-    exit();
-}
+require_role('client');
 
 $userId = (int)($_SESSION['user_id'] ?? 0);
 $clientName = trim((string)($_SESSION['name'] ?? 'Client User'));

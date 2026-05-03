@@ -1,11 +1,10 @@
 <?php
-require_once __DIR__ . '/../../config/auth_middleware.php';
+define('AUTH_REQUIRED_ROLE', 'super_admin');
+require_once __DIR__ . '/../../config/auth_check.php';
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../config/audit_log.php';
 require_once __DIR__ . '/../../config/project_progress.php';
 require_once __DIR__ . '/../../config/profile_photo_storage.php';
-
-require_role('super_admin');
 
 $message = '';
 $error = '';

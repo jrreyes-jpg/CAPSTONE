@@ -1,6 +1,9 @@
 <?php
-    session_start();
+    require_once __DIR__ . '/../../config/auth_middleware.php';
     require_once __DIR__ . '/../../config/database.php';
+
+    auth_start_session();
+    auth_apply_no_cache_headers();
 
     $error = "";
     $failed_attempts_display = "";
@@ -9,6 +12,8 @@
         $error = "Your session expired after 15 minutes of inactivity. Please log in again.";
     } elseif (isset($_GET['logout'])) {
         $error = "You have been logged out successfully.";
+    } else {
+        auth_redirect_authenticated_user();
     }
 
     $max_attempts = 10;
@@ -59,21 +64,14 @@ Account will be temporarily locked after $max_attempts failed attempts.";
                 $deleteAttempts->bind_param("ss", $email, $ip_address);
                 $deleteAttempts->execute();
 
-                session_regenerate_id(true);
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['name'] = $user['full_name'];
-                $_SESSION['role'] = $user['role'];
-                $_SESSION['last_activity_at'] = time();
-
-                if ($user['role'] == 'super_admin') {
-                    header("Location: ../../SUPERADMIN/dashboards/super_admin_dashboard.php");
-                } elseif ($user['role'] == 'engineer') {
-                    header("Location: ../../ENGINEER/dashboards/engineer_dashboard.php");
-                } elseif ($user['role'] == 'foreman') {
-                    header("Location: ../../FOREMAN/dashboards/foreman_dashboard.php");
-                } else {
-                    header("Location:../../CLIENT/dashboards/client_dashboard.php");
+                $dashboardPath = auth_dashboard_path_for_role($user['role']);
+                if ($dashboardPath === null) {
+                    $error = "Your account role is not allowed to access this system.";
+                    goto end_login;
                 }
+
+                auth_login_user($user);
+                header('Location: ' . $dashboardPath);
                 exit();
 
             } else {
