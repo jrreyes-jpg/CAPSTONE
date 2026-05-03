@@ -16,20 +16,26 @@ session_start();
 </head>
 <body>
     <div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading page">
-        <span class="page-loader__beam page-loader__beam--one"></span>
-        <span class="page-loader__beam page-loader__beam--two"></span>
         <div class="page-loader__content">
-            <div class="page-loader__brand-mark" aria-hidden="true">
-                <span class="page-loader__orb page-loader__orb--primary"></span>
-                <span class="page-loader__orb page-loader__orb--secondary"></span>
-                <span class="page-loader__ring"></span>
-                <span class="page-loader__ring page-loader__ring--outer"></span>
-                <span class="page-loader__scan"></span>
+            <div class="page-loader__scene" aria-hidden="true">
+                <div class="page-loader__floor"></div>
+                <div class="page-loader__orbit page-loader__orbit--horizontal"></div>
+                <div class="page-loader__orbit page-loader__orbit--vertical"></div>
+                <div class="page-loader__orbit page-loader__orbit--tilted"></div>
+                <div class="page-loader__cube">
+                    <span class="page-loader__cube-face page-loader__cube-face--front"></span>
+                    <span class="page-loader__cube-face page-loader__cube-face--back"></span>
+                    <span class="page-loader__cube-face page-loader__cube-face--right"></span>
+                    <span class="page-loader__cube-face page-loader__cube-face--left"></span>
+                    <span class="page-loader__cube-face page-loader__cube-face--top"></span>
+                    <span class="page-loader__cube-face page-loader__cube-face--bottom"></span>
+                </div>
+                <div class="page-loader__logo-disk">
+                    <img src="../../IMAGES/edge.jpg" alt="" class="page-loader__logo">
+                </div>
                 <span class="page-loader__spark page-loader__spark--one"></span>
                 <span class="page-loader__spark page-loader__spark--two"></span>
                 <span class="page-loader__spark page-loader__spark--three"></span>
-                <span class="page-loader__spark page-loader__spark--four"></span>
-                <img src="../../IMAGES/edge.jpg" alt="" class="page-loader__logo">
             </div>
             <div class="page-loader__meta">
                 <span class="page-loader__text">Edge Automation Technology Services, Co.</span>
