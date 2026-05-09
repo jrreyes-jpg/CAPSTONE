@@ -75,7 +75,7 @@ const initFormHandling = () => {
 };
 
 const initScrollAnimations = () => {
-    const elements = document.querySelectorAll('.service-card, .feature, .project-item');
+    const elements = document.querySelectorAll('.service-card, .feature, .project-item, .projects-summary');
 
     if (elements.length === 0) {
         return;
