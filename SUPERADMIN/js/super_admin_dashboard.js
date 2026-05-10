@@ -271,7 +271,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (sidebar && overlay) {
         const mainContent = document.querySelector('.main-content');
         const storageKey = 'edgeSidebarCollapsed';
-        const isMobile = () => window.innerWidth <= 768;
+        const isMobile = () => window.innerWidth <= 900;
         let audioContext = null;
 
         const playSidebarSound = (variant) => {
@@ -319,6 +319,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const closeMobileSidebar = () => {
             sidebar.classList.remove('mobile-open');
             overlay.classList.remove('active');
+            document.body.classList.remove('sidebar-drawer-open');
         };
 
         const updateToggleUi = () => {
@@ -370,6 +371,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const isOpen = sidebar.classList.toggle('mobile-open');
                 overlay.classList.toggle('active', isOpen);
+                document.body.classList.toggle('sidebar-drawer-open', isOpen);
                 playSidebarSound('toggle');
                 updateToggleUi();
             });
@@ -392,6 +394,13 @@ document.addEventListener('DOMContentLoaded', function () {
         overlay.addEventListener('click', function () {
             closeMobileSidebar();
             updateToggleUi();
+        });
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && sidebar.classList.contains('mobile-open')) {
+                closeMobileSidebar();
+                updateToggleUi();
+            }
         });
 
         document.querySelectorAll('.menu-link').forEach(function (link) {
