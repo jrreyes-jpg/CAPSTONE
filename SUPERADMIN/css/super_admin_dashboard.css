@@ -3213,6 +3213,30 @@ tbody tr:hover {
     background: rgba(255, 255, 255, 0.9);
 }
 
+.user-management-table__col-name {
+    width: 22%;
+}
+
+.user-management-table__col-email {
+    width: 24%;
+}
+
+.user-management-table__col-phone {
+    width: 16%;
+}
+
+.user-management-table__col-role {
+    width: 12%;
+}
+
+.user-management-table__col-status {
+    width: 10%;
+}
+
+.user-management-table__col-actions {
+    width: 16%;
+}
+
 .user-management-table .responsive-table thead {
     background: #f8fafc;
 }
@@ -3225,6 +3249,10 @@ tbody tr:hover {
 
 .user-management-table .responsive-table td {
     vertical-align: middle;
+}
+
+.hidden-save-form {
+    display: none;
 }
 
 .user-table-empty {

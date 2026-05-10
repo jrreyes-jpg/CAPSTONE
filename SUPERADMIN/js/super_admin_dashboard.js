@@ -500,6 +500,15 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    document.querySelectorAll('[data-ph-phone-lock-prefix]').forEach(function (input) {
+        input.addEventListener('input', function () {
+            input.value = input.value.replace(/[^0-9]/g, '');
+            if (!input.value.startsWith('09')) {
+                input.value = '09';
+            }
+        });
+    });
+
     document.querySelectorAll('.user-row').forEach(function (row) {
         const editBtn = row.querySelector('[data-edit-btn]');
         const saveBtn = row.querySelector('[data-save-btn]');
