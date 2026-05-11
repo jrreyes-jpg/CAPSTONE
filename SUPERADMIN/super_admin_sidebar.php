@@ -583,10 +583,10 @@ $superAdminProfileInitials = super_admin_profile_initials($superAdminProfileName
 </nav>
 <div id="sidebarOverlay" class="sidebar-overlay"></div>
 <header class="global-topbar" aria-live="polite">
-    <div class="global-topbar__copy">
+    <a href="/codesamplecaps/SUPERADMIN/dashboards/super_admin_dashboard.php?tab=dashboard" class="global-topbar__copy global-topbar__brand-link" aria-label="Go to Super Admin overview">
         <img src="/codesamplecaps/IMAGES/edge.jpg" alt="Edge Automation logo" class="global-topbar__brand-logo">
         <strong>EDGE Automation</strong>
-    </div>
+    </a>
     <div class="global-topbar__actions">
         <div class="topbar-profile" data-profile-root>
             <button 

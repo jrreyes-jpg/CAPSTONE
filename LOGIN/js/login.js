@@ -5,6 +5,12 @@
         return;
     }
 
+    const shouldReduceMotion = window.matchMedia('(max-width: 768px), (prefers-reduced-motion: reduce)').matches;
+    if (shouldReduceMotion) {
+        canvas.remove();
+        return;
+    }
+
     const context = canvas.getContext('2d');
 
     if (!context) {

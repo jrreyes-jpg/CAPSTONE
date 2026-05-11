@@ -141,6 +141,11 @@ class="back-home animate__animated animate__fadeInDown">
         <!-- LOGIN FORM -->
         <div class="form active" id="loginForm">
             <form method="POST">
+                <div class="mobile-login-brand">
+                    <img src="../../IMAGES/edge.jpg" alt="Edge Automation logo">
+                    <strong>EDGE Automation</strong>
+                    <span>Secure Portal</span>
+                </div>
                 <h2>Login</h2>
     <?php if($error): ?>
 <div class="error-box <?php echo ($attempts >= 8 ? 'error-warning' : ($attempts >= $max_attempts ? 'error-locked' : '')); ?>">
@@ -162,27 +167,16 @@ class="back-home animate__animated animate__fadeInDown">
         <button type="button" class="togglePassword" data-target="password">Show</button>
     </div>
 
-                <button type="submit" name="login">Login</button>
+                <button type="submit" name="login" data-loading-text="Logging in...">Login</button>
 
 <div class="links">
-    <a onclick="showForgot()">Forgot Password?</a>
+    <a href="/codesamplecaps/LOGIN/php/forgot.php">Forgot Password?</a>
 </div>         </form>
         </div>
 
     </div>
 
     </div>
-
-<script>
-function showLogin(){
-    window.location.href = '/codesamplecaps/LOGIN/php/login.php';
-}
-
-function showForgot(){
-    window.location.href = '/codesamplecaps/LOGIN/php/forgot.php';
-}
-
-</script>
 
     <script src="../js/login.js"></script>
     </body>

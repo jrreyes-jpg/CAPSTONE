@@ -422,6 +422,35 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.body.classList.add('page-loaded');
 
+    document.querySelectorAll('[data-overview-analytics]').forEach(function (details) {
+        let wasDesktop = null;
+        const syncOverviewAnalytics = function () {
+            const isDesktopOverview = window.innerWidth > 900;
+            if (wasDesktop === isDesktopOverview) {
+                return;
+            }
+
+            wasDesktop = isDesktopOverview;
+            details.open = isDesktopOverview;
+        };
+
+        syncOverviewAnalytics();
+        window.addEventListener('resize', syncOverviewAnalytics);
+
+        details.addEventListener('toggle', function () {
+            if (!details.open || window.innerWidth > 900) {
+                return;
+            }
+
+            window.setTimeout(function () {
+                details.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start',
+                });
+            }, 80);
+        });
+    });
+
     const counters = document.querySelectorAll('.counter');
     counters.forEach((counter) => {
         const updateCount = () => {
