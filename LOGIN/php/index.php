@@ -110,9 +110,8 @@ session_start();
                 We engineer field-ready systems that reduce downtime, improve plant visibility, and keep critical operations running with confidence.
             </p>
             <div class="services-grid">
-                <!-- Mechanical Engineering -->
                 <div class="service-card">
-                    <div class="service-icon">⚙️</div>
+                    <div class="service-icon">&#9881;</div>
                     <h3>Mechanical Engineering</h3>
                     <ul class="service-list">
                         <li>Utility Systems (Air, Water, Steam)</li>
@@ -124,9 +123,8 @@ session_start();
                     </ul>
                 </div>
 
-                <!-- Electrical Engineering -->
                 <div class="service-card">
-                    <div class="service-icon">⚡</div>
+                    <div class="service-icon">&#9889;</div>
                     <h3>Electrical Engineering</h3>
                     <ul class="service-list">
                         <li>Electrical Power System Analysis</li>
@@ -138,9 +136,8 @@ session_start();
                     </ul>
                 </div>
 
-                <!-- Electronics & Automation -->
                 <div class="service-card">
-                    <div class="service-icon">🤖</div>
+                    <div class="service-icon">&#129302;</div>
                     <h3>Electronics & Automation</h3>
                     <ul class="service-list">
                         <li>Factory Automation Systems</li>
@@ -285,32 +282,32 @@ session_start();
             <h2 class="section-title">Why Choose Us</h2>
             <div class="features-grid">
                 <div class="feature">
-                    <div class="feature-icon">🏆</div>
+                    <div class="feature-icon">&#127942;</div>
                     <h4>Industry Expertise</h4>
                     <p>Years of proven experience in industrial automation</p>
                 </div>
                 <div class="feature">
-                    <div class="feature-icon">✅</div>
+                    <div class="feature-icon">&#9989;</div>
                     <h4>Reliable Systems</h4>
                     <p>Engineered for stability and long-term performance</p>
                 </div>
                 <div class="feature">
-                    <div class="feature-icon">📈</div>
+                    <div class="feature-icon">&#128200;</div>
                     <h4>Scalable Solutions</h4>
                     <p>Grow your operations with our flexible systems</p>
                 </div>
                 <div class="feature">
-                    <div class="feature-icon">🔧</div>
+                    <div class="feature-icon">&#128295;</div>
                     <h4>End-to-End Support</h4>
                     <p>From planning through implementation and beyond</p>
                 </div>
                 <div class="feature">
-                    <div class="feature-icon">🛡️</div>
+                    <div class="feature-icon">&#128737;</div>
                     <h4>Preventive Care</h4>
                     <p>Minimize downtime with proactive maintenance</p>
                 </div>
                 <div class="feature">
-                    <div class="feature-icon">💡</div>
+                    <div class="feature-icon">&#128161;</div>
                     <h4>Innovation</h4>
                     <p>Cutting-edge technology and best practices</p>
                 </div>
@@ -318,63 +315,53 @@ session_start();
         </div>
     </section>
 
-    <!-- Contact Section (Login-gated) -->
+    <!-- Contact Section -->
     <section id="contact" class="contact">
         <div class="container">
             <h2 class="section-title">Client & Project Inquiries</h2>
+            <div class="contact-content">
+                <div class="contact-card contact-card-main">
+                    <h3>Talk to Edge Automation</h3>
+                    <p>
+                        Share your plant, facility, or equipment requirement and our team will guide you through the next practical step.
+                    </p>
+                    <div class="contact-actions">
+                        <a href="tel:+639178789571" class="contact-action contact-action-primary">Call 0917 878 9571</a>
+                        <button class="contact-action" id="consultBtnSecondary" type="button">Request Consultation</button>
+                    </div>
+                </div>
 
+                <div class="contact-card contact-card-details">
+                    <h3>Contact Information</h3>
+                    <p>
+                        <strong>Company:</strong> Edge Automation Technology Services, Co.<br>
+                        <strong>Location:</strong> Blk 4 Lot 16 Camella Dos Rios, Brgy. Pittland, Cabuyao, Laguna<br>
+                        <strong>Specialization:</strong> Industrial Automation & Engineering<br>
+                        <strong>Email:</strong> <a href="mailto:ejimenez.edge@gmail.com">ejimenez.edge@gmail.com</a>
+                    </p>
 
-           <div class="contact-content">
-              
-
-           <div class="contact-card">
-    <h3>Contact Information</h3>
-    <p>
-        <strong>Company:</strong> Edge Automation Technology Services, Co.<br>
-        <strong>Company Location:</strong> Blk 4 Lot 16 Camella Dos Rios, Brgy. Pittland, Cabuyao, Laguna<br>
-        <strong>Specialization:</strong> Industrial Automation & Engineering<br></div></p>
-
-                   <div class="contact-card" >
-
-        <p><strong>FB Page:</strong> <a href="https://www.facebook.com/edgeautomationtsc" target="_blank">Edge Automation Technology Services, Co.</a><br>
-        <strong>Contact Number:</strong> 0917 878 9571<br>
-        <strong>Email:</strong> <a href="https://mail.google.com/mail/?view=cm&fs=1&to=ejimenez.edge@gmail.com" target="_blank">
-        ejimenez.edge@gmail.com
-        <hr>
-</a>    </p>
-
-  <div class="social-links" id="socialLinks">
-
-    <!-- Social Icons -->
-    <a href="https://www.facebook.com/edgeautomationtsc" target="_blank"
-       class="social-icon">
-        <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" width="24">
-    </a>
-
-    <a href="https://invite.viber.com/?number=09178789571" target="_blank"
-       class="social-icon">
-        <img src="https://cdn-icons-png.flaticon.com/512/3670/3670059.png" width="24">
-    </a>
-
-    <a href="https://mail.google.com/mail/?view=cm&fs=1&to=ejimenez.edge@gmail.com"
-       target="_blank" class="social-icon">
-        <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" width="24">
-    </a>
-
-    <!-- ✅ POPUP MESSAGE (NOW CORRECT POSITION) -->
-    <div class="social-tooltip" id="newClientTip">
-        <div class="tooltip-arrow"></div>
-        <p>
-            <strong>New client?</strong><br>
-            To request a project consultation, please contact us using one of the platforms below.
-        </p>
-        <button id="dismissTip" type="button">Got it</button>
-    </div>
-
-</div>
-            
+                    <div class="social-links" id="socialLinks" aria-label="Contact platforms">
+                        <a href="https://www.facebook.com/edgeautomationtsc" target="_blank" rel="noopener noreferrer" class="social-icon" aria-label="Facebook Page">
+                            <img src="https://cdn-icons-png.flaticon.com/512/733/733547.png" alt="" width="24">
+                        </a>
+                        <a href="https://invite.viber.com/?number=639178789571" target="_blank" rel="noopener noreferrer" class="social-icon" aria-label="Viber Chat">
+                            <img src="https://cdn-icons-png.flaticon.com/512/3670/3670059.png" alt="" width="24">
+                        </a>
+                        <a href="mailto:ejimenez.edge@gmail.com?subject=Request%20Consultation" class="social-icon" aria-label="Email">
+                            <img src="https://cdn-icons-png.flaticon.com/512/732/732200.png" alt="" width="24">
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </section>
 
+    <div class="mobile-contact-bar" aria-label="Quick contact actions">
+        <a href="tel:+639178789571">Call</a>
+        <a href="https://invite.viber.com/?number=639178789571" target="_blank" rel="noopener noreferrer">Viber</a>
+        <a href="https://www.facebook.com/edgeautomationtsc" target="_blank" rel="noopener noreferrer">FB</a>
+        <button id="consultBtnMobile" type="button">Consult</button>
+    </div>
     <!-- Footer -->
     <footer class="footer">
         <div class="container">

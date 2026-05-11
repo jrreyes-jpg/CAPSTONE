@@ -718,6 +718,36 @@ p {
     gap: 20px;
     flex-wrap: wrap; /* para responsive */
 }
+
+.contact-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 1.25rem;
+}
+
+.contact-action {
+    border: 1px solid var(--color-primary);
+    border-radius: 8px;
+    background: #ffffff;
+    color: var(--color-primary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font: inherit;
+    font-weight: 700;
+    min-height: 46px;
+    padding: 10px 16px;
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.contact-action-primary,
+.contact-action:hover {
+    background: var(--color-primary);
+    color: #ffffff;
+}
 .contact-form {
     display: flex;
     flex-direction: column;
@@ -783,7 +813,7 @@ p {
     border-radius: 12px;
     background: #f3f6f8;
     transition: 0.25s ease;
-    position: relative; /* 🔥 important para sa tooltip */
+    position: relative;
 }
 .social-icon:hover {
     background: var(--color-accent);
@@ -806,11 +836,19 @@ p {
     margin: 0;
 }
 
+.mobile-contact-bar {
+    display: none;
+}
+
 /* ===================================================
    RESPONSIVE DESIGN
    =================================================== */
 
 @media (max-width: 768px) {
+    body {
+        padding-bottom: 74px;
+    }
+
     .nav-menu {
         display: none;
         position: absolute;
@@ -847,8 +885,18 @@ p {
         transform: rotate(-45deg) translate(5px, -5px);
     }
 
+    .hero {
+        min-height: 72vh;
+        padding: 4rem 1rem 3rem;
+    }
+
+    .hero-content {
+        width: min(100%, 430px);
+    }
+
     .hero-title {
         font-size: 2rem;
+        margin-bottom: 1rem;
     }
     .nav-actions { display: none; }
     .mobile-only { display: block; }
@@ -861,14 +909,67 @@ p {
         font-size: 2rem;
     }
 
+    .services,
+    .projects,
+    .why-choose,
+    .contact,
+    .about {
+        padding: 3.25rem 0;
+    }
+
     .services-grid,
-    .projects-grid,
     .features-grid {
         grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .projects-grid {
+        display: flex;
+        gap: 1rem;
+        margin: 0 -14px;
+        overflow-x: auto;
+        padding: 0 14px 1rem;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .project-item {
+        flex: 0 0 82%;
+        scroll-snap-align: start;
+    }
+
+    .projects-summary {
+        flex: 0 0 88%;
+    }
+
+    .service-card,
+    .feature {
+        padding: 1.25rem;
+    }
+
+    .service-card h3,
+    .feature h4 {
+        margin-bottom: 0.75rem;
+    }
+
+    .service-icon,
+    .feature-icon {
+        font-size: 2rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .service-list {
+        gap: 0.45rem;
+    }
+
+    .service-list li:nth-child(n+5) {
+        display: none;
     }
 
     .contact-content {
+        display: grid;
         grid-template-columns: 1fr;
+        gap: 1rem;
     }
 
     .cta-buttons {
@@ -883,6 +984,48 @@ p {
     .contact-form button {
         width: 100%;
         align-self: stretch;
+    }
+
+    .contact-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .mobile-contact-bar {
+        position: fixed;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        z-index: 1001;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        padding: 8px;
+        border: 1px solid rgba(15, 157, 56, 0.2);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 12px 34px rgba(0, 0, 0, 0.18);
+    }
+
+    .mobile-contact-bar a,
+    .mobile-contact-bar button {
+        border: 0;
+        border-radius: 10px;
+        background: #f3f7f4;
+        color: var(--color-primary-dark);
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 800;
+        min-height: 44px;
+        padding: 9px 4px;
+        text-align: center;
+        text-decoration: none;
+    }
+
+    .mobile-contact-bar button {
+        background: var(--color-accent);
+        color: #ffffff;
     }
 }
 
@@ -909,9 +1052,12 @@ p {
     }
 
     .service-card,
-    .feature,
-    .project-item {
+    .feature {
         padding: 1.5rem;
+    }
+
+    .project-content {
+        padding: 1rem;
     }
 
     .nav-logo {
@@ -1239,4 +1385,36 @@ z-index:999;
 
 .hidden {
     display: none !important;
+}
+
+/* Final mobile conversion pass */
+.contact-card-main,
+.contact-card-details {
+    flex: 1 1 360px;
+    max-width: 560px;
+}
+
+.consult-modal {
+    z-index: 2000;
+}
+
+@media (max-width: 768px) {
+    .contact-card-main,
+    .contact-card-details {
+        max-width: none;
+        width: 100%;
+        margin: 0;
+    }
+
+    .contact-card h3 {
+        font-size: 1.2rem;
+    }
+
+    .contact-card p {
+        font-size: 0.95rem;
+    }
+
+    .footer {
+        padding-bottom: 5.5rem;
+    }
 }

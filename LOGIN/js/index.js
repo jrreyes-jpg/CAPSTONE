@@ -128,7 +128,7 @@ const initNewClientTooltip = () => {
 };
 
 const initConsultationModal = () => {
-    const openButtons = document.querySelectorAll('#consultBtn, #consultBtnSecondary');
+    const openButtons = document.querySelectorAll('#consultBtn, #consultBtnSecondary, #consultBtnMobile');
     const closeButton = document.getElementById('closeConsult');
     const modal = document.getElementById('consultModal');
 
